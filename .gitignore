@@ -1,3 +1,5 @@
-
+/build/
+/out/
+/.venv/
 __pycache__/
-*.pyc
+*.core

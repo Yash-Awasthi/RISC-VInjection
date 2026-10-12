@@ -1,0 +1,3527 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Yash-Awasthi <yashawasthi12032006@gmail.com>
+Date: Tue, 13 Oct 2026 02:57:57 +0530
+Subject: [PATCH] RISC-V: add Xattn, its builtin and the attention recognizer
+
+__builtin_riscv_attn emits attn; -mattn-recognize proves C multi-head attention loops equivalent and replaces them behind a runtime guard.
+---
+ gcc/config.gcc                                |    2 +-
+ gcc/config/riscv/riscv-attn-recog.cc          | 2059 +++++++++++++++++
+ gcc/config/riscv/riscv-builtins.cc            |   18 +
+ gcc/config/riscv/riscv-ext-xattn.def          |   35 +
+ gcc/config/riscv/riscv-ext.def                |    1 +
+ gcc/config/riscv/riscv-ext.opt                |    5 +
+ gcc/config/riscv/riscv-ftypes.def             |    1 +
+ gcc/config/riscv/riscv-passes.def             |    1 +
+ gcc/config/riscv/riscv-protos.h               |    3 +
+ gcc/config/riscv/riscv.md                     |    6 +-
+ gcc/config/riscv/riscv.opt                    |    5 +
+ gcc/config/riscv/t-riscv                      |    9 +-
+ gcc/config/riscv/xattn.def                    |    3 +
+ gcc/config/riscv/xattn.md                     |   40 +
+ gcc/doc/riscv-ext.texi                        |    4 +
+ gcc/testsuite/gcc.target/riscv/xattn-1.c      |   15 +
+ gcc/testsuite/gcc.target/riscv/xattn-2.c      |   15 +
+ gcc/testsuite/gcc.target/riscv/xattn-3.c      |   15 +
+ gcc/testsuite/gcc.target/riscv/xattn-4.c      |   15 +
+ gcc/testsuite/gcc.target/riscv/xattn-5.c      |   15 +
+ gcc/testsuite/gcc.target/riscv/xattn-6.c      |   15 +
+ gcc/testsuite/gcc.target/riscv/xattn-7.c      |    9 +
+ gcc/testsuite/gcc.target/riscv/xattn-8.c      |    7 +
+ .../gcc.target/riscv/xattn-recog-1.c          |   87 +
+ .../gcc.target/riscv/xattn-recog-10.c         |   86 +
+ .../gcc.target/riscv/xattn-recog-2.c          |   88 +
+ .../gcc.target/riscv/xattn-recog-3.c          |   87 +
+ .../gcc.target/riscv/xattn-recog-4.c          |   87 +
+ .../gcc.target/riscv/xattn-recog-5.c          |   87 +
+ .../gcc.target/riscv/xattn-recog-6.c          |   87 +
+ .../gcc.target/riscv/xattn-recog-7.c          |   87 +
+ .../gcc.target/riscv/xattn-recog-8.c          |   87 +
+ .../gcc.target/riscv/xattn-recog-9.c          |   89 +
+ 33 files changed, 3167 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/config/riscv/riscv-attn-recog.cc
+ create mode 100644 gcc/config/riscv/riscv-ext-xattn.def
+ create mode 100644 gcc/config/riscv/xattn.def
+ create mode 100644 gcc/config/riscv/xattn.md
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-1.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-2.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-3.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-4.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-5.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-6.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-7.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-8.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
+
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 743421768ea..723703d7dd6 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -569,7 +569,7 @@ pru-*-*)
+ 	;;
+ riscv*)
+ 	cpu_type=riscv
+-	extra_objs="riscv-builtins.o riscv-c.o riscv-sr.o riscv-shorten-memrefs.o riscv-selftests.o riscv-string.o"
++	extra_objs="riscv-builtins.o riscv-c.o riscv-sr.o riscv-shorten-memrefs.o riscv-selftests.o riscv-string.o riscv-attn-recog.o"
+ 	extra_objs="${extra_objs} riscv-v.o riscv-vsetvl.o riscv-vector-costs.o riscv-avlprop.o riscv-vect-permconst.o"
+ 	extra_objs="${extra_objs} riscv-vector-builtins.o riscv-vector-builtins-shapes.o riscv-vector-builtins-bases.o sifive-vector-builtins-bases.o andes-vector-builtins-bases.o"
+ 	extra_objs="${extra_objs} thead.o riscv-target-attr.o riscv-zicfilp.o riscv-bclr-lowest-set-bit.o riscv-opt-popretz.o"
+diff --git a/gcc/config/riscv/riscv-attn-recog.cc b/gcc/config/riscv/riscv-attn-recog.cc
+new file mode 100644
+index 00000000000..4e864a17a26
+--- /dev/null
++++ b/gcc/config/riscv/riscv-attn-recog.cc
+@@ -0,0 +1,2059 @@
++/* Recognize multi-head self-attention written as C loops and replace it with
++   the Xattn `attn' instruction.
++   Copyright (C) 2026 Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify it
++under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful, but
++WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* The pass looks for five sibling loop nests
++
++     Q = X Wq (+ bq)   K = X Wk (+ bk)   V = X Wv (+ bv)
++     per head and row: scores, running max, exp and sum, weighted sum of V
++     Y = C Wo (+ bo)
++
++   whose scratch buffers (Q, K, V, C and the score row) are local heap or
++   stack allocations, and proves that they compute exactly what `attn'
++   computes:
++
++   - every address is an exact polynomial in the dimensions and the loop
++     counters, evaluated with interval checks that rule out wrap-around in
++     every intermediate integer type;
++   - every floating-point operation, load, store and call in the nests is
++     matched against the instruction's definition, operand for operand and
++     in the same order, so results are bit-identical;
++   - every branch that is not a loop exit is decided under the runtime
++     guard 1 <= n <= ATTN_MAX_N, 1 <= e <= ATTN_MAX_E, h >= 1, d * h == e;
++   - stores do not alias any input, and the scratch buffers are only freed
++     afterwards.
++
++   The region is then preceded by that runtime guard; when it holds, one
++   `attn' replaces the whole region, otherwise the original loops run.  */
++
++#define IN_TARGET_CODE 1
++#define INCLUDE_MAP
++#define INCLUDE_SET
++#define INCLUDE_ALGORITHM
++#define INCLUDE_VECTOR
++
++#include "config.h"
++#include "system.h"
++#include "coretypes.h"
++#include "backend.h"
++#include "target.h"
++#include "tree.h"
++#include "gimple.h"
++#include "tree-pass.h"
++#include "ssa.h"
++#include "tm_p.h"
++#include "fold-const.h"
++#include "stor-layout.h"
++#include "gimple-iterator.h"
++#include "gimple-fold.h"
++#include "gimplify.h"
++#include "tree-cfg.h"
++#include "cfgloop.h"
++#include "cfghooks.h"
++#include "cfganal.h"
++#include "tree-into-ssa.h"
++#include "tree-scalar-evolution.h"
++#include "tree-ssa-loop.h"
++#include "tree-ssa-alias.h"
++#include "dumpfile.h"
++#include "real.h"
++#include "case-cfn-macros.h"
++#include "diagnostic-core.h"
++
++/* Implementation limits of attn (include/attn_abi.h in the Xattn
++   repository): larger problems trap, so the guard keeps them on the loop
++   path.  */
++static const HOST_WIDE_INT attn_max_n = 4096;
++static const HOST_WIDE_INT attn_max_e = 2048;
++
++/* attn_cfg.flags bits and descriptor layouts, also from attn_abi.h.  */
++static const unsigned attn_f_causal = 1;
++static const unsigned attn_f_scale = 2;
++
++/* Upper bound on any dimension or loop counter inside an accepted region;
++   the runtime guard establishes it.  */
++static const unsigned HOST_WIDE_INT atom_max = attn_max_n;
++
++namespace {
++
++/* ------------------------------------------------------------------ */
++/* Polynomials over SSA atoms with non-negative integer coefficients.  */
++
++typedef std::vector<unsigned> mono;
++
++struct poly
++{
++  std::map<mono, HOST_WIDE_INT> t;
++
++  static poly cst (HOST_WIDE_INT c)
++  {
++    poly p;
++    if (c)
++      p.t[mono ()] = c;
++    return p;
++  }
++
++  static poly atom (unsigned v)
++  {
++    poly p;
++    p.t[mono (1, v)] = 1;
++    return p;
++  }
++
++  poly operator+ (const poly &o) const
++  {
++    poly r = *this;
++    for (auto &kv : o.t)
++      if ((r.t[kv.first] += kv.second) == 0)
++	r.t.erase (kv.first);
++    return r;
++  }
++
++  poly operator* (const poly &o) const
++  {
++    poly r;
++    for (auto &a : t)
++      for (auto &b : o.t)
++	{
++	  mono m = a.first;
++	  m.insert (m.end (), b.first.begin (), b.first.end ());
++	  std::sort (m.begin (), m.end ());
++	  if ((r.t[m] += a.second * b.second) == 0)
++	    r.t.erase (m);
++	}
++    return r;
++  }
++
++  bool operator== (const poly &o) const { return t == o.t; }
++  bool operator!= (const poly &o) const { return t != o.t; }
++
++  /* True if this is a single atom with coefficient 1.  */
++  bool single_atom (unsigned *v) const
++  {
++    if (t.size () != 1 || t.begin ()->second != 1
++	|| t.begin ()->first.size () != 1)
++      return false;
++    *v = t.begin ()->first[0];
++    return true;
++  }
++
++  bool constant (HOST_WIDE_INT *c) const
++  {
++    if (t.empty ())
++      {
++	*c = 0;
++	return true;
++      }
++    if (t.size () != 1 || !t.begin ()->first.empty ())
++      return false;
++    *c = t.begin ()->second;
++    return true;
++  }
++};
++
++static poly
++P (unsigned v)
++{
++  return poly::atom (v);
++}
++
++static poly
++C (HOST_WIDE_INT c)
++{
++  return poly::cst (c);
++}
++
++/* A problem dimension: one atom or a constant.  */
++
++struct dim
++{
++  bool is_atom;
++  unsigned atom;
++  HOST_WIDE_INT cst;
++
++  poly as_poly () const { return is_atom ? P (atom) : C (cst); }
++  bool operator== (const dim &o) const
++  {
++    return is_atom == o.is_atom && (is_atom ? atom == o.atom : cst == o.cst);
++  }
++};
++
++static bool
++dim_of (const poly &p, dim *d)
++{
++  d->is_atom = p.single_atom (&d->atom);
++  if (d->is_atom)
++    return true;
++  return p.constant (&d->cst) && d->cst >= 1;
++}
++
++/* ------------------------------------------------------------------ */
++/* Per-loop facts.  */
++
++struct loop_info
++{
++  class loop *l;
++  tree iv;		/* header PHI: 0, +1 */
++  edge exit;
++  poly trip;		/* iterations per entry */
++  std::vector<basic_block> path;  /* blocks executed once per iteration */
++  std::vector<class loop *> kids;  /* child loops in execution order */
++  bool walked = false;
++};
++
++/* A matched matrix product OUT[r][c] = sum_k A[r][k] * B[k][c] (+ bias[c]).  */
++
++struct matmul
++{
++  class loop *outer;
++  tree a, b, out, bias;
++  dim r, k, c;
++};
++
++/* A matched attention core.  */
++
++struct attention
++{
++  class loop *outer;
++  tree q, k, v, c, p, mask, scale;
++  dim h, n, d, e;
++  bool causal;
++};
++
++class attn_recog
++{
++public:
++  attn_recog (function *f) : fun (f), changed (false) {}
++  unsigned run ();
++
++private:
++  function *fun;
++  bool changed;
++
++  /* State of the candidate being checked.  */
++  std::map<unsigned, tree> atoms;
++  std::map<class loop *, loop_info> linfo;
++  std::set<gimple *> matched;
++  hash_set<edge> dead;
++  std::vector<unsigned> guard_atoms;
++  /* Loops whose blocks count as "inside" for address evaluation.  */
++  std::vector<class loop *> scope;
++  /* Statements of the region's first block that precede the region.  */
++  hash_set<gimple *> pre;
++  /* Divisor a copied division may use (known non-zero), or NULL.  */
++  tree safe_divisor;
++  const char *why;
++
++  bool fail (const char *msg)
++  {
++    if (!why)
++      why = msg;
++    return false;
++  }
++
++  void reset ()
++  {
++    atoms.clear ();
++    linfo.clear ();
++    matched.clear ();
++    dead.empty ();
++    guard_atoms.clear ();
++    scope.clear ();
++    pre.empty ();
++    safe_divisor = NULL_TREE;
++    why = NULL;
++  }
++
++  /* Expression evaluation.  */
++  unsigned atom_id (tree ssa);
++  bool expand_int (tree t, poly &p, unsigned HOST_WIDE_INT &max, int depth);
++  bool expand_addr (tree t, tree &base, poly &off,
++		    unsigned HOST_WIDE_INT &max, int depth);
++  bool mem_access (tree ref, tree &base, poly &off);
++  bool float_type_p (tree t);
++
++  /* Control flow.  */
++  bool iv_phi_p (tree name, class loop **lp);
++  bool decide (gcond *cond, bool *taken);
++  bool analyze_loop (class loop *l);
++  bool walk_body (class loop *l, std::vector<class loop *> &kids);
++  bool on_path (class loop *l, basic_block bb);
++  tree live_value (gphi *phi);
++  bool edge_dead (edge e, int depth = 0);
++  bool in_nest (basic_block bb)
++  {
++    for (class loop *l : scope)
++      if (flow_bb_inside_loop_p (l, bb))
++	return true;
++    return false;
++  }
++  bool analyze_all (class loop *l);
++  bool walk_all (class loop *l);
++  bool stmt_in (gimple *g, class loop *l, bool body_only);
++
++  /* Patterns.  */
++  tree look (tree t);
++  bool def_assign (tree t, tree_code code, gassign **a);
++  tree reduction (class loop *l, tree lc, tree *prod);
++  bool load_of (tree t, class loop *l, tree &base, poly &off);
++  bool match_matmul (class loop *outer, matmul &m);
++  bool match_attention (class loop *outer, attention &a);
++  bool account (class loop *outer);
++
++  /* Region and rewrite.  */
++  bool find_region (std::vector<class loop *> &order, gimple *&start,
++		    basic_block &first, basic_block &exit);
++  bool glue_block (basic_block bb);
++  bool available (tree t, basic_block first);
++  bool glue_ok (gimple *g);
++  tree materialize (tree t, gimple_seq *seq, basic_block first,
++		    std::map<tree, tree> &copies, int depth);
++  void rewrite (const std::vector<class loop *> &order, matmul mm[4],
++		const attention &at, gimple *start, basic_block first,
++		basic_block exit, location_t loc);
++  bool try_attention (class loop *att);
++};
++
++/* ------------------------------------------------------------------ */
++/* Expression evaluation.  */
++
++unsigned
++attn_recog::atom_id (tree ssa)
++{
++  atoms[SSA_NAME_VERSION (ssa)] = ssa;
++  return SSA_NAME_VERSION (ssa);
++}
++
++bool
++attn_recog::float_type_p (tree t)
++{
++  return TYPE_MAIN_VARIANT (t) == float_type_node;
++}
++
++/* NAME is the counter of a loop inside the current nest: a header PHI
++   starting at 0 and stepping by 1.  */
++
++bool
++attn_recog::iv_phi_p (tree name, class loop **lp)
++{
++  gimple *def = SSA_NAME_DEF_STMT (name);
++  gphi *phi = dyn_cast <gphi *> (def);
++  if (!phi || !INTEGRAL_TYPE_P (TREE_TYPE (name)))
++    return false;
++  class loop *l = gimple_bb (phi)->loop_father;
++  if (l->header != gimple_bb (phi) || !in_nest (l->header))
++    return false;
++  if (gimple_phi_num_args (phi) != 2 || !loop_preheader_edge (l)
++      || !l->latch)
++    return false;
++  tree init = PHI_ARG_DEF_FROM_EDGE (phi, loop_preheader_edge (l));
++  tree next = PHI_ARG_DEF_FROM_EDGE (phi, loop_latch_edge (l));
++  if (!integer_zerop (init) || TREE_CODE (next) != SSA_NAME)
++    return false;
++  gassign *inc = dyn_cast <gassign *> (SSA_NAME_DEF_STMT (next));
++  if (!inc || gimple_assign_rhs_code (inc) != PLUS_EXPR
++      || gimple_assign_rhs1 (inc) != name
++      || !integer_onep (gimple_assign_rhs2 (inc)))
++    return false;
++  *lp = l;
++  return true;
++}
++
++/* Evaluate integer expression T as a polynomial.  MAX bounds its value
++   given every atom in [0, atom_max]; each operation is checked to fit its
++   type, so integer conversions never change a value.  */
++
++bool
++attn_recog::expand_int (tree t, poly &p, unsigned HOST_WIDE_INT &max,
++			int depth)
++{
++  if (depth > 32)
++    return fail ("address expression too deep");
++  if (TREE_CODE (t) == INTEGER_CST)
++    {
++      if (!tree_fits_uhwi_p (t) || tree_to_uhwi (t) > (1u << 20))
++	return fail ("negative or large constant in an address");
++      p = C (tree_to_uhwi (t));
++      max = tree_to_uhwi (t);
++      return true;
++    }
++  if (TREE_CODE (t) != SSA_NAME || !INTEGRAL_TYPE_P (TREE_TYPE (t)))
++    return fail ("unsupported operand in an address");
++
++  class loop *l;
++  if (iv_phi_p (t, &l))
++    {
++      p = P (atom_id (t));
++      max = atom_max;
++      return true;
++    }
++
++  gimple *def = SSA_NAME_DEF_STMT (t);
++  bool outside = SSA_NAME_IS_DEFAULT_DEF (t) || !in_nest (gimple_bb (def));
++  gassign *a = dyn_cast <gassign *> (def);
++  bool ok = false;
++  poly p1, p2;
++  unsigned HOST_WIDE_INT m1, m2;
++  if (a)
++    {
++      tree_code code = gimple_assign_rhs_code (a);
++      if ((CONVERT_EXPR_CODE_P (code) || code == SSA_NAME)
++	  && INTEGRAL_TYPE_P (TREE_TYPE (gimple_assign_rhs1 (a)))
++	  && TYPE_PRECISION (TREE_TYPE (t)) >= 32)
++	{
++	  ok = expand_int (gimple_assign_rhs1 (a), p, max, depth + 1);
++	  if (!ok)
++	    return false;
++	}
++      else if (code == PLUS_EXPR || code == MULT_EXPR)
++	{
++	  if (!expand_int (gimple_assign_rhs1 (a), p1, m1, depth + 1)
++	      || !expand_int (gimple_assign_rhs2 (a), p2, m2, depth + 1))
++	    return false;
++	  if (code == PLUS_EXPR)
++	    {
++	      p = p1 + p2;
++	      max = m1 + m2;
++	    }
++	  else
++	    {
++	      p = p1 * p2;
++	      max = (m1 && m2 > HOST_WIDE_INT_M1U / 4 / m1) ? HOST_WIDE_INT_M1U / 4
++		    : m1 * m2;
++	    }
++	  ok = true;
++	}
++    }
++  if (!ok)
++    {
++      /* Anything else is an opaque dimension, which must be invariant in
++	 the nest.  */
++      if (!outside)
++	return fail ("loop-variant value in an address is not affine");
++      p = P (atom_id (t));
++      max = atom_max;
++      return true;
++    }
++
++  tree type = TREE_TYPE (t);
++  unsigned prec = TYPE_PRECISION (type) - !TYPE_UNSIGNED (type);
++  if (max >= (HOST_WIDE_INT_1U << 61)
++      || (prec < 61 && max >= (HOST_WIDE_INT_1U << prec)))
++    return fail ("address arithmetic may wrap");
++  return true;
++}
++
++/* Split pointer T into BASE + OFF bytes.  */
++
++bool
++attn_recog::expand_addr (tree t, tree &base, poly &off,
++			 unsigned HOST_WIDE_INT &max, int depth)
++{
++  if (depth > 32 || TREE_CODE (t) != SSA_NAME || !POINTER_TYPE_P (TREE_TYPE (t)))
++    return fail ("unsupported address");
++  gimple *def = SSA_NAME_DEF_STMT (t);
++  gassign *a = dyn_cast <gassign *> (def);
++  if (a && gimple_assign_rhs_code (a) == POINTER_PLUS_EXPR)
++    {
++      poly o;
++      unsigned HOST_WIDE_INT m;
++      if (!expand_addr (gimple_assign_rhs1 (a), base, off, max, depth + 1)
++	  || !expand_int (gimple_assign_rhs2 (a), o, m, depth + 1))
++	return false;
++      off = off + o;
++      max += m;
++      return true;
++    }
++  if (a && (gimple_assign_rhs_code (a) == SSA_NAME
++	    || CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (a)))
++      && POINTER_TYPE_P (TREE_TYPE (gimple_assign_rhs1 (a))))
++    return expand_addr (gimple_assign_rhs1 (a), base, off, max, depth + 1);
++  if (!SSA_NAME_IS_DEFAULT_DEF (t) && in_nest (gimple_bb (def)))
++    return fail ("pointer computed inside the loops");
++  base = t;
++  off = poly ();
++  max = 0;
++  return true;
++}
++
++/* REF is a scalar float memory reference; split its address.  */
++
++bool
++attn_recog::mem_access (tree ref, tree &base, poly &off)
++{
++  if (TREE_CODE (ref) != MEM_REF || TREE_THIS_VOLATILE (ref)
++      || !float_type_p (TREE_TYPE (ref)))
++    return fail ("unsupported memory reference");
++  unsigned HOST_WIDE_INT max;
++  if (!expand_addr (TREE_OPERAND (ref, 0), base, off, max, 0))
++    return false;
++  tree o = TREE_OPERAND (ref, 1);
++  if (!tree_fits_uhwi_p (o))
++    return fail ("negative memory offset");
++  off = off + C (tree_to_uhwi (o));
++  return true;
++}
++
++/* ------------------------------------------------------------------ */
++/* Control flow.  */
++
++/* Decide COND assuming every atom is a dimension in [1, atom_max] or a
++   loop counter in [0, atom_max].  Atoms used are recorded so they can be
++   checked against the guarded dimensions later.  */
++
++bool
++attn_recog::decide (gcond *cond, bool *taken)
++{
++  tree lhs = gimple_cond_lhs (cond), rhs = gimple_cond_rhs (cond);
++  if (!INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
++    return false;
++  poly pl, pr;
++  unsigned HOST_WIDE_INT ml, mr;
++  const char *saved = why;
++  if (!expand_int (lhs, pl, ml, 0) || !expand_int (rhs, pr, mr, 0))
++    {
++      why = saved;
++      return false;
++    }
++  /* Lower bounds: counters are >= 0, other atoms >= 1.  */
++  auto lower = [&] (const poly &p) {
++    HOST_WIDE_INT lo = 0;
++    for (auto &kv : p.t)
++      {
++	HOST_WIDE_INT term = kv.second;
++	for (unsigned v : kv.first)
++	  {
++	    class loop *l;
++	    if (iv_phi_p (atoms[v], &l))
++	      term = 0;
++	    guard_atoms.push_back (v);
++	  }
++	lo += term;
++      }
++    return lo;
++  };
++  HOST_WIDE_INT lol = lower (pl), lor = lower (pr);
++  HOST_WIDE_INT hil = ml, hir = mr;
++  tree_code code = gimple_cond_code (cond);
++  bool known = false, val = false;
++  switch (code)
++    {
++    case GT_EXPR:
++      if (lol > hir) known = val = true;
++      else if (hil <= lor) known = true;
++      break;
++    case GE_EXPR:
++      if (lol >= hir) known = val = true;
++      else if (hil < lor) known = true;
++      break;
++    case LT_EXPR:
++      if (hil < lor) known = val = true;
++      else if (lol >= hir) known = true;
++      break;
++    case LE_EXPR:
++      if (hil <= lor) known = val = true;
++      else if (lol > hir) known = true;
++      break;
++    case NE_EXPR:
++      if (lol > hir || hil < lor) known = val = true;
++      break;
++    case EQ_EXPR:
++      if (lol > hir || hil < lor) known = true;
++      break;
++    default:
++      break;
++    }
++  if (!known)
++    return false;
++  *taken = val;
++  return true;
++}
++
++/* E is never taken: it was decided dead, or every way into its source
++   block is.  */
++
++bool
++attn_recog::edge_dead (edge e, int depth)
++{
++  if (dead.contains (e))
++    return true;
++  basic_block bb = e->src;
++  if (depth > 8 || EDGE_COUNT (bb->preds) == 0
++      || bb->loop_father->header == bb)
++    return false;
++  edge p;
++  edge_iterator ei;
++  FOR_EACH_EDGE (p, ei, bb->preds)
++    if (!edge_dead (p, depth + 1))
++      return false;
++  return true;
++}
++
++/* The value of PHI along its live incoming edges, if they all agree.  */
++
++tree
++attn_recog::live_value (gphi *phi)
++{
++  tree v = NULL_TREE;
++  for (unsigned i = 0; i < gimple_phi_num_args (phi); i++)
++    {
++      if (edge_dead (gimple_phi_arg_edge (phi, i)))
++	continue;
++      tree a = gimple_phi_arg_def (phi, i);
++      if (v && !operand_equal_p (v, a))
++	return NULL_TREE;
++      v = a;
++    }
++  return v;
++}
++
++/* Record the counter, exit and trip count of L.  The loop must be rotated:
++   its single exit tests the incremented counter after the body.  */
++
++bool
++attn_recog::analyze_loop (class loop *l)
++{
++  loop_info li;
++  li.l = l;
++  li.exit = single_exit (l);
++  if (!li.exit || !l->latch || !loop_preheader_edge (l)
++      || EDGE_COUNT (l->header->preds) != 2)
++    return fail ("loop is not in simple form");
++  gcond *cond = safe_dyn_cast <gcond *> (*gsi_last_bb (li.exit->src));
++  if (!cond || (li.exit->src == l->header && l->num_nodes > 2))
++    return fail ("loop exit is not a rotated counter test");
++
++  /* Normalise to "continue while A < B" or "A <= B".  */
++  tree_code code = gimple_cond_code (cond);
++  if (li.exit->flags & EDGE_TRUE_VALUE)
++    code = invert_tree_comparison (code, false);
++  tree a = gimple_cond_lhs (cond), b = gimple_cond_rhs (cond);
++  if (code == GT_EXPR || code == GE_EXPR)
++    {
++      std::swap (a, b);
++      code = swap_tree_comparison (code);
++    }
++  if (code != LT_EXPR && code != LE_EXPR && code != NE_EXPR)
++    return fail ("loop exit is not a counter bound");
++
++  /* A must be the incremented counter.  */
++  li.iv = NULL_TREE;
++  for (gphi_iterator gsi = gsi_start_phis (l->header); !gsi_end_p (gsi);
++       gsi_next (&gsi))
++    {
++      tree r = gimple_phi_result (gsi.phi ());
++      class loop *il;
++      if (!virtual_operand_p (r) && iv_phi_p (r, &il) && il == l
++	  && PHI_ARG_DEF_FROM_EDGE (gsi.phi (), loop_latch_edge (l)) == a)
++	li.iv = r;
++    }
++  if (!li.iv)
++    return fail ("loop is not counted by a 0, +1 induction variable");
++
++  poly bp;
++  unsigned HOST_WIDE_INT bm;
++  if (!expand_int (b, bp, bm, 0))
++    return false;
++  li.trip = code == LE_EXPR ? bp + C (1) : bp;
++  linfo[l] = li;
++  return true;
++}
++
++/* Walk one iteration of L from its header to its exit test, following
++   only live edges and stepping over child loops; record the blocks on the
++   way and the children in execution order.  */
++
++bool
++attn_recog::walk_body (class loop *l, std::vector<class loop *> &kids)
++{
++  loop_info &li = linfo[l];
++  basic_block bb = l->header;
++  for (unsigned steps = 0; steps < 1000; steps++)
++    {
++      li.path.push_back (bb);
++      if (bb == li.exit->src)
++	return true;
++
++      /* Entering a child loop?  */
++      edge e;
++      edge_iterator ei;
++      edge live = NULL;
++      unsigned nlive = 0;
++      FOR_EACH_EDGE (e, ei, bb->succs)
++	if (!dead.contains (e))
++	  {
++	    live = e;
++	    nlive++;
++	  }
++      if (nlive != 1)
++	{
++	  gcond *cond = safe_dyn_cast <gcond *> (*gsi_last_bb (bb));
++	  bool taken;
++	  if (!cond || !decide (cond, &taken))
++	    return fail ("branch inside the loops depends on data");
++	  edge t, f;
++	  extract_true_false_edges_from_block (bb, &t, &f);
++	  dead.add (taken ? f : t);
++	  live = taken ? t : f;
++	}
++      class loop *child = live->dest->loop_father;
++      if (child != l && loop_outer (child) == l
++	  && live->dest == child->header)
++	{
++	  if (loop_preheader_edge (child)->src != bb)
++	    return fail ("child loop has no preheader");
++	  kids.push_back (child);
++	  if (!linfo.count (child))
++	    return fail ("child loop not analysed");
++	  bb = linfo[child].exit->dest;
++	  continue;
++	}
++      if (!flow_bb_inside_loop_p (l, live->dest) || live->dest == l->latch
++	  || live->dest == l->header)
++	return fail ("unexpected control flow in loop body");
++      bb = live->dest;
++    }
++  return fail ("loop body too large");
++}
++
++bool
++attn_recog::analyze_all (class loop *l)
++{
++  if (!linfo.count (l) && !analyze_loop (l))
++    return false;
++  for (class loop *c = l->inner; c; c = c->next)
++    if (!analyze_all (c))
++      return false;
++  return true;
++}
++
++bool
++attn_recog::walk_all (class loop *l)
++{
++  for (class loop *c = l->inner; c; c = c->next)
++    if (!walk_all (c))
++      return false;
++  loop_info &li = linfo[l];
++  if (li.walked)
++    return true;
++  li.walked = true;
++  return walk_body (l, li.kids);
++}
++
++bool
++attn_recog::on_path (class loop *l, basic_block bb)
++{
++  for (basic_block b : linfo[l].path)
++    if (b == bb)
++      return true;
++  return false;
++}
++
++/* G executes exactly once per iteration of L (and not in a child loop
++   of L when BODY_ONLY).  */
++
++bool
++attn_recog::stmt_in (gimple *g, class loop *l, bool body_only)
++{
++  basic_block bb = gimple_bb (g);
++  if (body_only && bb->loop_father != l)
++    return false;
++  return on_path (l, bb);
++}
++
++/* ------------------------------------------------------------------ */
++/* Pattern matching.  */
++
++/* Look through merge PHIs (not loop headers) that carry one value on
++   every live edge, as partial redundancy elimination creates.  */
++
++tree
++attn_recog::look (tree t)
++{
++  for (int i = 0; i < 8 && TREE_CODE (t) == SSA_NAME; i++)
++    {
++      gphi *phi = dyn_cast <gphi *> (SSA_NAME_DEF_STMT (t));
++      if (!phi || gimple_bb (phi)->loop_father->header == gimple_bb (phi))
++	break;
++      tree v = live_value (phi);
++      if (!v || TREE_CODE (v) != SSA_NAME)
++	break;
++      matched.insert (phi);
++      t = v;
++    }
++  return t;
++}
++
++bool
++attn_recog::def_assign (tree t, tree_code code, gassign **a)
++{
++  t = look (t);
++  if (TREE_CODE (t) != SSA_NAME)
++    return false;
++  *a = dyn_cast <gassign *> (SSA_NAME_DEF_STMT (t));
++  return *a && gimple_assign_rhs_code (*a) == code;
++}
++
++/* LC is the value leaving loop L (directly or through an LCSSA PHI) of a
++   sum  acc = 0.0; acc = acc + prod  computed once per iteration of L, in
++   iteration order.  Return the PHI result and set *PROD.  */
++
++tree
++attn_recog::reduction (class loop *l, tree lc, tree *prod)
++{
++  lc = look (lc);
++  if (TREE_CODE (lc) != SSA_NAME)
++    return NULL_TREE;
++  gimple *d = SSA_NAME_DEF_STMT (lc);
++  if (gphi *lcssa = dyn_cast <gphi *> (d))
++    {
++      if (gimple_bb (lcssa) != linfo[l].exit->dest)
++	return NULL_TREE;
++      tree v = live_value (lcssa);
++      if (!v)
++	return NULL_TREE;
++      matched.insert (lcssa);
++      lc = v;
++    }
++  gassign *add;
++  if (!def_assign (lc, PLUS_EXPR, &add) || !stmt_in (add, l, true))
++    return NULL_TREE;
++  tree acc = gimple_assign_rhs1 (add), p = gimple_assign_rhs2 (add);
++  for (int swap = 0; swap < 2; swap++, std::swap (acc, p))
++    {
++      if (TREE_CODE (acc) != SSA_NAME)
++	continue;
++      gphi *phi = dyn_cast <gphi *> (SSA_NAME_DEF_STMT (acc));
++      if (!phi || gimple_bb (phi) != l->header)
++	continue;
++      tree init = PHI_ARG_DEF_FROM_EDGE (phi, loop_preheader_edge (l));
++      tree next = PHI_ARG_DEF_FROM_EDGE (phi, loop_latch_edge (l));
++      if (next != lc || TREE_CODE (init) != REAL_CST
++	  || !real_identical (TREE_REAL_CST_PTR (init), &dconst0))
++	continue;
++      matched.insert (phi);
++      matched.insert (add);
++      *prod = p;
++      return acc;
++    }
++  return NULL_TREE;
++}
++
++/* T is a float load executed once per iteration of L.  */
++
++bool
++attn_recog::load_of (tree t, class loop *l, tree &base, poly &off)
++{
++  gassign *ld;
++  t = look (t);
++  if (TREE_CODE (t) != SSA_NAME
++      || !(ld = dyn_cast <gassign *> (SSA_NAME_DEF_STMT (t)))
++      || !gimple_assign_load_p (ld) || !stmt_in (ld, l, true))
++    return fail ("expected a load");
++  if (!mem_access (gimple_assign_rhs1 (ld), base, off))
++    return false;
++  matched.insert (ld);
++  return true;
++}
++
++/* OUTER heads a nest  for r  for c { acc = 0; for k acc += A[r][k] * B[k][c];
++   OUT[r][c] = acc (+ bias[c]); }  with r and c in either order.  */
++
++bool
++attn_recog::match_matmul (class loop *outer, matmul &m)
++{
++  class loop *mid = outer->inner;
++  if (!mid || mid->next || !mid->inner || mid->inner->next
++      || mid->inner->inner)
++    return fail ("not a three-deep loop nest");
++  class loop *in = mid->inner;
++  if (!analyze_all (outer) || !walk_all (outer))
++    return false;
++
++  /* The single store, in the middle loop's body.  */
++  gassign *st = NULL;
++  basic_block *body = get_loop_body (outer);
++  for (unsigned i = 0; i < outer->num_nodes; i++)
++    for (gimple_stmt_iterator gsi = gsi_start_bb (body[i]); !gsi_end_p (gsi);
++	 gsi_next (&gsi))
++      if (gimple_vdef (gsi_stmt (gsi)))
++	{
++	  gassign *s = dyn_cast <gassign *> (gsi_stmt (gsi));
++	  if (st || !s || !gimple_store_p (s))
++	    {
++	      free (body);
++	      return fail ("matrix product nest has extra side effects");
++	    }
++	  st = s;
++	}
++  free (body);
++  if (!st || !stmt_in (st, mid, true))
++    return fail ("matrix product nest has no store");
++
++  tree ob;
++  poly ooff;
++  if (!mem_access (gimple_assign_lhs (st), ob, ooff))
++    return false;
++  matched.insert (st);
++
++  tree val = gimple_assign_rhs1 (st), prod = NULL_TREE, acc;
++  m.bias = NULL_TREE;
++  poly boff;
++  gassign *badd;
++  if (!(acc = reduction (in, val, &prod)))
++    {
++      if (!def_assign (val, PLUS_EXPR, &badd) || !stmt_in (badd, mid, true))
++	return fail ("store is not a dot product");
++      tree x = gimple_assign_rhs1 (badd), y = gimple_assign_rhs2 (badd);
++      if (!(acc = reduction (in, x, &prod)))
++	{
++	  std::swap (x, y);
++	  acc = reduction (in, x, &prod);
++	}
++      if (!acc || !load_of (y, mid, m.bias, boff))
++	return fail ("store is not a dot product plus bias");
++      matched.insert (badd);
++    }
++
++  gassign *mul;
++  if (!def_assign (prod, MULT_EXPR, &mul) || !stmt_in (mul, in, true))
++    return fail ("dot product term is not a product");
++  matched.insert (mul);
++  tree b1, b2;
++  poly o1, o2;
++  if (!load_of (gimple_assign_rhs1 (mul), in, b1, o1)
++      || !load_of (gimple_assign_rhs2 (mul), in, b2, o2))
++    return false;
++
++  /* Assign roles from the address polynomials.  */
++  unsigned io = atom_id (linfo[outer].iv), im = atom_id (linfo[mid].iv);
++  unsigned ik = atom_id (linfo[in].iv);
++  dim tk;
++  if (!dim_of (linfo[in].trip, &tk))
++    return fail ("reduction length is not a dimension");
++  for (int order = 0; order < 2; order++)
++    {
++      unsigned ir = order ? im : io, ic = order ? io : im;
++      class loop *lr = order ? mid : outer, *lc = order ? outer : mid;
++      dim tr, tc;
++      if (!dim_of (linfo[lr].trip, &tr) || !dim_of (linfo[lc].trip, &tc))
++	continue;
++      poly R = P (ir), Cc = P (ic), K = P (ik);
++      poly want_out = C (4) * tc.as_poly () * R + C (4) * Cc;
++      poly want_a = C (4) * tk.as_poly () * R + C (4) * K;
++      poly want_b = C (4) * tc.as_poly () * K + C (4) * Cc;
++      if (ooff != want_out)
++	continue;
++      for (int s = 0; s < 2; s++)
++	{
++	  tree ab = s ? b2 : b1, bb = s ? b1 : b2;
++	  const poly &oa = s ? o2 : o1, &ob2 = s ? o1 : o2;
++	  if (oa == want_a && ob2 == want_b
++	      && (!m.bias || boff == C (4) * Cc))
++	    {
++	      m.outer = outer;
++	      m.a = ab;
++	      m.b = bb;
++	      m.out = ob;
++	      m.r = tr;
++	      m.k = tk;
++	      m.c = tc;
++	      return true;
++	    }
++	}
++    }
++  return fail ("addresses do not form a row-major matrix product");
++}
++
++/* OUTER heads the per-head attention nest (see the file comment).  */
++
++bool
++attn_recog::match_attention (class loop *outer, attention &at)
++{
++  class loop *l2 = outer->inner;
++  if (!l2 || l2->next)
++    return fail ("attention nest: expected two outer loops");
++  if (!analyze_all (outer) || !walk_all (outer))
++    return false;
++  std::vector<class loop *> &kids = linfo[l2].kids;
++  if (kids.size () != 3)
++    return fail ("attention nest: expected three loops per row");
++  class loop *ls = kids[0], *le = kids[1], *lo = kids[2];
++  if (!ls->inner || ls->inner->next || ls->inner->inner || le->inner
++      || !lo->inner || lo->inner->next || lo->inner->inner)
++    return fail ("attention nest: unexpected loop shape");
++  class loop *ldot = ls->inner, *lw = lo->inner;
++
++  /* Exactly three stores and one call.  */
++  gassign *st_s = NULL, *st_e = NULL, *st_o = NULL;
++  gcall *ex = NULL;
++  basic_block *body = get_loop_body (outer);
++  bool extra = false;
++  for (unsigned i = 0; i < outer->num_nodes; i++)
++    for (gimple_stmt_iterator gsi = gsi_start_bb (body[i]); !gsi_end_p (gsi);
++	 gsi_next (&gsi))
++      {
++	gimple *g = gsi_stmt (gsi);
++	if (gcall *c = dyn_cast <gcall *> (g))
++	  {
++	    if (ex)
++	      extra = true;
++	    ex = c;
++	  }
++	else if (gimple_vdef (g))
++	  {
++	    gassign *s = dyn_cast <gassign *> (g);
++	    basic_block b = gimple_bb (g);
++	    if (!s || !gimple_store_p (s))
++	      extra = true;
++	    else if (b->loop_father == ls && !st_s)
++	      st_s = s;
++	    else if (b->loop_father == le && !st_e)
++	      st_e = s;
++	    else if (b->loop_father == lo && !st_o)
++	      st_o = s;
++	    else
++	      extra = true;
++	  }
++      }
++  free (body);
++  if (extra || !st_s || !st_e || !st_o || !ex)
++    return fail ("attention nest: unexpected side effects");
++
++  /* Roles of the two outer loops come from the Q address.  */
++  dim t_dot, t_o, t1, t2;
++  if (!dim_of (linfo[ldot].trip, &t_dot) || !dim_of (linfo[lo].trip, &t_o)
++      || !(t_dot == t_o) || !dim_of (linfo[outer].trip, &t1)
++      || !dim_of (linfo[l2].trip, &t2))
++    return fail ("attention nest: head width or loop counts unknown");
++  at.d = t_dot;
++  poly D = at.d.as_poly ();
++  unsigned i1 = atom_id (linfo[outer].iv), i2 = atom_id (linfo[l2].iv);
++  unsigned js = atom_id (linfo[ls].iv), je = atom_id (linfo[le].iv);
++  unsigned jw = atom_id (linfo[lw].iv), td = atom_id (linfo[ldot].iv);
++  unsigned to = atom_id (linfo[lo].iv);
++
++  /* Row length is the same in all three inner loops: n or i + 1.  */
++  poly lim = linfo[ls].trip;
++  if (linfo[le].trip != lim || linfo[lw].trip != lim)
++    return fail ("attention nest: inner loops differ in length");
++
++  /* Scores: s = sum_t Q[i][hd*d+t] * K[j][hd*d+t]; s = s * scale (+ M).  */
++  if (!stmt_in (st_s, ls, true))
++    return fail ("score store is conditional");
++  tree pb;
++  poly poff;
++  if (!mem_access (gimple_assign_lhs (st_s), pb, poff) || poff != C (4) * P (js))
++    return fail ("score row is not p[j]");
++  matched.insert (st_s);
++  tree s3 = gimple_assign_rhs1 (st_s), s2 = s3;
++  gassign *a;
++  at.mask = NULL_TREE;
++  poly moff;
++  if (def_assign (s3, PLUS_EXPR, &a) && stmt_in (a, ls, true))
++    {
++      tree x = gimple_assign_rhs1 (a), y = gimple_assign_rhs2 (a);
++      gassign *mm;
++      if (!def_assign (x, MULT_EXPR, &mm))
++	std::swap (x, y);
++      if (!load_of (y, ls, at.mask, moff))
++	return false;
++      s2 = x;
++      matched.insert (a);
++    }
++  gassign *sc;
++  if (!def_assign (s2, MULT_EXPR, &sc) || !stmt_in (sc, ls, true))
++    return fail ("score is not scaled by a multiplication");
++  matched.insert (sc);
++  tree prod, s_lc = gimple_assign_rhs1 (sc);
++  at.scale = gimple_assign_rhs2 (sc);
++  if (!reduction (ldot, s_lc, &prod))
++    {
++      std::swap (s_lc, at.scale);
++      if (!reduction (ldot, s_lc, &prod))
++	return fail ("score is not a dot product");
++    }
++  if (TREE_CODE (at.scale) == SSA_NAME
++      && !SSA_NAME_IS_DEFAULT_DEF (at.scale)
++      && in_nest (gimple_bb (SSA_NAME_DEF_STMT (at.scale))))
++    return fail ("scale varies inside the loops");
++  if (TREE_CODE (at.scale) != SSA_NAME && TREE_CODE (at.scale) != REAL_CST)
++    return fail ("scale is not a value");
++  gassign *qk;
++  if (!def_assign (prod, MULT_EXPR, &qk) || !stmt_in (qk, ldot, true))
++    return fail ("score term is not a product");
++  matched.insert (qk);
++  tree qb, kb;
++  poly qo, ko;
++  if (!load_of (gimple_assign_rhs1 (qk), ldot, qb, qo)
++      || !load_of (gimple_assign_rhs2 (qk), ldot, kb, ko))
++    return false;
++
++  /* Which outer loop is the head loop?  */
++  bool found = false;
++  for (int order = 0; order < 2 && !found; order++)
++    {
++      unsigned ih = order ? i2 : i1, ii = order ? i1 : i2;
++      dim th = order ? t2 : t1, tn = order ? t1 : t2;
++      poly H = P (ih), I = P (ii);
++      for (int s = 0; s < 2 && !found; s++)
++	{
++	  const poly &oq = s ? ko : qo, &ok = s ? qo : ko;
++	  /* e is the coefficient of i in the Q address.  */
++	  for (auto &kv : oq.t)
++	    {
++	      if (kv.first.size () != 2 || kv.second != 4)
++		continue;
++	      unsigned other;
++	      if (kv.first[0] == ii)
++		other = kv.first[1];
++	      else if (kv.first[1] == ii)
++		other = kv.first[0];
++	      else
++		continue;
++	      dim e = { true, other, 0 };
++	      poly E = e.as_poly ();
++	      if (oq == C (4) * E * I + C (4) * D * H + C (4) * P (td)
++		  && ok == C (4) * E * P (js) + C (4) * D * H + C (4) * P (td))
++		{
++		  at.e = e;
++		  at.h = th;
++		  at.n = tn;
++		  at.q = s ? kb : qb;
++		  at.k = s ? qb : kb;
++		  found = true;
++		  i1 = ii;
++		  i2 = ih;
++		  break;
++		}
++	    }
++	}
++    }
++  if (!found)
++    return fail ("score addresses do not match per-head Q and K");
++  unsigned ii = i1, ih = i2;
++  poly E = at.e.as_poly (), N = at.n.as_poly ();
++  poly H = P (ih), I = P (ii);
++  if (lim == N)
++    at.causal = false;
++  else if (lim == I + C (1))
++    at.causal = true;
++  else
++    return fail ("row loops neither cover n keys nor are causal");
++  if (at.mask && moff != C (4) * N * I + C (4) * P (js))
++    return fail ("mask is not indexed [i][j]");
++
++  /* Running maximum over the scores.  */
++  gphi *mxphi = NULL;
++  for (gphi_iterator gsi = gsi_start_phis (ls->header); !gsi_end_p (gsi);
++       gsi_next (&gsi))
++    {
++      gphi *phi = gsi.phi ();
++      tree r = gimple_phi_result (phi);
++      if (virtual_operand_p (r) || !float_type_p (TREE_TYPE (r)))
++	continue;
++      tree init = PHI_ARG_DEF_FROM_EDGE (phi, loop_preheader_edge (ls));
++      if (mxphi || TREE_CODE (init) != REAL_CST
++	  || !real_isinf (TREE_REAL_CST_PTR (init))
++	  || !real_isneg (TREE_REAL_CST_PTR (init)))
++	return fail ("running maximum does not start at -inf");
++      mxphi = phi;
++    }
++  if (!mxphi)
++    return fail ("no running maximum");
++  tree mx = gimple_phi_result (mxphi);
++  tree mxn = PHI_ARG_DEF_FROM_EDGE (mxphi, loop_latch_edge (ls));
++  gassign *upd = NULL;
++  bool upd_ok = false;
++  if (def_assign (mxn, COND_EXPR, &upd) && stmt_in (upd, ls, true))
++    {
++      gassign *cmp;
++      tree c = gimple_assign_rhs1 (upd);
++      if (gimple_assign_rhs2 (upd) == s3 && gimple_assign_rhs3 (upd) == mx
++	  && TREE_CODE (c) == SSA_NAME
++	  && (cmp = dyn_cast <gassign *> (SSA_NAME_DEF_STMT (c)))
++	  && stmt_in (cmp, ls, true)
++	  && ((gimple_assign_rhs_code (cmp) == GT_EXPR
++	       && gimple_assign_rhs1 (cmp) == s3
++	       && gimple_assign_rhs2 (cmp) == mx)
++	      || (gimple_assign_rhs_code (cmp) == LT_EXPR
++		  && gimple_assign_rhs1 (cmp) == mx
++		  && gimple_assign_rhs2 (cmp) == s3)))
++	{
++	  matched.insert (cmp);
++	  upd_ok = true;
++	}
++    }
++  else if (def_assign (mxn, MAX_EXPR, &upd) && stmt_in (upd, ls, true)
++	   && !HONOR_NANS (float_type_node)
++	   && !HONOR_SIGNED_ZEROS (float_type_node))
++    {
++      tree x = gimple_assign_rhs1 (upd), y = gimple_assign_rhs2 (upd);
++      upd_ok = (x == s3 && y == mx) || (x == mx && y == s3);
++    }
++  if (!upd_ok)
++    return fail ("running maximum is not  if (s > max) max = s");
++  matched.insert (upd);
++  matched.insert (mxphi);
++
++  /* Exponentials: p[j] = expf (p[j] - max); l += p[j].  */
++  if (!stmt_in (ex, le, true) || !stmt_in (st_e, le, true))
++    return fail ("exponential loop is conditional");
++  combined_fn fn = gimple_call_combined_fn (ex);
++  if ((fn != CFN_BUILT_IN_EXPF && fn != CFN_EXP) || gimple_vdef (ex)
++      || gimple_call_num_args (ex) != 1 || !gimple_call_lhs (ex)
++      || !float_type_p (TREE_TYPE (gimple_call_lhs (ex))))
++    return fail ("exponential is not a const call to expf "
++		 "(compile with -fno-math-errno)");
++  tree eb;
++  poly eo;
++  if (!mem_access (gimple_assign_lhs (st_e), eb, eo) || eb != pb
++      || eo != C (4) * P (je) || gimple_assign_rhs1 (st_e) != gimple_call_lhs (ex))
++    return fail ("exponential is not stored back to p[j]");
++  matched.insert (st_e);
++  matched.insert (ex);
++  gassign *sub;
++  if (!def_assign (gimple_call_arg (ex, 0), MINUS_EXPR, &sub)
++      || !stmt_in (sub, le, true))
++    return fail ("exponent is not p[j] - max");
++  tree lb;
++  poly lo2;
++  if (!load_of (gimple_assign_rhs1 (sub), le, lb, lo2) || lb != pb
++      || lo2 != C (4) * P (je))
++    return fail ("exponent does not read p[j]");
++  tree m2 = gimple_assign_rhs2 (sub);
++  gphi *mlc;
++  if (TREE_CODE (m2) != SSA_NAME
++      || !(mlc = dyn_cast <gphi *> (SSA_NAME_DEF_STMT (m2)))
++      || gimple_bb (mlc) != linfo[ls].exit->dest || live_value (mlc) != mxn)
++    return fail ("exponent does not subtract the final maximum");
++  matched.insert (mlc);
++  matched.insert (sub);
++  tree sum_prod;
++  gphi *llc = NULL;
++
++  /* Weighted sum: C[i][hd*d+t] = (sum_j p[j] * V[j][hd*d+t]) / l.  */
++  if (!stmt_in (st_o, lo, true))
++    return fail ("output store is conditional");
++  tree cb;
++  poly co;
++  if (!mem_access (gimple_assign_lhs (st_o), cb, co)
++      || co != C (4) * E * I + C (4) * D * H + C (4) * P (to))
++    return fail ("attention output is not C[i][hd*d+t]");
++  matched.insert (st_o);
++  gassign *dv;
++  if (!def_assign (gimple_assign_rhs1 (st_o), RDIV_EXPR, &dv)
++      || !stmt_in (dv, lo, true))
++    return fail ("attention output is not divided by the sum");
++  matched.insert (dv);
++  tree wprod;
++  if (!reduction (lw, gimple_assign_rhs1 (dv), &wprod))
++    return fail ("attention output is not a weighted sum");
++  tree l_lc = gimple_assign_rhs2 (dv);
++  if (TREE_CODE (l_lc) != SSA_NAME
++      || !(llc = dyn_cast <gphi *> (SSA_NAME_DEF_STMT (l_lc)))
++      || gimple_bb (llc) != linfo[le].exit->dest)
++    return fail ("divisor is not the exponential sum");
++  if (!reduction (le, l_lc, &sum_prod) || sum_prod != gimple_call_lhs (ex))
++    return fail ("divisor is not the sum of the exponentials");
++  gassign *pv;
++  if (!def_assign (wprod, MULT_EXPR, &pv) || !stmt_in (pv, lw, true))
++    return fail ("weighted sum term is not a product");
++  matched.insert (pv);
++  tree w1, w2;
++  poly wo1, wo2;
++  if (!load_of (gimple_assign_rhs1 (pv), lw, w1, wo1)
++      || !load_of (gimple_assign_rhs2 (pv), lw, w2, wo2))
++    return false;
++  if (w1 != pb)
++    {
++      std::swap (w1, w2);
++      std::swap (wo1, wo2);
++    }
++  if (w1 != pb || wo1 != C (4) * P (jw)
++      || wo2 != C (4) * E * P (jw) + C (4) * D * H + C (4) * P (to))
++    return fail ("weighted sum does not read p[j] and V[j][hd*d+t]");
++
++  at.outer = outer;
++  at.v = w2;
++  at.c = cb;
++  at.p = pb;
++  return true;
++}
++
++/* Every statement in the nest under OUTER is loop control, side-effect
++   free integer arithmetic, or matched.  */
++
++bool
++attn_recog::account (class loop *outer)
++{
++  basic_block *body = get_loop_body (outer);
++  bool ok = true;
++  for (unsigned i = 0; i < outer->num_nodes && ok; i++)
++    {
++      basic_block bb = body[i];
++      for (gphi_iterator gsi = gsi_start_phis (bb); !gsi_end_p (gsi);
++	   gsi_next (&gsi))
++	{
++	  tree r = gimple_phi_result (gsi.phi ());
++	  if (!virtual_operand_p (r) && !INTEGRAL_TYPE_P (TREE_TYPE (r))
++	      && !matched.count (gsi.phi ()))
++	    ok = fail ("unmatched floating-point value in the loops");
++	}
++      for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
++	   gsi_next (&gsi))
++	{
++	  gimple *g = gsi_stmt (gsi);
++	  if (is_gimple_debug (g) || gimple_code (g) == GIMPLE_LABEL
++	      || matched.count (g))
++	    continue;
++	  if (gimple_code (g) == GIMPLE_COND)
++	    {
++	      bool is_exit = false;
++	      for (auto &kv : linfo)
++		if (kv.second.exit->src == bb)
++		  is_exit = true;
++	      bool taken;
++	      if (!is_exit && !decide (as_a <gcond *> (g), &taken))
++		ok = fail ("data-dependent branch in the loops");
++	      continue;
++	    }
++	  gassign *a = dyn_cast <gassign *> (g);
++	  if (!a || gimple_vuse (a) || gimple_could_trap_p (a)
++	      || !(INTEGRAL_TYPE_P (TREE_TYPE (gimple_assign_lhs (a)))
++		   || POINTER_TYPE_P (TREE_TYPE (gimple_assign_lhs (a)))))
++	    {
++	      ok = fail ("unmatched statement in the loops");
++	      break;
++	    }
++	  for (unsigned o = 1; o < gimple_num_ops (a); o++)
++	    if (FLOAT_TYPE_P (TREE_TYPE (gimple_op (a, o))))
++	      ok = fail ("unmatched floating-point comparison");
++	}
++    }
++  free (body);
++  return ok;
++}
++
++/* ------------------------------------------------------------------ */
++/* The region.  */
++
++static bool int_division_p (gassign *a);
++
++/* G may sit between the nests: no memory access and no side effect.
++   Divisions are allowed here; materialize only copies them once the
++   divisor is known to be non-zero.  */
++
++bool
++attn_recog::glue_ok (gimple *g)
++{
++  if (is_gimple_debug (g) || gimple_code (g) == GIMPLE_LABEL
++      || gimple_code (g) == GIMPLE_COND)
++    return true;
++  if (gimple_vuse (g) || gimple_vdef (g) || gimple_has_volatile_ops (g))
++    return false;
++  if (gassign *a = dyn_cast <gassign *> (g))
++    return !gimple_could_trap_p (a) || int_division_p (a)
++	   || FLOAT_TYPE_P (TREE_TYPE (gimple_assign_lhs (a)));
++  if (gcall *c = dyn_cast <gcall *> (g))
++    return gimple_call_lhs (c) && (gimple_call_flags (c) & ECF_CONST)
++	   && !gimple_call_internal_p (c);
++  return false;
++}
++
++/* A must not run before its divisor is known to be non-zero.  */
++
++static bool
++int_division_p (gassign *a)
++{
++  switch (gimple_assign_rhs_code (a))
++    {
++    case TRUNC_DIV_EXPR:
++    case TRUNC_MOD_EXPR:
++    case EXACT_DIV_EXPR:
++    case CEIL_DIV_EXPR:
++    case FLOOR_DIV_EXPR:
++    case ROUND_DIV_EXPR:
++      return INTEGRAL_TYPE_P (TREE_TYPE (gimple_assign_lhs (a)));
++    default:
++      return false;
++    }
++}
++
++/* Every statement of BB that belongs to the region is glue.  */
++
++bool
++attn_recog::glue_block (basic_block bb)
++{
++  for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
++       gsi_next (&gsi))
++    if (!pre.contains (gsi_stmt (gsi)) && !glue_ok (gsi_stmt (gsi)))
++      return false;
++  return true;
++}
++
++/* Find the single-entry single-exit region holding the nests in ORDER and
++   only glue between them.  START is the last statement of FIRST that
++   precedes the region (NULL if the region starts at FIRST's beginning);
++   EXIT is the block the region falls into.  */
++
++bool
++attn_recog::find_region (std::vector<class loop *> &order, gimple *&start,
++			 basic_block &first, basic_block &exit)
++{
++  class loop *parent = loop_outer (order[0]);
++  for (class loop *l : order)
++    if (loop_outer (l) != parent)
++      return fail ("nests are not siblings");
++
++  /* Entry: climb the dominator tree from the point that dominates every
++     nest while blocks are glue.  */
++  basic_block bb = loop_preheader_edge (order[0])->src;
++  for (class loop *l : order)
++    bb = nearest_common_dominator (CDI_DOMINATORS, bb,
++				   loop_preheader_edge (l)->src);
++  start = NULL;
++  for (;;)
++    {
++      gimple *last_bad = NULL;
++      for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
++	   gsi_next (&gsi))
++	if (!glue_ok (gsi_stmt (gsi)))
++	  last_bad = gsi_stmt (gsi);
++      if (last_bad)
++	{
++	  if (is_ctrl_stmt (last_bad) || bb->loop_father != parent)
++	    return fail ("region has no single entry");
++	  first = bb;
++	  start = last_bad;
++	  break;
++	}
++      basic_block up = get_immediate_dominator (CDI_DOMINATORS, bb);
++      if (!up || up == ENTRY_BLOCK_PTR_FOR_FN (fun)
++	  || up->loop_father != parent || up == parent->header)
++	{
++	  if (!single_pred_p (bb) || !gsi_end_p (gsi_start_nonvirtual_phis (bb)))
++	    return fail ("region has no single entry");
++	  first = bb;
++	  break;
++	}
++      bb = up;
++    }
++  if (start)
++    for (gimple_stmt_iterator gsi = gsi_for_stmt (start); !gsi_end_p (gsi);
++	 gsi_prev (&gsi))
++      pre.add (gsi_stmt (gsi));
++
++  /* Walk forward along live edges until a block that every path from the
++     entry reaches.  The first three nests (the projections) may run in
++     any order; the attention and the output product must follow.  */
++  bb = first;
++  unsigned next = 0;
++  bool seen[5] = { false, false, false, false, false };
++  exit = NULL;
++  for (unsigned steps = 0; steps < 10000; steps++)
++    {
++      if (next == order.size ()
++	  && dominated_by_p (CDI_POST_DOMINATORS, first, bb) && bb != first)
++	{
++	  exit = bb;
++	  break;
++	}
++      int k = -1;
++      for (unsigned i = 0; i < order.size (); i++)
++	if (!seen[i] && loop_preheader_edge (order[i])->src == bb
++	    && (i < 3 ? next < 3 : i == next))
++	  k = i;
++      if (k >= 0)
++	{
++	  if (!glue_block (bb))
++	    return fail ("side effect before a nest");
++	  seen[k] = true;
++	  bb = linfo[order[k]].exit->dest;
++	  next++;
++	  continue;
++	}
++      if (bb->loop_father != parent || bb == parent->latch
++	  || bb == EXIT_BLOCK_PTR_FOR_FN (fun))
++	return fail ("another loop or a return sits between the nests");
++      if (!glue_block (bb))
++	return fail ("side effect between the nests");
++      edge e, live = NULL;
++      edge_iterator ei;
++      unsigned nlive = 0;
++      FOR_EACH_EDGE (e, ei, bb->succs)
++	if (!dead.contains (e))
++	  {
++	    live = e;
++	    nlive++;
++	  }
++      if (nlive != 1)
++	{
++	  gcond *cond = safe_dyn_cast <gcond *> (*gsi_last_bb (bb));
++	  bool taken;
++	  if (!cond || !decide (cond, &taken))
++	    return fail ("data-dependent branch between the nests");
++	  edge t, f;
++	  extract_true_false_edges_from_block (bb, &t, &f);
++	  dead.add (taken ? f : t);
++	  live = taken ? t : f;
++	}
++      bb = live->dest;
++    }
++  if (!exit || next != order.size ())
++    return fail ("nests are not executed once each, in dependence order");
++  if (!gsi_end_p (gsi_start_nonvirtual_phis (exit)))
++    return fail ("values flow out of the region");
++
++  /* The region is every block between FIRST and EXIT.  Nothing may enter
++     it from outside or leave it other than into EXIT, and nothing it
++     defines may be used after it.  */
++  auto inside = [&] (basic_block b) {
++    return b != exit && dominated_by_p (CDI_DOMINATORS, b, first)
++	   && dominated_by_p (CDI_POST_DOMINATORS, b, exit);
++  };
++  basic_block b;
++  FOR_EACH_BB_FN (b, fun)
++    {
++      if (!inside (b))
++	continue;
++      edge e;
++      edge_iterator ei;
++      FOR_EACH_EDGE (e, ei, b->succs)
++	if (e->dest != exit && !inside (e->dest))
++	  return fail ("region has a second exit");
++      if (b != first)
++	FOR_EACH_EDGE (e, ei, b->preds)
++	  if (!inside (e->src))
++	    return fail ("region has a second entry");
++      if (b->loop_father != parent)
++	{
++	  bool ours = false;
++	  for (class loop *l : order)
++	    if (flow_bb_inside_loop_p (l, b))
++	      ours = true;
++	  if (!ours)
++	    return fail ("region contains other loops");
++	}
++      auto escapes = [&] (tree r) {
++	imm_use_iterator ui;
++	gimple *use;
++	FOR_EACH_IMM_USE_STMT (use, ui, r)
++	  if (!is_gimple_debug (use) && !inside (gimple_bb (use)))
++	    return true;
++	return false;
++      };
++      for (gimple_stmt_iterator gsi = gsi_start_bb (b); !gsi_end_p (gsi);
++	   gsi_next (&gsi))
++	{
++	  if (pre.contains (gsi_stmt (gsi)))
++	    continue;
++	  def_operand_p def;
++	  ssa_op_iter it;
++	  FOR_EACH_SSA_DEF_OPERAND (def, gsi_stmt (gsi), it, SSA_OP_DEF)
++	    if (escapes (DEF_FROM_PTR (def)))
++	      return fail ("value computed in the region is used later");
++	}
++      if (b != first || !start)
++	for (gphi_iterator gsi = gsi_start_phis (b); !gsi_end_p (gsi);
++	     gsi_next (&gsi))
++	  if (!virtual_operand_p (gimple_phi_result (gsi.phi ()))
++	      && escapes (gimple_phi_result (gsi.phi ())))
++	    return fail ("value computed in the region is used later");
++    }
++  return true;
++}
++
++/* T is computed before the region starts.  */
++
++bool
++attn_recog::available (tree t, basic_block first)
++{
++  if (TREE_CODE (t) != SSA_NAME || SSA_NAME_IS_DEFAULT_DEF (t))
++    return true;
++  gimple *def = SSA_NAME_DEF_STMT (t);
++  basic_block bb = gimple_bb (def);
++  if (bb == first)
++    return pre.contains (def)
++	   || (gimple_code (def) == GIMPLE_PHI && !pre.is_empty ());
++  return dominated_by_p (CDI_DOMINATORS, first, bb);
++}
++
++/* Make T available before the region, copying its side-effect-free
++   definition chain out of the region when needed.  */
++
++tree
++attn_recog::materialize (tree t, gimple_seq *seq, basic_block first,
++			 std::map<tree, tree> &copies, int depth)
++{
++  if (TREE_CODE (t) != SSA_NAME)
++    return is_gimple_min_invariant (t) ? t : NULL_TREE;
++  if (available (t, first))
++    return t;
++  if (copies.count (t))
++    return copies[t];
++  gimple *def = SSA_NAME_DEF_STMT (t);
++  if (depth > 16 || !glue_ok (def) || gimple_code (def) == GIMPLE_PHI
++      || gimple_code (def) == GIMPLE_COND)
++    return NULL_TREE;
++  if (gassign *a = dyn_cast <gassign *> (def))
++    if (int_division_p (a))
++      {
++	tree divisor = gimple_assign_rhs2 (a);
++	if (!(TREE_CODE (divisor) == INTEGER_CST && !integer_zerop (divisor))
++	    && divisor != safe_divisor)
++	  return NULL_TREE;
++      }
++  if (!seq)
++    {
++      /* Feasibility check only.  */
++      ssa_op_iter it;
++      tree op;
++      FOR_EACH_SSA_TREE_OPERAND (op, def, it, SSA_OP_USE)
++	if (!materialize (op, NULL, first, copies, depth + 1))
++	  return NULL_TREE;
++      return t;
++    }
++  /* A fresh copy has no operand cache, so rewrite its operands directly.  */
++  gimple *copy = gimple_copy (def);
++  unsigned from = is_gimple_call (copy) ? 3 : 1;
++  for (unsigned i = from; i < gimple_num_ops (copy); i++)
++    {
++      tree op = gimple_op (copy, i);
++      if (!op || TREE_CODE (op) != SSA_NAME)
++	continue;
++      tree v = materialize (op, seq, first, copies, depth + 1);
++      if (!v)
++	return NULL_TREE;
++      gimple_set_op (copy, i, v);
++    }
++  tree r = make_ssa_name (TREE_TYPE (t), copy);
++  gimple_set_lhs (copy, r);
++  gimple_seq_add_stmt (seq, copy);
++  copies[t] = r;
++  return r;
++}
++
++/* ------------------------------------------------------------------ */
++/* Rewrite.  */
++
++static tree
++mem_at (tree var, unsigned off, tree type)
++{
++  return build2 (MEM_REF, type, build_fold_addr_expr (var),
++		 build_int_cst (ptr_type_node, off));
++}
++
++void
++attn_recog::rewrite (const std::vector<class loop *> &order, matmul mm[4],
++		     const attention &at, gimple *start, basic_block first,
++		     basic_block exit, location_t loc)
++{
++  std::map<tree, tree> copies;
++  gimple_seq g1 = NULL, g2 = NULL, body = NULL;
++  tree i64 = long_long_integer_type_node;
++  tree u64 = long_long_unsigned_type_node;
++  tree u32 = unsigned_type_node;
++
++  auto dimval = [&] (const dim &d, gimple_seq *seq) -> tree {
++    if (!d.is_atom)
++      return build_int_cst (i64, d.cst);
++    tree v = materialize (atoms[d.atom], seq, first, copies, 0);
++    gcc_assert (v);
++    return gimple_convert (seq, i64, v);
++  };
++  auto in_range = [&] (gimple_seq *seq, tree v, HOST_WIDE_INT lo,
++		       HOST_WIDE_INT hi) {
++    tree a = gimple_build (seq, GE_EXPR, boolean_type_node, v,
++			   build_int_cst (i64, lo));
++    tree b = gimple_build (seq, LE_EXPR, boolean_type_node, v,
++			   build_int_cst (i64, hi));
++    return gimple_build (seq, BIT_AND_EXPR, boolean_type_node, a, b);
++  };
++
++  /* Guard 1: 1 <= n <= max_n, 1 <= e <= max_e, 1 <= h <= max_e.  */
++  tree n = dimval (at.n, &g1), e = dimval (at.e, &g1), h = dimval (at.h, &g1);
++  tree c1 = in_range (&g1, n, 1, attn_max_n);
++  c1 = gimple_build (&g1, BIT_AND_EXPR, boolean_type_node, c1,
++		     in_range (&g1, e, 1, attn_max_e));
++  c1 = gimple_build (&g1, BIT_AND_EXPR, boolean_type_node, c1,
++		     in_range (&g1, h, 1, attn_max_e));
++
++  /* Guard 2, now that h is known non-zero: d * h == e.  */
++  if (at.h.is_atom)
++    safe_divisor = atoms[at.h.atom];
++  tree d = dimval (at.d, &g2);
++  tree c2 = gimple_build (&g2, EQ_EXPR, boolean_type_node,
++			  gimple_build (&g2, MULT_EXPR, i64, d, h), e);
++
++  /* The descriptors and the instruction.  */
++  tree wty = build_array_type_nelts (u64, 8);
++  tree cty = build_array_type_nelts (u64, 5);
++  tree wvar = create_tmp_var (wty, "attn_w");
++  tree cvar = create_tmp_var (cty, "attn_cfg");
++  TREE_ADDRESSABLE (wvar) = 1;
++  TREE_ADDRESSABLE (cvar) = 1;
++  auto ptrval = [&] (tree p) -> tree {
++    if (!p)
++      return build_int_cst (u64, 0);
++    tree v = materialize (p, &body, first, copies, 0);
++    gcc_assert (v);
++    v = gimple_convert (&body, pointer_sized_int_node, v);
++    return gimple_convert (&body, u64, v);
++  };
++  auto put = [&] (unsigned off, tree type, tree val) {
++    gimple_seq_add_stmt (&body, gimple_build_assign (mem_at (cvar, off, type),
++						     val));
++  };
++  tree wf[8] = { mm[0].b, mm[1].b, mm[2].b, mm[3].b,
++		 mm[0].bias, mm[1].bias, mm[2].bias, mm[3].bias };
++  for (int i = 0; i < 8; i++)
++    gimple_seq_add_stmt (&body, gimple_build_assign (mem_at (wvar, 8 * i, u64),
++						     ptrval (wf[i])));
++  tree scale = materialize (at.scale, &body, first, copies, 0);
++  gcc_assert (scale);
++  unsigned flags = attn_f_scale | (at.causal ? attn_f_causal : 0);
++  put (0, u32, gimple_convert (&body, u32, n));
++  put (4, u32, gimple_convert (&body, u32, e));
++  put (8, u32, gimple_convert (&body, u32, h));
++  put (12, u32, build_int_cst (u32, 0));
++  put (16, u32, build_int_cst (u32, flags));
++  put (20, u32, build_int_cst (u32, 0));
++  put (24, float_type_node, scale);
++  put (28, u32, build_int_cst (u32, 0));
++  put (32, u64, ptrval (at.mask));
++  tree y = materialize (mm[3].out, &body, first, copies, 0);
++  tree x = materialize (mm[0].a, &body, first, copies, 0);
++  gcc_assert (y && x);
++  gcall *call = gimple_build_call (riscv_attn_builtin_decl (), 4, y, x,
++				   build_fold_addr_expr (wvar),
++				   build_fold_addr_expr (cvar));
++  gimple_set_location (call, loc);
++  gimple_seq_add_stmt (&body, call);
++  gimple_seq_add_stmt (&body, gimple_build_assign (wvar, build_clobber (wty)));
++  gimple_seq_add_stmt (&body, gimple_build_assign (cvar, build_clobber (cty)));
++
++  /* CFG:  before -> G1 -(guard 1)-> G2 -(guard 2)-> A -> EXIT,
++     with both guards falling back to the original loops.  */
++  edge in = start ? split_block (first, start) : single_pred_edge (first);
++  basic_block region = in->dest;
++  class loop *parent = loop_outer (order[0]);
++  basic_block bg1 = split_edge (in);
++  basic_block bg2 = create_empty_bb (bg1);
++  basic_block ba = create_empty_bb (bg2);
++  add_bb_to_loop (bg2, parent);
++  add_bb_to_loop (ba, parent);
++
++  gimple_stmt_iterator gsi = gsi_last_bb (bg1);
++  gsi_insert_seq_after (&gsi, g1, GSI_CONTINUE_LINKING);
++  gsi_insert_after (&gsi, gimple_build_cond (NE_EXPR, c1, boolean_false_node,
++					     NULL_TREE, NULL_TREE),
++		    GSI_CONTINUE_LINKING);
++  gsi = gsi_last_bb (bg2);
++  gsi_insert_seq_after (&gsi, g2, GSI_CONTINUE_LINKING);
++  gsi_insert_after (&gsi, gimple_build_cond (NE_EXPR, c2, boolean_false_node,
++					     NULL_TREE, NULL_TREE),
++		    GSI_CONTINUE_LINKING);
++  gsi = gsi_last_bb (ba);
++  gsi_insert_seq_after (&gsi, body, GSI_CONTINUE_LINKING);
++
++  edge to_region = single_succ_edge (bg1);
++  to_region->flags = EDGE_FALSE_VALUE;
++  to_region->probability = profile_probability::unlikely ();
++  edge e1 = make_edge (bg1, bg2, EDGE_TRUE_VALUE);
++  e1->probability = profile_probability::likely ();
++  edge e2 = make_edge (bg2, ba, EDGE_TRUE_VALUE);
++  e2->probability = profile_probability::likely ();
++  edge e3 = make_edge (bg2, region, EDGE_FALSE_VALUE);
++  e3->probability = profile_probability::unlikely ();
++  edge e4 = make_edge (ba, exit, EDGE_FALLTHRU);
++  e4->probability = profile_probability::always ();
++  bg2->count = e1->count ();
++  ba->count = e2->count ();
++
++  free_dominance_info (CDI_DOMINATORS);
++  free_dominance_info (CDI_POST_DOMINATORS);
++  mark_virtual_operands_for_renaming (fun);
++  changed = true;
++}
++
++/* ------------------------------------------------------------------ */
++/* Driver.  */
++
++bool
++attn_recog::try_attention (class loop *att)
++{
++  reset ();
++  scope.push_back (att);
++  attention at;
++  if (!match_attention (att, at))
++    return false;
++
++  /* Producers of Q, K, V and the consumer of C among the siblings.  A
++     failed attempt must not leave statements marked as matched.  */
++  matmul mm[4];
++  tree want[3] = { at.q, at.k, at.v };
++  bool have[4] = { false, false, false, false };
++  class loop *parent = loop_outer (att);
++  const char *saved_why = why;
++  for (class loop *s = parent->inner; s; s = s->next)
++    {
++      if (s == att)
++	continue;
++      std::set<gimple *> keep = matched;
++      scope.assign (1, s);
++      matmul m;
++      bool used = false;
++      if (match_matmul (s, m))
++	{
++	  for (int i = 0; i < 3; i++)
++	    if (m.out == want[i] && !have[i])
++	      {
++		mm[i] = m;
++		have[i] = used = true;
++	      }
++	  if (m.a == at.c && !have[3])
++	    {
++	      mm[3] = m;
++	      have[3] = used = true;
++	    }
++	}
++      if (!used)
++	matched = keep;
++      why = saved_why;
++    }
++  if (!have[0] || !have[1] || !have[2] || !have[3])
++    return fail ("projections of Q, K, V or the output product not found");
++
++  for (int i = 0; i < 4; i++)
++    if (!(mm[i].r == at.n) || !(mm[i].k == at.e) || !(mm[i].c == at.e))
++      return fail ("matrix product shapes do not match the attention");
++  if (mm[0].a != mm[1].a || mm[0].a != mm[2].a)
++    return fail ("Q, K and V are not projected from the same input");
++
++  /* Every statement accounted for, in every nest.  */
++  for (int i = 0; i < 4; i++)
++    {
++      scope.assign (1, mm[i].outer);
++      if (!account (mm[i].outer))
++	return false;
++    }
++  scope.assign (1, att);
++  if (!account (att))
++    return false;
++
++  /* Scratch buffers: fresh allocations whose contents nobody reads outside
++     the region (only free may see them).  */
++  tree temps[5] = { at.q, at.k, at.v, at.c, at.p };
++  for (tree t : temps)
++    {
++      gimple *def = SSA_NAME_DEF_STMT (t);
++      if (SSA_NAME_IS_DEFAULT_DEF (t)
++	  || !(gimple_call_builtin_p (def, BUILT_IN_MALLOC)
++	       || gimple_call_builtin_p (def, BUILT_IN_CALLOC)
++	       || gimple_call_builtin_p (def, BUILT_IN_ALLOCA)
++	       || gimple_call_builtin_p (def, BUILT_IN_ALLOCA_WITH_ALIGN)))
++	return fail ("scratch buffers are not local allocations");
++      std::vector<tree> work (1, t);
++      while (!work.empty ())
++	{
++	  tree v = work.back ();
++	  work.pop_back ();
++	  imm_use_iterator ui;
++	  gimple *use;
++	  FOR_EACH_IMM_USE_STMT (use, ui, v)
++	    {
++	      if (is_gimple_debug (use)
++		  || gimple_call_builtin_p (use, BUILT_IN_FREE)
++		  || gimple_code (use) == GIMPLE_COND)
++		continue;
++	      gassign *a = dyn_cast <gassign *> (use);
++	      if (a && POINTER_TYPE_P (TREE_TYPE (gimple_assign_lhs (a)))
++		  && (gimple_assign_rhs_code (a) == POINTER_PLUS_EXPR
++		      || gimple_assign_rhs_code (a) == SSA_NAME
++		      || CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (a)))
++		  && gimple_assign_rhs1 (a) == v)
++		{
++		  work.push_back (gimple_assign_lhs (a));
++		  continue;
++		}
++	      if (matched.count (use))
++		continue;
++	      return fail ("a scratch buffer escapes or is read elsewhere");
++	    }
++	}
++    }
++
++  /* The output and the scratch buffers alias nothing that is read.  */
++  std::vector<tree> reads = { mm[0].a, mm[0].b, mm[1].b, mm[2].b, mm[3].b };
++  for (int i = 0; i < 4; i++)
++    if (mm[i].bias)
++      reads.push_back (mm[i].bias);
++  if (at.mask)
++    reads.push_back (at.mask);
++  tree y = mm[3].out;
++  for (tree r : reads)
++    if (ptr_derefs_may_alias_p (y, r))
++      return fail ("output may alias an input (declare it restrict)");
++  for (tree t : temps)
++    {
++      for (tree r : reads)
++	if (ptr_derefs_may_alias_p (t, r))
++	  return fail ("scratch buffer may alias an input");
++      if (ptr_derefs_may_alias_p (t, y))
++	return fail ("scratch buffer may alias the output");
++    }
++
++  /* Region: the three projections in program order, then the attention,
++     then the output product.  */
++  std::vector<class loop *> order = { mm[0].outer, mm[1].outer, mm[2].outer,
++				      att, mm[3].outer };
++  scope = order;
++  gimple *start;
++  basic_block first, exit;
++  if (!find_region (order, start, first, exit))
++    return false;
++
++  /* Every decided branch only looked at guarded dimensions and counters.  */
++  dim dims[4] = { at.n, at.e, at.h, at.d };
++  for (unsigned v : guard_atoms)
++    {
++      class loop *l;
++      bool ok = iv_phi_p (atoms[v], &l);
++      for (const dim &d : dims)
++	ok |= d.is_atom && d.atom == v;
++      if (!ok)
++	return fail ("a branch depends on a value the guard does not cover");
++    }
++  if (flag_rounding_math)
++    return fail ("-frounding-math is in effect");
++
++  /* Everything the instruction needs can be computed before the region,
++     with h (the only divisor allowed) checked first.  */
++  {
++    std::map<tree, tree> none;
++    safe_divisor = at.h.is_atom ? atoms[at.h.atom] : NULL_TREE;
++    std::vector<tree> need = { mm[3].out, mm[0].a, at.scale };
++    for (int i = 0; i < 4; i++)
++      {
++	need.push_back (mm[i].b);
++	if (mm[i].bias)
++	  need.push_back (mm[i].bias);
++      }
++    if (at.mask)
++      need.push_back (at.mask);
++    for (const dim &d : dims)
++      if (d.is_atom)
++	need.push_back (atoms[d.atom]);
++    for (tree t : need)
++      if (!materialize (t, NULL, first, none, 0))
++	return fail ("an operand cannot be computed ahead of the loops");
++    /* n, e and h feed the first guard, before h is known non-zero.  */
++    safe_divisor = NULL_TREE;
++    for (const dim &d : { at.n, at.e, at.h })
++      if (d.is_atom && !materialize (atoms[d.atom], NULL, first, none, 0))
++	return fail ("a dimension needs a division before the guard");
++  }
++
++  location_t loc = gimple_location (*gsi_last_bb (linfo[att].exit->src));
++  if (dump_enabled_p ())
++    dump_printf_loc (MSG_OPTIMIZED_LOCATIONS,
++		     dump_user_location_t::from_location_t (loc),
++		     "multi-head self-attention (%s%s%s) replaced with attn\n",
++		     at.causal ? "causal" : "full",
++		     at.mask ? ", masked" : "",
++		     mm[0].bias ? ", biased" : "");
++  rewrite (order, mm, at, start, first, exit, loc);
++  return true;
++}
++
++unsigned
++attn_recog::run ()
++{
++  if (!riscv_attn_builtin_decl ())
++    return 0;
++  calculate_dominance_info (CDI_DOMINATORS);
++  calculate_dominance_info (CDI_POST_DOMINATORS);
++
++  /* Candidate attention nests: a loop pair whose inner loop has three
++     children.  */
++  std::vector<class loop *> cands;
++  for (auto l : loops_list (fun, 0))
++    if (l->inner && !l->inner->next && l->inner->inner
++	&& l->inner->inner->next && l->inner->inner->next->next
++	&& !l->inner->inner->next->next->next)
++      cands.push_back (l);
++  for (class loop *l : cands)
++    {
++      if (!dom_info_available_p (CDI_DOMINATORS))
++	break;
++      if (!try_attention (l) && why && dump_enabled_p ())
++	dump_printf_loc (MSG_MISSED_OPTIMIZATION,
++			 dump_user_location_t::from_location_t
++			   (gimple_location (*gsi_last_bb (l->header))),
++			 "attention loops not replaced: %s\n", why);
++    }
++  free_dominance_info (CDI_POST_DOMINATORS);
++  if (changed)
++    {
++      scev_reset ();
++      return TODO_update_ssa_only_virtuals | TODO_cleanup_cfg;
++    }
++  return 0;
++}
++
++const pass_data pass_data_riscv_attn_recog =
++{
++  GIMPLE_PASS, /* type */
++  "attn_recog", /* name */
++  OPTGROUP_LOOP, /* optinfo_flags */
++  TV_NONE, /* tv_id */
++  ( PROP_cfg | PROP_ssa ), /* properties_required */
++  0, /* properties_provided */
++  0, /* properties_destroyed */
++  0, /* todo_flags_start */
++  0, /* todo_flags_finish */
++};
++
++class pass_riscv_attn_recog : public gimple_opt_pass
++{
++public:
++  pass_riscv_attn_recog (gcc::context *ctxt)
++    : gimple_opt_pass (pass_data_riscv_attn_recog, ctxt)
++  {}
++
++  bool gate (function *) final override
++  {
++    return TARGET_XATTN && riscv_attn_recognize && optimize;
++  }
++
++  unsigned execute (function *fun) final override
++  {
++    attn_recog r (fun);
++    return r.run ();
++  }
++};
++
++} // anon namespace
++
++gimple_opt_pass *
++make_pass_riscv_attn_recog (gcc::context *ctxt)
++{
++  return new pass_riscv_attn_recog (ctxt);
++}
+diff --git a/gcc/config/riscv/riscv-builtins.cc b/gcc/config/riscv/riscv-builtins.cc
+index 8c57fbb1aaa..4327cb88c4f 100644
+--- a/gcc/config/riscv/riscv-builtins.cc
++++ b/gcc/config/riscv/riscv-builtins.cc
+@@ -95,6 +95,8 @@ struct riscv_builtin_description {
+ };
+ 
+ AVAIL (hard_float, TARGET_HARD_FLOAT || TARGET_ZFINX)
++AVAIL (attn32, TARGET_XATTN && !TARGET_64BIT)
++AVAIL (attn64, TARGET_XATTN && TARGET_64BIT)
+ AVAIL (clean32, TARGET_ZICBOM && !TARGET_64BIT)
+ AVAIL (clean64, TARGET_ZICBOM && TARGET_64BIT)
+ AVAIL (flush32, TARGET_ZICBOM && !TARGET_64BIT)
+@@ -198,6 +200,7 @@ AVAIL (andesbfhcvt, TARGET_XANDESBFHCVT)
+ #define RISCV_ATYPE_SI intSI_type_node
+ #define RISCV_ATYPE_DI intDI_type_node
+ #define RISCV_ATYPE_VOID_PTR ptr_type_node
++#define RISCV_ATYPE_CVOID_PTR const_ptr_type_node
+ #define RISCV_ATYPE_INT_PTR integer_ptr_type_node
+ #define RISCV_ATYPE_BF bfloat16_type_node
+ #define RISCV_ATYPE_SF float_type_node
+@@ -221,6 +224,7 @@ static const struct riscv_builtin_description riscv_builtins[] = {
+   #include "riscv-scalar-crypto.def"
+   #include "corev.def"
+   #include "andes.def"
++  #include "xattn.def"
+ 
+   DIRECT_BUILTIN (frflags, RISCV_USI_FTYPE, hard_float),
+   DIRECT_NO_TARGET_BUILTIN (fsflags, RISCV_VOID_FTYPE_USI, hard_float),
+@@ -343,6 +347,20 @@ riscv_builtin_decl (unsigned int code, bool initialize_p ATTRIBUTE_UNUSED)
+   return error_mark_node;
+ }
+ 
++/* The declaration of __builtin_riscv_attn for the current XLEN, or null
++   when Xattn was not enabled when builtins were created.  */
++
++tree
++riscv_attn_builtin_decl (void)
++{
++  enum insn_code icode = TARGET_64BIT ? CODE_FOR_riscv_attn_di
++				      : CODE_FOR_riscv_attn_si;
++  for (size_t i = 0; i < ARRAY_SIZE (riscv_builtins); i++)
++    if (riscv_builtins[i].icode == icode)
++      return riscv_builtin_decls[i];
++  return NULL_TREE;
++}
++
+ /* Take argument ARGNO from EXP's argument list and convert it into
+    an expand operand.  Store the operand in *OP.  */
+ 
+diff --git a/gcc/config/riscv/riscv-ext-xattn.def b/gcc/config/riscv/riscv-ext-xattn.def
+new file mode 100644
+index 00000000000..da2e29a70bf
+--- /dev/null
++++ b/gcc/config/riscv/riscv-ext-xattn.def
+@@ -0,0 +1,35 @@
++/* Xattn extension definition file for RISC-V.
++   Copyright (C) 2026 Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.
++
++Please run `make riscv-regen` in build folder to make sure updated anything.
++
++Format of DEFINE_RISCV_EXT, please refer to riscv-ext.def.  */
++
++DEFINE_RISCV_EXT(
++  /* NAME */ xattn,
++  /* UPPERCASE_NAME */ XATTN,
++  /* FULL_NAME */ "Fused multi-head self-attention extension",
++  /* DESC */ "",
++  /* URL */ ,
++  /* DEP_EXTS */ ({}),
++  /* SUPPORTED_VERSIONS */ ({{1, 0}}),
++  /* FLAG_GROUP */ xattn,
++  /* BITMASK_GROUP_ID */ BITMASK_NOT_YET_ALLOCATED,
++  /* BITMASK_BIT_POSITION*/ BITMASK_NOT_YET_ALLOCATED,
++  /* EXTRA_EXTENSION_FLAGS */ 0)
+diff --git a/gcc/config/riscv/riscv-ext.def b/gcc/config/riscv/riscv-ext.def
+index 1621e81b011..c8c50828932 100644
+--- a/gcc/config/riscv/riscv-ext.def
++++ b/gcc/config/riscv/riscv-ext.def
+@@ -2089,3 +2089,4 @@ DEFINE_RISCV_EXT(
+ #include "riscv-ext-mips.def"
+ #include "riscv-ext-andes.def"
+ #include "riscv-ext-spacemit.def"
++#include "riscv-ext-xattn.def"
+diff --git a/gcc/config/riscv/riscv-ext.opt b/gcc/config/riscv/riscv-ext.opt
+index 18402ea97c7..8272c6b097e 100644
+--- a/gcc/config/riscv/riscv-ext.opt
++++ b/gcc/config/riscv/riscv-ext.opt
+@@ -46,6 +46,9 @@ int riscv_sv_subext
+ TargetVariable
+ int riscv_xandes_subext
+ 
++TargetVariable
++int riscv_xattn_subext
++
+ TargetVariable
+ int riscv_xcv_subext
+ 
+@@ -472,3 +475,5 @@ Mask(XANDESVDOT) Var(riscv_xandes_subext)
+ 
+ Mask(XSMTVDOT) Var(riscv_xsmt_subext)
+ 
++Mask(XATTN) Var(riscv_xattn_subext)
++
+diff --git a/gcc/config/riscv/riscv-ftypes.def b/gcc/config/riscv/riscv-ftypes.def
+index 8dcc1e5a71e..427459fb1fe 100644
+--- a/gcc/config/riscv/riscv-ftypes.def
++++ b/gcc/config/riscv/riscv-ftypes.def
+@@ -66,3 +66,4 @@ DEF_RISCV_FTYPE (3, (SI, SI, SI, UQI))
+ DEF_RISCV_FTYPE (3, (SI, SI, SI, SI))
+ DEF_RISCV_FTYPE (4, (USI, USI, USI, USI, UQI))
+ DEF_RISCV_FTYPE (4, (SI, SI, SI, SI, UQI))
++DEF_RISCV_FTYPE (4, (VOID, VOID_PTR, CVOID_PTR, CVOID_PTR, CVOID_PTR))
+diff --git a/gcc/config/riscv/riscv-passes.def b/gcc/config/riscv/riscv-passes.def
+index bc6b3c8b98d..24488308223 100644
+--- a/gcc/config/riscv/riscv-passes.def
++++ b/gcc/config/riscv/riscv-passes.def
+@@ -24,4 +24,5 @@ INSERT_PASS_BEFORE (pass_fast_rtl_dce, 1, pass_vsetvl);
+ INSERT_PASS_BEFORE (pass_shorten_branches, 1, pass_insert_landing_pad);
+ INSERT_PASS_BEFORE (pass_shorten_branches, 1, pass_combine_popretz);
+ INSERT_PASS_AFTER (pass_cse2, 1, pass_vector_permconst);
++INSERT_PASS_AFTER (pass_tree_loop_init, 1, pass_riscv_attn_recog);
+ 
+diff --git a/gcc/config/riscv/riscv-protos.h b/gcc/config/riscv/riscv-protos.h
+index dd029c70413..7a2933901f7 100644
+--- a/gcc/config/riscv/riscv-protos.h
++++ b/gcc/config/riscv/riscv-protos.h
+@@ -195,6 +195,7 @@ extern bool riscv_gimple_fold_builtin (gimple_stmt_iterator *);
+ extern rtx riscv_expand_builtin (tree, rtx, rtx, machine_mode, int);
+ extern tree riscv_builtin_decl (unsigned int, bool);
+ extern void riscv_init_builtins (void);
++extern tree riscv_attn_builtin_decl (void);
+ 
+ /* Routines implemented in riscv-common.cc.  */
+ extern std::string riscv_arch_str (bool version_p = true);
+@@ -206,6 +207,8 @@ rtl_opt_pass * make_pass_shorten_memrefs (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_avlprop (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_vsetvl (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_insert_landing_pad (gcc::context *ctxt);
++class gimple_opt_pass;
++gimple_opt_pass * make_pass_riscv_attn_recog (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_vector_permconst (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_bclr_lowest_set_bit (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_combine_popretz (gcc::context *ctxt);
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index 3e1580d7241..876c5df2d46 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -152,6 +152,9 @@
+   ;; XTheadInt unspec
+   UNSPECV_XTHEADINT_PUSH
+   UNSPECV_XTHEADINT_POP
++
++  ;; Xattn
++  UNSPECV_XATTN
+ ])
+ 
+ (define_constants
+@@ -520,7 +523,7 @@
+    vgather,vcompress,vmov,vector,vandn,vbrev,vbrev8,vrev8,vclz,vctz,vcpop,vrol,vror,vwsll,
+    vclmul,vclmulh,vghsh,vgmul,vaesef,vaesem,vaesdf,vaesdm,vaeskf1,vaeskf2,vaesz,
+    vsha2ms,vsha2ch,vsha2cl,vsm4k,vsm4r,vsm3me,vsm3c,vfncvtbf16,vfwcvtbf16,vfwmaccbf16,
+-   sf_vc,sf_vc_se"
++   sf_vc,sf_vc_se,attn"
+   (cond [(eq_attr "got" "load") (const_string "load")
+ 
+ 	 ;; If a doubleword move uses these expensive instructions,
+@@ -4998,6 +5001,7 @@
+ (include "thead.md")
+ (include "corev.md")
+ (include "andes.md")
++(include "xattn.md")
+ ;; Pipeline models
+ (include "generic.md")
+ (include "xiangshan.md")
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 2c26ee99691..1fa489c9ebb 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -423,3 +423,8 @@ Specifies whether the fence.tso instruction should be used.
+ mautovec-segment
+ Target Integer Var(riscv_mautovec_segment) Init(1)
+ Enable (default) or disable generation of vector segment load/store instructions.
++
++mattn-recognize
++Target Var(riscv_attn_recognize) Init(0)
++Replace multi-head self-attention written as C loops with the Xattn attn
++instruction when the compiler can prove the two are equivalent.
+diff --git a/gcc/config/riscv/t-riscv b/gcc/config/riscv/t-riscv
+index 2761e5e20c0..04fed4a2e6f 100644
+--- a/gcc/config/riscv/t-riscv
++++ b/gcc/config/riscv/t-riscv
+@@ -118,6 +118,12 @@ riscv-vector-costs.o: $(srcdir)/config/riscv/riscv-vector-costs.cc \
+ 	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
+ 		$(srcdir)/config/riscv/riscv-vector-costs.cc
+ 
++riscv-attn-recog.o: $(srcdir)/config/riscv/riscv-attn-recog.cc \
++  $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(TREE_H) $(GIMPLE_H) \
++  tree-pass.h ssa.h cfgloop.h tree-cfg.h
++	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
++		$(srcdir)/config/riscv/riscv-attn-recog.cc
++
+ riscv-avlprop.o: $(srcdir)/config/riscv/riscv-avlprop.cc \
+   $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) $(REGS_H) \
+   $(TARGET_H) tree-pass.h df.h rtl-ssa.h cfgcleanup.h insn-attr.h \
+@@ -223,7 +229,8 @@ RISCV_EXT_DEFS = \
+   $(srcdir)/config/riscv/riscv-ext-ventana.def \
+   $(srcdir)/config/riscv/riscv-ext-mips.def \
+   $(srcdir)/config/riscv/riscv-ext-andes.def \
+-  $(srcdir)/config/riscv/riscv-ext-spacemit.def
++  $(srcdir)/config/riscv/riscv-ext-spacemit.def \
++  $(srcdir)/config/riscv/riscv-ext-xattn.def
+ 
+ $(srcdir)/config/riscv/riscv-ext.opt: $(RISCV_EXT_DEFS)
+ 
+diff --git a/gcc/config/riscv/xattn.def b/gcc/config/riscv/xattn.def
+new file mode 100644
+index 00000000000..300582502e6
+--- /dev/null
++++ b/gcc/config/riscv/xattn.def
+@@ -0,0 +1,3 @@
++// Xattn fused multi-head self-attention.
++RISCV_BUILTIN (attn_si, "attn", RISCV_BUILTIN_DIRECT_NO_TARGET, RISCV_VOID_FTYPE_VOID_PTR_CVOID_PTR_CVOID_PTR_CVOID_PTR, attn32),
++RISCV_BUILTIN (attn_di, "attn", RISCV_BUILTIN_DIRECT_NO_TARGET, RISCV_VOID_FTYPE_VOID_PTR_CVOID_PTR_CVOID_PTR_CVOID_PTR, attn64),
+diff --git a/gcc/config/riscv/xattn.md b/gcc/config/riscv/xattn.md
+new file mode 100644
+index 00000000000..a4d5a2a2f7c
+--- /dev/null
++++ b/gcc/config/riscv/xattn.md
+@@ -0,0 +1,40 @@
++;; Machine description for the RISC-V Xattn extension.
++;; Copyright (C) 2026 Free Software Foundation, Inc.
++
++;; This file is part of GCC.
++
++;; GCC is free software; you can redistribute it and/or modify
++;; it under the terms of the GNU General Public License as published by
++;; the Free Software Foundation; either version 3, or (at your option)
++;; any later version.
++
++;; GCC is distributed in the hope that it will be useful,
++;; but WITHOUT ANY WARRANTY; without even the implied warranty of
++;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++;; GNU General Public License for more details.
++
++;; You should have received a copy of the GNU General Public License
++;; along with GCC; see the file COPYING3.  If not see
++;; <http://www.gnu.org/licenses/>.
++
++;; attn rd, rs1, rs2, rs3 reads X, the weight and configuration descriptors
++;; and every buffer they point to, and writes Y.  None of those accesses is
++;; visible through the operands, so the insn is a full memory barrier.
++(define_insn "riscv_attn_<mode>"
++  [(unspec_volatile:X [(match_operand:X 0 "register_operand" "r")
++		       (match_operand:X 1 "register_operand" "r")
++		       (match_operand:X 2 "register_operand" "r")
++		       (match_operand:X 3 "register_operand" "r")]
++		      UNSPECV_XATTN)
++   (clobber (mem:BLK (scratch)))]
++  "TARGET_XATTN"
++  "attn\t%0,%1,%2,%3"
++  [(set_attr "type" "attn")
++   (set_attr "mode" "<MODE>")])
++
++;; attn writes no register, so latency only orders it against itself.  The
++;; reservation is tune-independent, like "ghost", so every pipeline model
++;; can schedule it.
++(define_insn_reservation "xattn" 1
++  (eq_attr "type" "attn")
++  "nothing")
+diff --git a/gcc/doc/riscv-ext.texi b/gcc/doc/riscv-ext.texi
+index 36b4dff31ff..00f969444db 100644
+--- a/gcc/doc/riscv-ext.texi
++++ b/gcc/doc/riscv-ext.texi
+@@ -750,4 +750,8 @@
+ @tab 1.0
+ @tab SpacemiT vector dot product extension
+ 
++@item @samp{xattn}
++@tab 1.0
++@tab Fused multi-head self-attention extension
++
+ @end multitable
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-1.c b/gcc/testsuite/gcc.target/riscv/xattn-1.c
+new file mode 100644
+index 00000000000..3afa9311902
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-1.c
+@@ -0,0 +1,15 @@
++/* Xattn builtin: rv64.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++#include <stdint.h>
++
++void
++f (float *y, const float *x, const uint64_t *w, const uint32_t *c)
++{
++  __builtin_riscv_attn (y, x, w, c);
++  __builtin_riscv_attn (y + 1, x, w, c);
++}
++
++/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-2.c b/gcc/testsuite/gcc.target/riscv/xattn-2.c
+new file mode 100644
+index 00000000000..407310790cb
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-2.c
+@@ -0,0 +1,15 @@
++/* Xattn builtin: rv32.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv32gc_xattn -mabi=ilp32d -O2" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++#include <stdint.h>
++
++void
++f (float *y, const float *x, const uint64_t *w, const uint32_t *c)
++{
++  __builtin_riscv_attn (y, x, w, c);
++  __builtin_riscv_attn (y + 1, x, w, c);
++}
++
++/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-3.c b/gcc/testsuite/gcc.target/riscv/xattn-3.c
+new file mode 100644
+index 00000000000..7229c291c95
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-3.c
+@@ -0,0 +1,15 @@
++/* Xattn builtin: scheduled for sifive-7-series.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -mtune=sifive-7-series" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++#include <stdint.h>
++
++void
++f (float *y, const float *x, const uint64_t *w, const uint32_t *c)
++{
++  __builtin_riscv_attn (y, x, w, c);
++  __builtin_riscv_attn (y + 1, x, w, c);
++}
++
++/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-4.c b/gcc/testsuite/gcc.target/riscv/xattn-4.c
+new file mode 100644
+index 00000000000..6ca282f0e64
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-4.c
+@@ -0,0 +1,15 @@
++/* Xattn builtin: scheduled for generic-ooo.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -mtune=generic-ooo" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++#include <stdint.h>
++
++void
++f (float *y, const float *x, const uint64_t *w, const uint32_t *c)
++{
++  __builtin_riscv_attn (y, x, w, c);
++  __builtin_riscv_attn (y + 1, x, w, c);
++}
++
++/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-5.c b/gcc/testsuite/gcc.target/riscv/xattn-5.c
+new file mode 100644
+index 00000000000..80f9a6b4db6
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-5.c
+@@ -0,0 +1,15 @@
++/* Xattn builtin: scheduled for xiangshan-nanhu.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -mtune=xiangshan-nanhu" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++#include <stdint.h>
++
++void
++f (float *y, const float *x, const uint64_t *w, const uint32_t *c)
++{
++  __builtin_riscv_attn (y, x, w, c);
++  __builtin_riscv_attn (y + 1, x, w, c);
++}
++
++/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-6.c b/gcc/testsuite/gcc.target/riscv/xattn-6.c
+new file mode 100644
+index 00000000000..694dcd4703e
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-6.c
+@@ -0,0 +1,15 @@
++/* Xattn builtin: two calls are not merged or reordered.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O3" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++#include <stdint.h>
++
++void
++f (float *y, const float *x, const uint64_t *w, const uint32_t *c)
++{
++  __builtin_riscv_attn (y, x, w, c);
++  __builtin_riscv_attn (y + 1, x, w, c);
++}
++
++/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-7.c b/gcc/testsuite/gcc.target/riscv/xattn-7.c
+new file mode 100644
+index 00000000000..8acf5ea0ddc
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-7.c
+@@ -0,0 +1,9 @@
++/* Xattn builtin: unavailable without the extension.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc -mabi=lp64d -O2" } */
++
++void
++f (float *y, const float *x, const void *w, const void *c)
++{
++  __builtin_riscv_attn (y, x, w, c); /* { dg-error "implicit declaration" } */
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-8.c b/gcc/testsuite/gcc.target/riscv/xattn-8.c
+new file mode 100644
+index 00000000000..5424f6abcd2
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-8.c
+@@ -0,0 +1,7 @@
++/* Xattn: the extension defines its feature macro.  */
++/* { dg-do preprocess } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d" } */
++
++#if !defined (__riscv_xattn) || __riscv_xattn != 1000000
++#error "__riscv_xattn"
++#endif
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
+new file mode 100644
+index 00000000000..5029212b129
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
+@@ -0,0 +1,87 @@
++/* Xattn attention recognizer: causal, biased.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "replaced with attn" "attn_recog" } } */
++/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
+new file mode 100644
+index 00000000000..eff8eafb39f
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
+@@ -0,0 +1,86 @@
++/* Xattn attention recognizer: off without -mattn-recognize.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
+new file mode 100644
+index 00000000000..8709a2a392a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
+@@ -0,0 +1,88 @@
++/* Xattn attention recognizer: full, masked, constant scale, no biases.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict m, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 0.125f;
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc;
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc;
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc;
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j < n; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    s = s + m[i * n + j];
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j < n; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j < n; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc;
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "replaced with attn" "attn_recog" } } */
++/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
+new file mode 100644
+index 00000000000..4ca5459f8d1
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
+@@ -0,0 +1,87 @@
++/* Xattn attention recognizer: row loop outside the head loop.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc;
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc;
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc;
++      }
++  for (int i = 0; i < n; i++)
++    for (int hd = 0; hd < h; hd++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc;
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "replaced with attn" "attn_recog" } } */
++/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
+new file mode 100644
+index 00000000000..ca6943c4a21
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
+@@ -0,0 +1,87 @@
++/* Xattn attention recognizer: rv32.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv32gc_xattn -mabi=ilp32d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "replaced with attn" "attn_recog" } } */
++/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
+new file mode 100644
+index 00000000000..5b2bf2b8e90
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
+@@ -0,0 +1,87 @@
++/* Xattn attention recognizer: output may alias an input.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "not replaced: output may alias an input" "attn_recog" } } */
++/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
+new file mode 100644
+index 00000000000..21f70e6ab76
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
+@@ -0,0 +1,87 @@
++/* Xattn attention recognizer: expf may set errno.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "not replaced: exponential is not a const call" "attn_recog" } } */
++/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
+new file mode 100644
+index 00000000000..5b1a5930f1e
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
+@@ -0,0 +1,87 @@
++/* Xattn attention recognizer: division instead of multiplication by the scale.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s / sqrtf ((float) d);
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "not replaced: score is not scaled by a multiplication" "attn_recog" } } */
++/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
+new file mode 100644
+index 00000000000..22040aee040
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
+@@ -0,0 +1,87 @@
++/* Xattn attention recognizer: >= is not the instruction's running maximum.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s >= mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "not replaced: running maximum is not" "attn_recog" } } */
++/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
+new file mode 100644
+index 00000000000..becb65fcf9a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
+@@ -0,0 +1,89 @@
++/* Xattn attention recognizer: scratch buffer read after the loops.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++float
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  float r = q[0];
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++  return r;
++}
++
++/* { dg-final { scan-tree-dump "not replaced: a scratch buffer escapes or is read elsewhere" "attn_recog" } } */
++/* { dg-final { scan-assembler-not "\\tattn\\t" } } */

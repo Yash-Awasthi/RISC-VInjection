@@ -1,0 +1,168 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Yash-Awasthi <yashawasthi12032006@gmail.com>
+Date: Tue, 13 Oct 2026 02:57:51 +0530
+Subject: [PATCH] RISC-V: add the Xattn vendor extension
+
+attn rd, rs1, rs2, rs3 computes a multi-head self-attention block; it uses custom-3 funct3 1 funct2 3, the R4 slot no standard or vendor encoding overlaps.
+---
+ bfd/elfxx-riscv.c                     |  5 +++++
+ gas/testsuite/gas/riscv/x-attn-32.d   | 13 +++++++++++++
+ gas/testsuite/gas/riscv/x-attn-fail.d |  3 +++
+ gas/testsuite/gas/riscv/x-attn-fail.l |  4 ++++
+ gas/testsuite/gas/riscv/x-attn.d      | 13 +++++++++++++
+ gas/testsuite/gas/riscv/x-attn.s      |  4 ++++
+ include/opcode/riscv-opc.h            |  4 ++++
+ include/opcode/riscv.h                |  1 +
+ opcodes/riscv-opc.c                   |  3 +++
+ 9 files changed, 50 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/x-attn-32.d
+ create mode 100644 gas/testsuite/gas/riscv/x-attn-fail.d
+ create mode 100644 gas/testsuite/gas/riscv/x-attn-fail.l
+ create mode 100644 gas/testsuite/gas/riscv/x-attn.d
+ create mode 100644 gas/testsuite/gas/riscv/x-attn.s
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 750754c9255..5f8c5b788fe 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1660,6 +1660,7 @@ static const struct riscv_supported_ext riscv_supported_vendor_x_ext[] =
+   {"xtheadvdot",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xtheadzvamo",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xventanacondops",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
++  {"xattn",		ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xsfvcp",		ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xsfcease",		ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xsfvqmaccqoq",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+@@ -3112,6 +3113,8 @@ riscv_multi_subset_supports (riscv_parse_subset_t *rps,
+       return riscv_subset_supports (rps, "xtheadzvamo");
+     case INSN_CLASS_XVENTANACONDOPS:
+       return riscv_subset_supports (rps, "xventanacondops");
++    case INSN_CLASS_XATTN:
++      return riscv_subset_supports (rps, "xattn");
+     case INSN_CLASS_XSFVCP:
+       return riscv_subset_supports (rps, "xsfvcp");
+     case INSN_CLASS_XSFCEASE:
+@@ -3454,6 +3457,8 @@ riscv_multi_subset_supports_ext (riscv_parse_subset_t *rps,
+       return "xtheadzvamo";
+     case INSN_CLASS_XVENTANACONDOPS:
+       return "xventanacondops";
++    case INSN_CLASS_XATTN:
++      return "xattn";
+     case INSN_CLASS_XSFVCP:
+       return "xsfvcp";
+     case INSN_CLASS_XSFCEASE:
+diff --git a/gas/testsuite/gas/riscv/x-attn-32.d b/gas/testsuite/gas/riscv/x-attn-32.d
+new file mode 100644
+index 00000000000..1be4492becd
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-attn-32.d
+@@ -0,0 +1,13 @@
++#as: -march=rv32i_xattn
++#source: x-attn.s
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+0:[ 	]+66b516fb[ 	]+attn[ 	]+a3,a0,a1,a2
++[ 	]+4:[ 	]+161f907b[ 	]+attn[ 	]+zero,t6,ra,sp
++[ 	]+8:[ 	]+fe001ffb[ 	]+attn[ 	]+t6,zero,zero,t6
+diff --git a/gas/testsuite/gas/riscv/x-attn-fail.d b/gas/testsuite/gas/riscv/x-attn-fail.d
+new file mode 100644
+index 00000000000..109eca7fa05
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-attn-fail.d
+@@ -0,0 +1,3 @@
++#as: -march=rv64i
++#source: x-attn.s
++#error_output: x-attn-fail.l
+diff --git a/gas/testsuite/gas/riscv/x-attn-fail.l b/gas/testsuite/gas/riscv/x-attn-fail.l
+new file mode 100644
+index 00000000000..92c5e368de4
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-attn-fail.l
+@@ -0,0 +1,4 @@
++.*Assembler messages:
++.*Error: unrecognized opcode `attn a3,a0,a1,a2', extension `xattn' required
++.*Error: unrecognized opcode `attn zero,t6,ra,sp', extension `xattn' required
++.*Error: unrecognized opcode `attn t6,zero,zero,t6', extension `xattn' required
+diff --git a/gas/testsuite/gas/riscv/x-attn.d b/gas/testsuite/gas/riscv/x-attn.d
+new file mode 100644
+index 00000000000..61f46b8190b
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-attn.d
+@@ -0,0 +1,13 @@
++#as: -march=rv64i_xattn
++#source: x-attn.s
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+0:[ 	]+66b516fb[ 	]+attn[ 	]+a3,a0,a1,a2
++[ 	]+4:[ 	]+161f907b[ 	]+attn[ 	]+zero,t6,ra,sp
++[ 	]+8:[ 	]+fe001ffb[ 	]+attn[ 	]+t6,zero,zero,t6
+diff --git a/gas/testsuite/gas/riscv/x-attn.s b/gas/testsuite/gas/riscv/x-attn.s
+new file mode 100644
+index 00000000000..124cb94b5f7
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-attn.s
+@@ -0,0 +1,4 @@
++target:
++	attn	a3, a0, a1, a2
++	attn	zero, t6, ra, sp
++	attn	t6, zero, zero, t6
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 8f26c714369..ec537a9b195 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -3788,6 +3788,9 @@
+ #define MATCH_TH_VMAQAUS_VX 0x9c00600b
+ #define MASK_TH_VMAQAUS_VX 0xfc00707f
+ /* Vendor-specific (Ventana Microsystems) XVentanaCondOps instructions */
++/* Xattn.  */
++#define MATCH_ATTN 0x0600107b
++#define MASK_ATTN 0x0600707f
+ #define MATCH_VT_MASKC 0x607b
+ #define MASK_VT_MASKC 0xfe00707f
+ #define MATCH_VT_MASKCN 0x707b
+@@ -5151,6 +5154,7 @@ DECLARE_INSN(th_sync_i, MATCH_TH_SYNC_I, MASK_TH_SYNC_I)
+ DECLARE_INSN(th_sync_is, MATCH_TH_SYNC_IS, MASK_TH_SYNC_IS)
+ DECLARE_INSN(th_sync_s, MATCH_TH_SYNC_S, MASK_TH_SYNC_S)
+ /* Vendor-specific (Ventana Microsystems) XVentanaCondOps instructions. */
++DECLARE_INSN(attn, MATCH_ATTN, MASK_ATTN)
+ DECLARE_INSN(vt_maskc, MATCH_VT_MASKC, MASK_VT_MASKC)
+ DECLARE_INSN(vt_maskcn, MATCH_VT_MASKCN, MASK_VT_MASKCN)
+ /* Vendor-specific (MIPS) instructions.  */
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index a5b02aff3be..2401f82191f 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -624,6 +624,7 @@ enum riscv_insn_class
+   INSN_CLASS_XTHEADVDOT,
+   INSN_CLASS_XTHEADZVAMO,
+   INSN_CLASS_XVENTANACONDOPS,
++  INSN_CLASS_XATTN,
+   INSN_CLASS_XSFVCP,
+   INSN_CLASS_XSFCEASE,
+   INSN_CLASS_XSFVQMACCQOQ,
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 49bf79cbe74..292cf44b59c 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -3567,6 +3567,9 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vt.maskc",   64, INSN_CLASS_XVENTANACONDOPS, "d,s,t", MATCH_VT_MASKC, MASK_VT_MASKC, match_opcode, 0 },
+ {"vt.maskcn",  64, INSN_CLASS_XVENTANACONDOPS, "d,s,t", MATCH_VT_MASKCN, MASK_VT_MASKCN, match_opcode, 0 },
+ 
++/* Xattn fused multi-head self-attention.  */
++{"attn",        0, INSN_CLASS_XATTN, "d,s,t,r", MATCH_ATTN, MASK_ATTN, match_opcode, 0 },
++
+ /* Vendor-specific (SiFive) vector coprocessor interface instructions.  */
+ {"sf.vc.x",     0, INSN_CLASS_XSFVCP, "XsO2,Xst,Xsd,s",  MATCH_SF_VC_X, MASK_SF_VC_X, match_opcode, 0 },
+ {"sf.vc.v.x",   0, INSN_CLASS_XSFVCP, "XsO2,Xst,Vd,s",  MATCH_SF_VC_V_X, MASK_SF_VC_V_X, match_opcode, 0 },

@@ -1,0 +1,20 @@
+[submodule "binutils"]
+	path = binutils
+	url = https://github.com/gnutools/binutils-gdb.git
+	branch = binutils-2_47-branch
+[submodule "gcc"]
+	path = gcc
+	url = https://github.com/gcc-mirror/gcc.git
+	branch = releases/gcc-16
+[submodule "spike"]
+	path = spike
+	url = https://github.com/riscv-software-src/riscv-isa-sim.git
+	branch = master
+[submodule "qemu"]
+	path = qemu
+	url = https://github.com/qemu/qemu.git
+	branch = master
+[submodule "newlib"]
+	path = newlib
+	url = https://github.com/cygwin/cygwin.git
+	branch = main

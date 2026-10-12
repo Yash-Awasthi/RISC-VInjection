@@ -1,132 +1,163 @@
 #!/usr/bin/env python3
-"""Executable model of the attn instruction, see docs/01-instruction-spec.md.
+"""Independent model of the attn instruction (docs/01-instruction-spec.md).
 
-Three things are proven here, not just asserted:
-  1. the R4-type instruction word and the Q/K/V matrix blocks decode
-     from raw bytes -- the same bytes real hardware would read out of
-     a register file and memory, not from python call arguments.
-  2. the architectural semantics O = softmax(Q K^T / sqrt(d)) V match
-     an independently written scalar reference within 1e-5.
-  3. the register-block layout below is the one true copy of the
-     attn_ptrs/attn_dims/attn_cfg ABI; scripts/tests/test_attn_contract.py
-     parses demo/attn.h and diffs it against ATTN_STRUCTS field-for-field.
+Written from the specification in float64 with NumPy, without looking at
+include/attn_core.h, so the tests can compare the two.  Also owns the
+instruction encoding and the byte layout of the rs2/rs3 descriptors, which
+tests/test_core.py checks against the C structs.
 """
 
 import struct
+
 import numpy as np
 
-MATCH_ATTN = 0x0000000b
-MASK_ATTN = 0x0600707f
+ATTN_MATCH = 0x0600107B
+ATTN_MASK = 0x0600707F
+DT_F32, DT_BF16 = 0, 1
+F_CAUSAL, F_SCALE = 1, 2
 
-# rd/rs1/rs2/rs3 register-block layouts, byte widths on rv64 (pointers and
-# uint64_t are 8 bytes, uint32_t is 4). Each value is (field, C type, width)
-# in declaration order -- the same order demo/attn.h must declare them in.
-ATTN_STRUCTS = {
-    "attn_ptrs": [                      # rs1 -> &{ Q_ptr, K_ptr, V_ptr }
-        ("q", "const void *", 8),
-        ("k", "const void *", 8),
-        ("v", "const void *", 8),
-    ],
-    "attn_dims": [                      # rs2 -> &{ N, D, H }
-        ("n", "uint64_t", 8),
-        ("d", "uint64_t", 8),
-        ("h", "uint64_t", 8),
-    ],
-    "attn_cfg": [                       # rs3 -> &{ scale_bits, flags }
-        ("scale_bits", "uint32_t", 4),
-        ("flags", "uint32_t", 4),
-    ],
-}
+WEIGHTS_FMT = "<8Q"          # wq wk wv wo bq bk bv bo
+CFG_FMT = "<5I2H2IQ"         # n e h h_kv flags in_dtype out_dtype scale_bits reserved mask
+WEIGHTS_FIELDS = ["wq", "wk", "wv", "wo", "bq", "bk", "bv", "bo"]
+CFG_FIELDS = ["n", "e", "h", "h_kv", "flags", "in_dtype", "out_dtype",
+              "scale_bits", "reserved", "mask"]
 
 
-def decode_insn(raw):
-    """Decode a 4-byte little-endian attn word into its R4-type fields."""
-    insn, = struct.unpack("<I", raw)
-    if (insn & MASK_ATTN) != MATCH_ATTN:
-        raise ValueError("not an attn instruction: 0x%08x" % insn)
-    return {
-        "opcode": insn & 0x7f,
-        "rd": (insn >> 7) & 0x1f,
-        "funct3": (insn >> 12) & 0x7,
-        "rs1": (insn >> 15) & 0x1f,
-        "rs2": (insn >> 20) & 0x1f,
-        "funct2": (insn >> 25) & 0x3,
-        "rs3": (insn >> 27) & 0x1f,
-    }
+def encode(rd, rs1, rs2, rs3):
+    return ATTN_MATCH | rd << 7 | rs1 << 15 | rs2 << 20 | rs3 << 27
 
 
-def encode_insn(rd, rs1, rs2, rs3):
-    """Inverse of decode_insn, used only to build a test instruction word."""
-    insn = MATCH_ATTN | (rd << 7) | (rs1 << 15) | (rs2 << 20) | (rs3 << 27)
-    return struct.pack("<I", insn)
+def decode(word):
+    if word & ATTN_MASK != ATTN_MATCH:
+        raise ValueError("not attn: 0x%08x" % word)
+    return dict(rd=word >> 7 & 31, rs1=word >> 15 & 31,
+                rs2=word >> 20 & 31, rs3=word >> 27 & 31)
 
 
-def read_matrix(mem, addr, n, d):
-    """Read an [n x d] row-major float32 block out of raw memory bytes."""
-    flat = np.frombuffer(mem, dtype="<f4", count=n * d, offset=addr)
-    return flat.reshape(n, d).copy()
+def bf16_bits(a):
+    """float32 array -> uint16 bf16 bits, round to nearest even."""
+    u = np.asarray(a, np.float32).view(np.uint32).astype(np.uint64)
+    r = ((u + 0x7FFF + ((u >> 16) & 1)) >> 16).astype(np.uint16)
+    nan = (u & 0x7FFFFFFF) > 0x7F800000
+    r[nan] = ((u[nan] >> 16) | 0x40).astype(np.uint16)
+    return r
 
 
-def write_matrix(mem, addr, m):
-    """Write an [n x d] float32 matrix into raw memory bytes at addr."""
-    data = np.ascontiguousarray(m, dtype="<f4").tobytes()
-    mem[addr:addr + len(data)] = data
+def from_bf16_bits(b):
+    return (np.asarray(b, np.uint16).astype(np.uint32) << 16).view(np.float32)
 
 
-def attn(q, k, v, d):
-    """O = softmax(Q K^T / sqrt(d)) V, row-wise stable softmax."""
-    s = (q @ k.T) / np.sqrt(d)
-    s = s - s.max(axis=1, keepdims=True)
-    p = np.exp(s)
-    p = p / p.sum(axis=1, keepdims=True)
-    return p @ v
+def round_dtype(a, dt):
+    a = np.asarray(a, np.float32)
+    return from_bf16_bits(bf16_bits(a)) if dt == DT_BF16 else a
 
 
-def attn_reference(q, k, v, d):
-    """Scalar reference for attn(), written independently for the self-check."""
-    n = q.shape[0]
-    o = np.zeros_like(v)
-    for i in range(n):
-        row = [float(np.dot(q[i], k[j])) / d ** 0.5 for j in range(n)]
-        m = max(row)
-        exps = [np.exp(x - m) for x in row]
-        z = sum(exps)
-        for j in range(n):
-            o[i] += (exps[j] / z) * v[j]
-    return o
+def reference(x, wq, wk, wv, wo, bq=None, bk=None, bv=None, bo=None,
+              h=1, h_kv=0, causal=False, mask=None, scale=None):
+    """Multi-head self-attention in float64.  Weights are [in][out]."""
+    f = lambda a: None if a is None else np.asarray(a, np.float64)
+    x, wq, wk, wv, wo = map(f, (x, wq, wk, wv, wo))
+    bq, bk, bv, bo, mask = map(f, (bq, bk, bv, bo, mask))
+    n, e = x.shape
+    h_kv = h_kv or h
+    d = e // h
+    q = x @ wq + (0 if bq is None else bq)
+    k = x @ wk + (0 if bk is None else bk)
+    v = x @ wv + (0 if bv is None else bv)
+    scale = 1 / np.sqrt(d) if scale is None else scale
+    heads = []
+    for j in range(h):
+        g = j // (h // h_kv)
+        s = q[:, j * d:(j + 1) * d] @ k[:, g * d:(g + 1) * d].T * scale
+        if mask is not None:
+            s = s + mask
+        if causal:
+            s = np.where(np.tri(n, dtype=bool), s, -np.inf)
+        with np.errstate(invalid="ignore"):
+            p = np.exp(s - s.max(axis=1, keepdims=True))
+            p = p / p.sum(axis=1, keepdims=True)
+        heads.append(p @ v[:, g * d:(g + 1) * d])
+    return np.concatenate(heads, axis=1) @ wo + (0 if bo is None else bo)
 
 
-if __name__ == "__main__":
-    n, d = 64, 32  # shape from demo/sdpa_test.c: N=64 tokens, D=32 head dim
-    rng = np.random.default_rng(0)
-    q0 = rng.standard_normal((n, d)).astype("<f4")
-    k0 = rng.standard_normal((n, d)).astype("<f4")
-    v0 = rng.standard_normal((n, d)).astype("<f4")
+class Image:
+    """Flat little-endian guest memory with a bump allocator."""
 
-    # simulated flat memory: the three matrix blocks live at distinct addresses,
-    # spaced by the block size in bytes so they never overlap
-    blk = n * d * 4
-    mem = bytearray(0x1000 + 3 * blk)
-    addr_q, addr_k, addr_v = 0x1000, 0x1000 + blk, 0x1000 + 2 * blk
-    write_matrix(mem, addr_q, q0)
-    write_matrix(mem, addr_k, k0)
-    write_matrix(mem, addr_v, v0)
+    def __init__(self, base=0x1000):
+        self.base = base
+        self.buf = bytearray()
 
-    q = read_matrix(mem, addr_q, n, d)
-    k = read_matrix(mem, addr_k, n, d)
-    v = read_matrix(mem, addr_v, n, d)
-    assert np.array_equal(q, q0) and np.array_equal(k, k0) and np.array_equal(v, v0), \
-        "matrix blocks did not survive a raw memory round trip"
+    def put(self, data, align=16):
+        pad = -len(self.buf) % align
+        self.buf += bytes(pad)
+        addr = self.base + len(self.buf)
+        self.buf += data
+        return addr
 
-    # worked example from docs/01-instruction-spec.md S5: attn a3,a0,a1,a2
-    raw_insn = encode_insn(rd=13, rs1=10, rs2=11, rs3=12)
-    assert raw_insn == struct.pack("<I", 0x60b5068b)
-    fields = decode_insn(raw_insn)
-    assert fields == {"opcode": 0x0b, "rd": 13, "funct3": 0, "rs1": 10,
-                       "rs2": 11, "funct2": 0, "rs3": 12}
+    def array(self, a, dt):
+        a = np.ascontiguousarray(a, np.float32)
+        return self.put((bf16_bits(a) if dt == DT_BF16 else a).tobytes())
 
-    o = attn(q, k, v, d)
-    o_golden = attn_reference(q, k, v, d)
-    err = float(np.max(np.abs(o - o_golden)))
-    print("max abs err vs golden: %.3e" % err)
-    assert err < 1e-5, "attn() diverges from the scalar reference"
+    def reserve(self, nbytes):
+        return self.put(bytes(nbytes))
+
+
+def scale_bits(scale):
+    return struct.unpack("<I", struct.pack("<f", scale))[0]
+
+
+class Case:
+    """A random attn problem laid out in an Image, plus its expected Y."""
+
+    def __init__(self, rng, n, e, h, h_kv=0, flags=0, in_dt=DT_F32,
+                 out_dt=DT_F32, bias=True, mask=False, scale=None,
+                 base=0x1000):
+        self.n, self.e, self.h, self.h_kv = n, e, h, h_kv
+        self.flags, self.in_dt, self.out_dt = flags, in_dt, out_dt
+        kv = (h_kv or h) * (e // h)
+        g = lambda *s: rng.standard_normal(s).astype(np.float32)
+        w = 1 / np.sqrt(e)
+        self.x = g(n, e)
+        self.wq, self.wk, self.wv, self.wo = (g(e, e) * w, g(e, kv) * w,
+                                              g(e, kv) * w, g(e, e) * w)
+        self.b = [g(e), g(kv), g(kv), g(e)] if bias else [None] * 4
+        self.mask = None
+        if mask:
+            self.mask = np.where(rng.random((n, n)) < 0.2, -np.inf,
+                                 g(n, n)).astype(np.float32)
+            self.mask[:, 0] = 0  # keep every row alive
+        if scale is not None:
+            self.flags |= F_SCALE
+        self.scale = scale
+
+        im = self.image = Image(base)
+        self.x_addr = im.array(self.x, in_dt)
+        wp = [im.array(a, in_dt) for a in (self.wq, self.wk, self.wv, self.wo)]
+        bp = [0 if b is None else im.array(b, DT_F32) for b in self.b]
+        mp = 0 if self.mask is None else im.array(self.mask, DT_F32)
+        self.w_addr = im.put(struct.pack(WEIGHTS_FMT, *wp, *bp))
+        self.c_addr = im.put(struct.pack(
+            CFG_FMT, n, e, h, h_kv, self.flags, in_dt, out_dt,
+            scale_bits(scale) if scale is not None else 0, 0, mp))
+        self.y_addr = im.reserve(n * e * (2 if out_dt == DT_BF16 else 4))
+
+    def expected(self):
+        r = lambda a: round_dtype(a, self.in_dt)
+        return reference(r(self.x), r(self.wq), r(self.wk), r(self.wv),
+                         r(self.wo), *self.b, h=self.h, h_kv=self.h_kv,
+                         causal=bool(self.flags & F_CAUSAL), mask=self.mask,
+                         scale=self.scale)
+
+    def read_y(self, mem):
+        off = self.y_addr - self.image.base
+        cnt = self.n * self.e
+        if self.out_dt == DT_BF16:
+            raw = np.frombuffer(bytes(mem[off:off + 2 * cnt]), np.uint16)
+            y = from_bf16_bits(raw)
+        else:
+            y = np.frombuffer(bytes(mem[off:off + 4 * cnt]), np.float32)
+        return y.reshape(self.n, self.e)
+
+    def tolerance(self):
+        """Absolute tolerance for comparing Y with expected()."""
+        return 2.0 ** -7 if self.out_dt == DT_BF16 else 1e-4

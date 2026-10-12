@@ -1,353 +1,98 @@
-<p align="center">
-  <a href="./README.md"><strong>Overview</strong></a> ·
-  <a href="./docs/README.md">Docs index</a> ·
-  <a href="./demo/README.md">Reference demo</a> ·
-  <a href="./scripts/README.md">Generic pipeline</a>
-</p>
+# RISC-V Xattn: multi-head self-attention in one instruction
 
-<p align="center">
-  <a href="./docs/00-background.md">Background</a> ·
-  <a href="./docs/01-instruction-spec.md">Instruction Spec</a> ·
-  <a href="./docs/02-compiler-pass.md">Compiler Pass</a> ·
-  <a href="./docs/03-build-and-run.md">Build &amp; Run</a> ·
-  <a href="./docs/04-patches-and-files.md">Patches &amp; Files</a> ·
-  <a href="./docs/05-troubleshooting.md">Troubleshooting</a> ·
-  <a href="./docs/06-extending-toolchain.md">Extending</a> ·
-  <a href="./docs/07-research-context.md">Research Context</a> ·
-  <a href="./docs/08-glossary.md">Glossary</a>
-</p>
+```
+Y = concat_j softmax(Q_j K_j^T * scale + M) V_j  Wo + bo,   Q = X Wq + bq, K = X Wk + bk, V = X Wv + bv
 
-# `attn` — A Custom RISC-V Instruction for Transformer Attention
+attn  a3, a0, a1, a2        # 0x66b516fb: Y, X, &weights, &config
+```
 
-> A modified `riscv-gnu-toolchain` that adds a custom `attn` machine
-> instruction and exposes it two ways: an explicit
-> `__builtin_riscv_attn` builtin (the primary, non-experimental
-> path — no inline assembly, no `.insn` directives), and an
-> experimental, off-by-default GIMPLE pass that tries to recognise
-> the scaled dot-product attention (SDPA) pattern in ordinary,
-> unmodified C code and rewrite it to the same instruction. The
-> instruction itself has never executed anywhere — there is no
-> simulator or hardware model for it (see the status table below).
+This repository adds a custom RISC-V extension, **Xattn**. Its single
+instruction, `attn`, computes a complete transformer attention block:
+- the Q/K/V projections with biases;
+- scaled dot-product attention for every head, with optional causal
+  masking, an additive mask, grouped-query attention and an explicit scale;
+- the output projection.
 
----
+Inputs can be binary32 or bfloat16, with binary32 arithmetic throughout.
 
-## How to run the program
+The extension is implemented end to end on current upstream sources:
 
-This section is the shortest possible recipe for going from a fresh
-clone to a verified `attn` instruction in compiler output. For the
-narrative version with troubleshooting, see
-[`docs/03-build-and-run.md`](docs/03-build-and-run.md).
+| Layer | Project | What works |
+|-------|---------|------------|
+| Assembler, disassembler | binutils 2.47 branch | `attn` under `-march=..._xattn`, ELF attribute `xattn1p0`, objdump |
+| Compiler | GCC 16.2 | `-march=..._xattn`, `__riscv_xattn`, `__builtin_riscv_attn`, scheduling under every pipeline model |
+| Compiler, automatic | GCC 16.2 | `-mattn-recognize`: proves that C attention loops equal the instruction and replaces all five loop nests with **one** `attn`, behind a runtime guard |
+| Simulator | Spike | `--isa=rv64gc_xattn`, precise traps, disassembly |
+| Simulator | QEMU | `-cpu rv64,xattn=on`, system and user mode, precise traps, `-d in_asm` |
 
-### 0. Prerequisites (once per machine)
+All three executions (Spike, QEMU, host) run one shared definition,
+`include/attn_core.h`, and agree bit for bit. That definition is checked
+against an independent float64 model.
+
+## Quick start
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y \
-    autoconf automake autotools-dev curl python3 python3-pip python3-tomli \
-    libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison flex \
-    texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev ninja-build \
-    git cmake libglib2.0-dev libslirp-dev libncurses-dev
+git clone https://github.com/Yash-Awasthi/RISC-V_Injection.git && cd RISC-V_Injection
+git submodule update --init gcc binutils spike qemu newlib
+scripts/patches.sh apply      # Xattn patches on the pinned upstream commits
+make                          # toolchain + simulators, about 15 minutes on 16 cores
+make check                    # every test, a few minutes
 ```
 
-Disk: ≥ 12 GiB free. RAM: ≥ 8 GiB. Build time: 45–90 min on 8 cores.
-Tested on Ubuntu 24.04 / WSL2.
+Step-by-step instructions, package lists and troubleshooting are in
+[docs/build-and-test.md](docs/build-and-test.md).
 
-### 1. Clone the repository
+## From C to one instruction
 
 ```bash
-git clone https://github.com/Yash-Awasthi/CD.git riscv-attn
-cd riscv-attn
+out/toolchain/bin/riscv64-unknown-elf-gcc -march=rv64gc_xattn -O2 -fno-math-errno \
+    -mattn-recognize -fopt-info-loop -S demo/mha_plain.c -o - | grep -w attn
+demo/mha_plain.c:53:23: optimized: multi-head self-attention (causal, biased) replaced with attn
+	attn	s6,s9,a5,a4
 ```
 
-### 2. Configure and build the modified toolchain
+`demo/mha_plain.c` is ordinary C: three projection loops, the per-head
+softmax loops and the output projection, about 90 lines. Or call the
+instruction directly through `include/attn.h`:
+
+```c
+#include "attn.h"
+attn_mha (y, x, &weights, &cfg);   /* one attn with Xattn, attn_core.h without */
+```
+
+## Add your own instruction
 
 ```bash
-./configure --prefix=$HOME/riscv-install \
-            --with-arch=rv64gc --with-abi=lp64d --disable-gdb
-make -j$(nproc) 2>&1 | tee build.log
+scripts/find_opcodes.py --inputs 2            # free encodings, checked against ~3000 known ones
+scripts/xinsn.py apply examples/insns/mac.spec   # into binutils, GCC, Spike and QEMU
+scripts/build.sh binutils gcc spike qemu
+scripts/xinsn.py test examples/insns/mac.spec    # runs on QEMU and Spike
 ```
 
-Produces `riscv64-unknown-elf-{gcc,as,objdump,…}` under
-`$HOME/riscv-install/bin/`.
+See [docs/new-instruction.md](docs/new-instruction.md).
 
-### 3. Verify the assembler accepts `attn` (Layer 1)
+## Documentation
 
-```bash
-echo '_start: attn a3, a0, a1, a2' > /tmp/t.S
-$HOME/riscv-install/bin/riscv64-unknown-elf-as /tmp/t.S -o /tmp/t.o
-$HOME/riscv-install/bin/riscv64-unknown-elf-objdump -d /tmp/t.o | grep attn
-# Expect: ... 0000000b ... attn  a3,a0,a1,a2
-```
+| Document | For |
+|----------|-----|
+| [docs/theory.md](docs/theory.md) | attention, multi-head, GQA, bf16, stable softmax; RISC-V formats, custom opcodes, vendor extensions |
+| [docs/spec.md](docs/spec.md) | the normative definition: encoding, descriptors, exact semantics, exceptions |
+| [docs/implementation.md](docs/implementation.md) | every file changed in binutils, GCC, Spike and QEMU, and why |
+| [docs/recognizer.md](docs/recognizer.md) | how GCC proves C loops equal to `attn` |
+| [docs/build-and-test.md](docs/build-and-test.md) | building and testing on a fresh machine |
+| [docs/new-instruction.md](docs/new-instruction.md) | the opcode finder and the instruction generator |
+| [docs/study.md](docs/study.md) | a reading path through the theory and the code |
 
-### 4. Verify GCC emits `attn` automatically from plain C (Layer 2)
-
-```bash
-$HOME/riscv-install/bin/riscv64-unknown-elf-gcc \
-    -mattn -mattn-recognize -O2 \
-    -fno-schedule-insns -fno-schedule-insns2 \
-    -S demo/sdpa_test.c -o /tmp/sdpa_test.s
-grep -n '\battn\b' /tmp/sdpa_test.s
-# Expect: a single line such as:
-#   ...:        attn    a3,a0,a1,a2
-```
-
-### 5. Run the full verification harness (recommended)
-
-```bash
-chmod +x demo/verify_attn.sh
-./demo/verify_attn.sh demo/sdpa_test.c
-# Expect: all PASS lines and a final “verification complete”.
-```
-
-### 6. Add *another* custom instruction (optional)
-
-`scripts/inject.sh` is a bash script (no Python; Linux, macOS, WSL, Git Bash)
-that turns one instruction spec into support for a *new* custom mnemonic in
-binutils, GCC, LLVM, Spike, QEMU, customasm and `.insn` form:
-
-```bash
-bash scripts/tests/test_inject.sh                      # no toolchain needed
-scripts/inject.sh --mnemonic mac --format R4 --semantics "rs1 * rs2 + rs3"
-scripts/inject.sh spec.txt --backend binutils,gcc --apply
-scripts/inject.sh spec.txt --verify $HOME/riscv-install
-```
-
-See [`scripts/README.md`](scripts/README.md) for the full surface.
-
----
-
-## At a glance
-
-| Item | Value |
-|------|-------|
-| Mnemonic | `attn` |
-| Format | R4-type (4 register operands, like `fmadd`) |
-| Opcode slot | `custom-0` (`opcode[6:0] = 0x0b`) |
-| MATCH / MASK | `0x0000000b` / `0x0600707f` |
-| Compiler flag | `-mattn` (instruction + `__builtin_riscv_attn`, primary path), `-mattn-recognize` (experimental idiom recognizer, off by default) |
-| GCC version | 15.2.0 (riscv-gnu-toolchain fork) |
-| Binutils version | 2.46 |
-| Pass position | `attnrec` idiom recognizer: #179 in the GIMPLE pipeline (after Graphite) |
-| Builtin | `__builtin_riscv_attn(rd, rs1, rs2, rs3)`, maps 1:1 onto the `attn` RTL pattern — no internal function involved |
-| Status | Encoding, builtin, and recognizer are toolchain-side complete; the instruction has never executed on hardware or a simulator; the recognizer is experimental and known-unsound (see status table below) |
-
-The instruction is the compiler-visible counterpart of the operation
-implemented by every Transformer self-attention block:
-
-$$
-\text{Attention}(Q, K, V) \;=\; \mathrm{softmax}\!\left(\frac{Q K^{\top}}{\sqrt{d_k}}\right) V
-$$
-
-A plain C implementation of this expression — four loop nests, an
-`expf` call, a division, several thousand multiply-adds — is reduced
-by the compiler to a single 32-bit machine word:
-
-```asm
-attn  a3, a0, a1, a2     # rd = O,  rs1 = Q,  rs2 = K,  rs3 = V
-```
-
----
-
-## Repository layout
+## Layout
 
 ```
-CD/
-├── README.md                 ← you are here (overview + how to run)
-├── docs/                     ← deep-dive documentation set
-│   └── README.md             ← documentation index (audience guide)
-├── demo/                     ← reference attn demonstration
-│   ├── README.md
-│   ├── sdpa_test.c           ← canonical SDPA test source
-│   ├── sdpa_test.s           ← expected assembly output
-│   ├── sdpa_test.c.179t.attnrec  ← GIMPLE dump after pass #179
-│   └── verify_attn.sh        ← end-to-end verification harness
-├── scripts/                  ← generic “add a new custom RISC-V insn” pipeline
-│   ├── README.md
-│   ├── inject.sh             ← generic injector (bash)
-│   └── tests/                ← inject.sh self-check, attn contract test
-├── gcc/                      ← upstream GCC 15.2 source tree (modified) — DO NOT TOUCH MANUALLY
-└── binutils/                 ← upstream binutils 2.46 source tree (modified) — DO NOT TOUCH MANUALLY
+include/        attn_abi.h (interface), attn_core.h (definition), attn.h (C API)
+demo/           mha_plain.c, the C code the compiler turns into one attn
+patches/        the Xattn change to each upstream project, as git patches
+gcc/ binutils/ spike/ qemu/ newlib/    upstream submodules (official mirrors)
+scripts/        build.sh, patches.sh, find_opcodes.py, xinsn.py
+examples/insns/ instruction specs for xinsn.py (1, 2 and 3 inputs)
+tests/          host model tests, bare-metal simulator tests, recognizer tests
+tools/          independent float64 model and host runner
+docs/           the documents above
 ```
-
-The `gcc/` and `binutils/` directories are vendored upstream sources
-with the project's modifications applied in place. Every change in
-those trees is enumerated, with line numbers and rationales, in
-[`docs/04-patches-and-files.md`](docs/04-patches-and-files.md).
-
----
-
-## What this project actually contains
-
-This repository is a fork of [`riscv-gnu-toolchain`](https://github.com/riscv-collab/riscv-gnu-toolchain).
-On top of the upstream sources, it adds:
-
-1. **A new GIMPLE optimisation pass** (`attnrec`,
-   `gcc/gcc/tree-ssa-attn.cc`, ~500 lines) that walks every loop nest
-   in the function being compiled and decides whether it implements
-   SDPA.
-2. **An explicit GCC builtin**, `__builtin_riscv_attn`
-   (`gcc/gcc/config/riscv/riscv-builtins.cc`,
-   `gcc/gcc/config/riscv/riscv-ftypes.def`), that maps its four
-   `void *` arguments straight onto the RTL pattern below — no
-   internal function, no hand-written expander. Used directly by
-   [`demo/attn.h`](demo/attn.h) and [`demo/sdpa_builtin.c`](demo/sdpa_builtin.c).
-   An earlier revision routed this through a dedicated internal
-   function, `IFN_RISCV_ATTN`; that internal function has since been
-   deleted from the tree in favour of the direct builtin call.
-3. **A new RTL pattern** (`define_insn "riscv_attn"` in
-   `gcc/gcc/config/riscv/riscv.md`) that emits the assembly mnemonic.
-4. **Two new compiler flags** (`gcc/gcc/config/riscv/riscv.opt`):
-   `-mattn` makes the `attn` instruction and the builtin available —
-   this is the primary, non-experimental path; `-mattn-recognize`
-   separately enables the experimental idiom recognizer described
-   above, and is off by default.
-5. **A new binutils opcode table entry** so that GAS can encode `attn`
-   and `objdump` can disassemble it
-   (`binutils/include/opcode/riscv-opc.h`,
-   `binutils/opcodes/riscv-opc.c`).
-
-Two entry points exist side by side. The **explicit builtin**
-(`__builtin_riscv_attn`, via [`demo/attn.h`](demo/attn.h)) requires
-the programmer to state the operation, in exchange for no
-pattern-matching risk — this is the recommended path. The
-**idiom recognizer** (`attnrec`) instead leaves the user's C code
-unchanged — no header, no intrinsic call, no inline-asm block — and
-tries to detect SDPA automatically during normal `-O2` compilation.
-It is gated by the separate, off-by-default `-mattn-recognize` flag
-precisely because that automatic detection is experimental and known
-to be unsound in at least one documented case — see the
-known-limitation note in
-[`docs/02-compiler-pass.md`](docs/02-compiler-pass.md) and the
-known-false-positive case in
-[`demo/failures/README.md`](demo/failures/README.md#known-false-positive-fail_scattered-signature-known-false-positivec)
-before enabling it on real code.
-
----
-
-## The documentation set
-
-The long-form documentation under `docs/` is written for two
-audiences in parallel: a CS undergraduate who has never opened a
-compiler source tree, and a research supervisor or reviewer who
-wants the depth and the citations. Every file is self-contained;
-the numbering below is a suggested reading order, not a hard
-dependency chain.
-
-| File | Audience | Read it for |
-|------|----------|-------------|
-| [`README.md`](README.md) | everyone | this overview |
-| [`docs/README.md`](docs/README.md) | everyone | docs index + reading order |
-| [`docs/00-background.md`](docs/00-background.md) | undergraduate | RISC-V, attention, the GCC pipeline, GIMPLE/SSA, custom instructions — from zero |
-| [`docs/01-instruction-spec.md`](docs/01-instruction-spec.md) | undergraduate + supervisor | the ISA-level specification of `attn` (encoding, semantics, ABI, worked decoding) |
-| [`docs/02-compiler-pass.md`](docs/02-compiler-pass.md) | undergraduate + supervisor | the `attnrec` pass — how it detects SDPA and emits the instruction |
-| [`docs/03-build-and-run.md`](docs/03-build-and-run.md) | undergraduate | how to build the toolchain and verify each layer |
-| [`docs/04-patches-and-files.md`](docs/04-patches-and-files.md) | undergraduate + supervisor | every file that changed, the exact diff, and *why* |
-| [`docs/05-troubleshooting.md`](docs/05-troubleshooting.md) | implementer | every ICE / build error encountered, with root cause and fix |
-| [`docs/06-extending-toolchain.md`](docs/06-extending-toolchain.md) | researcher | template for adding *any* new RISC-V custom instruction |
-| [`docs/07-research-context.md`](docs/07-research-context.md) | supervisor | related work, novelty claim, limitations, future research |
-| [`docs/08-glossary.md`](docs/08-glossary.md) | undergraduate | every acronym and term used in this repo, defined |
-
----
-
-## Suggested reading order
-
-**If you have ~30 minutes and want the gist**
-
-1. This README.
-2. [`docs/00-background.md`](docs/00-background.md) §1–§4
-   (just enough RISC-V and just enough attention).
-3. [`docs/01-instruction-spec.md`](docs/01-instruction-spec.md) §1–§3.
-4. [`docs/02-compiler-pass.md`](docs/02-compiler-pass.md) §1–§4
-   (the high-level idea of the pass).
-
-**If you are evaluating this as research output**
-
-1. [`docs/07-research-context.md`](docs/07-research-context.md) (positioning).
-2. [`docs/02-compiler-pass.md`](docs/02-compiler-pass.md) (the contribution).
-3. [`docs/01-instruction-spec.md`](docs/01-instruction-spec.md) (the artefact).
-4. [`docs/05-troubleshooting.md`](docs/05-troubleshooting.md) (depth of engagement with GCC internals).
-
-**If you want to reproduce the build**
-
-1. [`docs/03-build-and-run.md`](docs/03-build-and-run.md).
-2. [`docs/05-troubleshooting.md`](docs/05-troubleshooting.md) when something
-   inevitably goes wrong.
-
----
-
-## What the result looks like
-
-Compiling a clean C implementation of fused SDPA (`demo/sdpa_test.c`)
-with the modified toolchain:
-
-```bash
-$HOME/riscv-install/bin/riscv64-unknown-elf-gcc \
-    -mattn -mattn-recognize -O2 \
-    -fno-schedule-insns -fno-schedule-insns2 \
-    -S demo/sdpa_test.c -o /tmp/sdpa_test.s
-```
-
-produces, among the usual prologue/epilogue, a single line:
-
-```asm
-        attn    a3,a0,a1,a2
-```
-
-That one instruction stands in for what is otherwise hundreds of
-lines of unrolled vectorised loop body. The original loops are still
-present in the output — the compiler matched the pattern but did not
-*prove* the hardware is semantically equivalent — see
-[§7 of `docs/02-compiler-pass.md`](docs/02-compiler-pass.md#7-why-the-loop-body-stays-and-what-removing-it-would-take)
-for why this is the correct behaviour and how to take the next step.
-
----
-
-## Project status and what is *not* in this repository
-
-| Layer | Status | Where it lives |
-|-------|--------|----------------|
-| Toolchain-side encoding (assembler / disassembler) | Complete | this repo |
-| Explicit builtin (`__builtin_riscv_attn`, primary path) | Complete; ABI (`attn_ptrs`/`attn_dims`/`attn_cfg`) matches [`docs/01-instruction-spec.md` §4](docs/01-instruction-spec.md#4-operand-convention-and-abi) | this repo, see [`demo/attn.h`](demo/attn.h) |
-| Compiler pattern matching (`attnrec` pass) | Experimental, off by default (`-mattn-recognize`). **Known unsound**, not just incomplete: [`demo/failures/fail_scattered-signature-known-false-positive.c`](demo/failures/fail_scattered-signature-known-false-positive.c) is a documented, currently-unfixed case where the matcher accepts non-attention code. It also does not build the block ABI above — it emits the pre-ABI raw O/Q/K/V pointer form, a known limitation stated in the pass's own source. Do not enable on real code; see `plan.md` item 1. | this repo |
-| RTL / IR plumbing (`define_insn`, builtin expansion) | Complete | this repo |
-| Generic pipeline for *new* custom instructions | Complete | `scripts/` |
-| Semantics: executable Python model, no RTL | Complete | [`tools/attn_model.py`](tools/attn_model.py) |
-| **Instruction executed anywhere** (simulator or hardware) | **Never executed. No Spike/QEMU model and no hardware exist for `attn`** — Phase 4, not started | future work |
-| Synthesisable RTL (Verilog/Chisel) for an accelerator | Out of scope | future work |
-| Equivalence proof / verified loop deletion | Out of scope — blocked on the row above | future work |
-
-Because the instruction has never executed, nothing in this repo has
-measured whether `attn` is correct, let alone whether it is faster
-than the loop it replaces — the compiled output always contains
-*both* the `attn` call and the original loop body (see below), and
-the loop body is what actually runs today, on every path, including
-the primary builtin one. The contribution of this project is
-therefore precisely the **software-side custom-instruction
-infrastructure**, demonstrated end to end on a non-trivial
-computation, not a working accelerator. The hardware accelerator is
-the natural next step in a hardware/software co-design pipeline; see
-[§5 of `docs/07-research-context.md`](docs/07-research-context.md#5-future-work)
-and `plan.md`.
-
----
-
-## Author and credits
-
-* **Author:** Yash Awasthi
-* **Upstream toolchain:** `riscv-gnu-toolchain` (RISC-V International)
-* **Compiler:** GCC 15.2.0
-* **Binutils:** 2.46
-* **Host platform tested:** Ubuntu 24.04 / WSL2
-
-Bug reports and questions are welcome via the repository issue tracker.
-
----
-
-## License
-
-The toolchain sources retain their original licenses (GPLv3 for GCC,
-GPLv3 / LGPL for binutils, etc.). The project-specific additions
-(`gcc/gcc/tree-ssa-attn.cc`, the documentation set under `docs/`,
-the reference test program in `demo/`, and the generic pipeline in
-`scripts/`) are released under the same license as the component
-they extend.
