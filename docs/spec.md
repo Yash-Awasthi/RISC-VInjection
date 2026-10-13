@@ -138,10 +138,14 @@ nothing, when any of these holds:
 
 - `-march=..._xattn` enables the extension in GCC and binutils and
   defines `__riscv_xattn` (value 1000000, for version 1.0).
-- `void __builtin_riscv_attn(void *y, const void *x, const void *w, const void *cfg)`
-  emits one `attn`.
+- `void __builtin_attn(void *y, const void *x, const void *w, const void *cfg)`
+  is a GCC builtin on every target, like `__builtin_fma`. With Xattn it
+  emits one `attn`, at any optimization level. Without Xattn it calls
+  `__attn` in libgcc, which runs `attn_core.h` (link with `-lm`).
+- `void __builtin_riscv_attn(...)`, the same with the same arguments, is
+  the RISC-V-only form.
 - `include/attn.h` wraps it as `attn_mha()`. Without Xattn the same call
   runs `attn_core.h` in software, with identical results.
-- `-mattn-recognize` lets GCC replace C code that computes this
-  definition with the instruction (see `docs/recognizer.md`).
+- At `-O2`, GCC replaces C code that computes this definition with the
+  instruction, with no flags or headers (see `docs/recognizer.md`).
 - Spike: `--isa=rv64gc_xattn`. QEMU: `-cpu rv64,xattn=on`.

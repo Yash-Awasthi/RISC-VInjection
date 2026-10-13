@@ -200,13 +200,18 @@ both simulators.
 
 GCC reaches the instruction in two ways.
 
-1. **The builtin.** `__builtin_riscv_attn(y, x, w, cfg)` expands to the
-   RTL pattern `riscv_attn_<mode>`, which prints `attn rd, rs1, rs2, rs3`.
-   The pattern is an `unspec_volatile` with a memory clobber. That tells
-   the optimizers it reads and writes memory they cannot see, so loads
-   and stores are never moved across it.
-2. **Recognition.** A GIMPLE pass (`-mattn-recognize`) looks for the five
+1. **The builtin.** `__builtin_attn(y, x, w, cfg)`, which every GCC
+   target knows, like `__builtin_fma`, becomes the internal function
+   `.ATTN`. The `attn` optab expands it to the RTL code
+   `(attn r0 r1 r2 r3)`, matched by `riscv_attn_<mode>`, which prints
+   `attn rd, rs1, rs2, rs3`. A memory clobber tells the optimizers it reads
+   and writes memory they cannot see, so loads and stores never move
+   across it; register arithmetic may. Without the optab the builtin calls
+   `__attn` in libgcc.
+2. **Recognition.** A middle-end GIMPLE pass (`-ftree-loop-attn`, on at
+   `-O2`) looks for the five
    loop nests of a C implementation of multi-head attention. It proves
    they compute exactly what `attn` computes and replaces them with one
-   instruction behind a runtime guard. `docs/recognizer.md` explains how
+   `.ATTN` internal call behind a runtime guard; the `attn` optab expands
+   it to the instruction. `docs/recognizer.md` explains how
    the proof works.

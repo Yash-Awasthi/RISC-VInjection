@@ -32,12 +32,22 @@ export PATH=$TC/bin:$OUT/host/bin:$PATH
 
 log() { printf '\n== %s\n' "$*"; }
 
-# configure_once DIR CONFIGURE ARGS... : run configure only for a new DIR.
+# configure_once DIR CONFIGURE ARGS... : run configure for a new DIR, or
+# from scratch when ARGS differ from the last run (e.g. after Xattn was
+# removed and the default -march changed).
 configure_once() {
   local dir=$1
   shift
+  # Build trees from before this check are assumed current.
+  [ -f "$dir/Makefile" ] || [ -f "$dir/build.ninja" ] &&
+    [ ! -f "$dir/configure.args" ] && echo "$*" > "$dir/configure.args"
+  if [ -f "$dir/configure.args" ] && [ "$(cat "$dir/configure.args")" != "$*" ]; then
+    echo "configure arguments changed, reconfiguring $dir"
+    rm -rf "$dir"
+  fi
   mkdir -p "$dir"
   if [ ! -f "$dir/Makefile" ] && [ ! -f "$dir/build.ninja" ]; then
+    echo "$*" > "$dir/configure.args"
     (cd "$dir" && "$@" > configure.log 2>&1) || {
       echo "configure failed, see $dir/configure.log" >&2
       exit 1
@@ -68,9 +78,12 @@ step_binutils() {
 
 step_gcc() {
   log gcc
+  # Xattn is the default extension whenever the tree has it.
+  local ARCH=rv64gc
+  [ -f "$REPO/gcc/gcc/config/riscv/riscv-ext-xattn.def" ] && ARCH=rv64gc_xattn
   configure_once "$B/gcc" "$REPO/gcc/configure" \
     --target=$TARGET --prefix="$TC" --enable-languages=c \
-    --disable-bootstrap --disable-multilib --with-arch=rv64gc \
+    --disable-bootstrap --disable-multilib --with-arch="$ARCH" \
     --with-abi=lp64d --without-headers --with-newlib --disable-shared \
     --disable-threads --disable-libssp --disable-libgomp \
     --disable-libquadmath --disable-libatomic --disable-nls --disable-werror

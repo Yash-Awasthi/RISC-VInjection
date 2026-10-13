@@ -198,7 +198,7 @@ row points to where the Xattn patches do it.
 | a trap in the middle of a long operation | load every input before the first store, then re-execute after the fault; keep no resources across loads, because a fault leaves by exception or longjmp | `attn_execute`, Spike/QEMU scratch buffers |
 | the scheduler must know the instruction | give it its own insn type with a reservation every pipeline model sees (a type without one crashes `riscv_sched_variable_issue`) | `xattn.md` |
 | an encoding that coexists with every vendor | `find_opcodes.py --strict` | custom-3 funct3 1 funct2 3 |
-| the compiler should use it without a builtin | a GIMPLE pass that proves equivalence before rewriting (section 5.3) | `riscv-attn-recog.cc` |
+| the compiler should use it without a builtin | a middle-end GIMPLE pass that proves equivalence, emits an internal function, and an optab the target implements (section 5.3) | `tree-ssa-loop-attn.cc` |
 | a C API that also works without the extension | `#ifdef __riscv_x<n>` builtin, else the shared definition in software | `include/attn.h` |
 
 ### 5.3 Teaching the compiler to find your instruction
@@ -227,7 +227,7 @@ lot of code. `attn` replaces five loop nests. The approach generalizes:
    same inputs, plus cases that fail the guard.
 
 `docs/recognizer.md` walks through each step for `attn`, and
-`riscv-attn-recog.cc` is the code. Its helpers (polynomials, `analyze_loop`,
+`tree-ssa-loop-attn.cc` is the code. Its helpers (polynomials, `analyze_loop`,
 `walk_body`, `decide`, `find_region`, `materialize`) do not depend on
 attention and can be reused.
 

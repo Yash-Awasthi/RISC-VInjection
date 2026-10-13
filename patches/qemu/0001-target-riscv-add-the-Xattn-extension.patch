@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 02:57:51 +0530
-Subject: [PATCH] target/riscv: add the Xattn extension
+Subject: [PATCH 1/2] target/riscv: add the Xattn extension
 
 The attn helper runs attn_core.h over guest memory with precise faults; -cpu ...,xattn=on enables it and the disassembler decodes it.
 ---

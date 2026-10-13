@@ -60,12 +60,17 @@ shows it whenever the ELF attributes say the object uses Xattn.
 |------|--------|
 | `config/riscv/riscv-ext-xattn.def` | the extension: name, version 1.0, flag group. `riscv-ext.opt` and `doc/riscv-ext.texi` are regenerated from it (`make riscv-regen`, or by hand with `gen-riscv-ext-opt` / `gen-riscv-ext-texi`) |
 | `config/riscv/riscv-ext.def`, `t-riscv` | include the new `.def`, list it in `RISCV_EXT_DEFS` |
-| `config/riscv/xattn.md` | `riscv_attn_<mode>`: `unspec_volatile:X` over four register operands plus `(clobber (mem:BLK (scratch)))`. Also insn type `attn` with a tune-independent reservation |
-| `config/riscv/riscv.md` | `UNSPECV_XATTN`, the `attn` type, `(include "xattn.md")` |
+| `config/riscv/xattn.md` | `riscv_attn_<mode>`: the RTL code `(attn r0 r1 r2 r3)` plus `(clobber (mem:BLK (scratch)))`; the `attn<mode>` optab expander for `IFN_ATTN`. Also insn type `attn` with a tune-independent reservation |
+| `config/riscv/riscv.md` | the `attn` type, `(include "xattn.md")` |
 | `config/riscv/riscv-ftypes.def` | `void (void *, const void *, const void *, const void *)` |
-| `config/riscv/xattn.def`, `riscv-builtins.cc` | `__builtin_riscv_attn` for RV32 and RV64 (`AVAIL attn32/attn64`), and `riscv_attn_builtin_decl ()` for the recognizer |
-| `config/riscv/riscv-attn-recog.cc` | the recognizer (see `recognizer.md`) |
-| `config/riscv/riscv-passes.def`, `riscv-protos.h`, `riscv.opt`, `config.gcc` | register the pass after `pass_tree_loop_init`; add `-mattn-recognize`; build `riscv-attn-recog.o` |
+| `config/riscv/xattn.def`, `riscv-builtins.cc` | `__builtin_riscv_attn` for RV32 and RV64 (`AVAIL attn32/attn64`) |
+| `tree-ssa-loop-attn.cc` | the recognizer, a middle-end pass (see `recognizer.md`) |
+| `internal-fn.def`, `internal-fn.cc`, `optabs.def` | `IFN_ATTN`, an optab internal function like `IFN_FMA` (type `attn`, keyed off the pointer mode), and the new `attn` optab |
+| `builtins.def`, `builtin-types.def`, `builtins.cc` | the target-independent `__builtin_attn (y, x, w, cfg)`: `IFN_ATTN` when the target has the optab, else a call to `__attn` |
+| `rtl.def`, `rtlanal.cc`, `dce.cc`, `sched-deps.cc` | the RTL code `attn`: four register uses, no register set, may trap, ordered against memory only. `rtlanal.cc` also sends codes with more than three `e` operands down the generic subrtx walk |
+| `libgcc/attn.c`, `libgcc/Makefile.in` | `__attn`, the software fallback, built from a copy of `attn_core.h` (needs `-lm` for `expf`, as `fma` does) |
+| `passes.def`, `tree-pass.h`, `Makefile.in` | run the pass after `pass_tree_loop_init`, build `tree-ssa-loop-attn.o` |
+| `common.opt`, `opts.cc` | `-ftree-loop-attn`, on at `-O2` and above |
 | `testsuite/gcc.target/riscv/xattn-*.c` | builtin, feature macro, missing extension, several `-mtune` models, and the recognizer cases |
 
 `__riscv_xattn` needs no code of its own. GCC defines `__riscv_<ext>` for
@@ -81,12 +86,15 @@ works: one `define_insn_reservation` that reserves no unit and so applies
 under every `-mtune`. `xattn-3.c` to `xattn-5.c` compile with three
 different pipeline models.
 
-**Why `unspec_volatile` with a memory clobber?** The registers carry only
-addresses. Through the descriptors, the instruction reads memory nobody
-can name in RTL. The clobber makes it a full memory barrier, so no load or
-store moves across it. At GIMPLE level the builtin is an ordinary call
-whose pointer arguments escape, so alias analysis already treats it
-conservatively.
+**Why an RTL code with a memory clobber, not `unspec_volatile`?** The
+registers carry only addresses. Through the descriptors, the instruction
+reads memory nobody can name in RTL. The clobber makes it a full memory
+barrier, so no load or store moves across it. An `unspec_volatile` would
+also be a barrier for every register instruction (`sched-deps.cc` treats
+it as `TRUE_BARRIER`). The `attn` code orders only memory, so the scheduler
+may move register arithmetic across it (`xattn-rtl-2.c`). At GIMPLE level
+`.ATTN` has no fnspec, so alias analysis treats it as reading and
+clobbering memory.
 
 ## Spike
 

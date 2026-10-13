@@ -63,8 +63,8 @@ pragma exists.
 2. Dump the pipeline yourself:
    `gcc -O2 -fdump-tree-all -S demo/mha_plain.c`. Open the `loopinit`
    dump and find the five nests.
-3. Read in order: `xattn.md` (20 lines), `riscv-builtins.cc` (the AVAIL
-   lines and `riscv_attn_builtin_decl`), then `riscv-attn-recog.cc`:
+3. Read in order: `xattn.md` (30 lines), `riscv-builtins.cc` (the AVAIL
+   lines), `expand_ATTN` in `internal-fn.cc`, then `tree-ssa-loop-attn.cc`:
    `poly`, `expand_int`, `analyze_loop`, `walk_body`, `match_matmul`,
    `match_attention`, `account`, `find_region`, `rewrite`.
 4. Related work inside GCC: `gimple-crc-optimization.cc` (GCC 15), which

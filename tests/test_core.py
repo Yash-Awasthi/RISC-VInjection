@@ -108,7 +108,8 @@ def test_encoding():
     assert am.decode(w) == dict(rd=13, rs1=10, rs2=11, rs3=12)
 
 
-@pytest.mark.parametrize("copy", ["spike/riscv", "qemu/target/riscv"])
+@pytest.mark.parametrize("copy", ["spike/riscv", "qemu/target/riscv",
+                                  "gcc/libgcc"])
 def test_simulator_cores_match_include(copy):
     for name in ("attn_abi.h", "attn_core.h"):
         assert (REPO / copy / name).read_bytes() == \

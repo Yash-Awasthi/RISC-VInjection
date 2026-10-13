@@ -1,8 +1,8 @@
 /* Multi-head self-attention written as ordinary C loops.
 
-   Compiled with -march=..._xattn -O2 -mattn-recognize -fno-math-errno,
-   GCC proves that this function computes exactly what one attn instruction
-   computes and replaces all of the loops below with that instruction.  */
+   Compiled with plain -O2 (the toolchain defaults to Xattn), GCC proves
+   that this function computes exactly what one attn instruction computes
+   and replaces all of the loops below with that instruction.  */
 
 #include <math.h>
 #include <stdlib.h>

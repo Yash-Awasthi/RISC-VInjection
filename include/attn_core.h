@@ -9,7 +9,14 @@
 #ifndef ATTN_CORE_H
 #define ATTN_CORE_H
 
+#ifdef ATTN_FREESTANDING
+/* libgcc has no libc headers; the calls still bind to libm.  */
+#define expf __builtin_expf
+#define sqrtf __builtin_sqrtf
+#define INFINITY __builtin_inff ()
+#else
 #include <math.h>
+#endif
 #include <stdint.h>
 #include "attn_abi.h"
 

@@ -1,0 +1,629 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Yash-Awasthi <yashawasthi12032006@gmail.com>
+Date: Tue, 13 Oct 2026 14:36:13 +0530
+Subject: [PATCH 2/4] Move the attention recognizer into the middle end
+
+It runs at -O2 on any target with the new attn optab and emits IFN_ATTN; -mattn-recognize is gone and errno from expf no longer blocks it.
+---
+ gcc/Makefile.in                               |  1 +
+ gcc/common.opt                                |  5 ++
+ gcc/config.gcc                                |  2 +-
+ gcc/config/riscv/riscv-builtins.cc            | 14 ---
+ gcc/config/riscv/riscv-passes.def             |  1 -
+ gcc/config/riscv/riscv-protos.h               |  3 -
+ gcc/config/riscv/riscv.opt                    |  5 --
+ gcc/config/riscv/t-riscv                      |  6 --
+ gcc/config/riscv/xattn.md                     | 10 +++
+ gcc/internal-fn.cc                            | 12 +++
+ gcc/internal-fn.def                           |  7 ++
+ gcc/optabs.def                                |  1 +
+ gcc/opts.cc                                   |  1 +
+ gcc/passes.def                                |  1 +
+ .../gcc.target/riscv/xattn-recog-1.c          |  2 +-
+ .../gcc.target/riscv/xattn-recog-10.c         |  4 +-
+ .../gcc.target/riscv/xattn-recog-11.c         | 87 +++++++++++++++++++
+ .../gcc.target/riscv/xattn-recog-2.c          |  2 +-
+ .../gcc.target/riscv/xattn-recog-3.c          |  2 +-
+ .../gcc.target/riscv/xattn-recog-4.c          |  2 +-
+ .../gcc.target/riscv/xattn-recog-5.c          |  2 +-
+ .../gcc.target/riscv/xattn-recog-6.c          |  2 +-
+ .../gcc.target/riscv/xattn-recog-7.c          |  2 +-
+ .../gcc.target/riscv/xattn-recog-8.c          |  2 +-
+ .../gcc.target/riscv/xattn-recog-9.c          |  2 +-
+ gcc/tree-pass.h                               |  1 +
+ ...cv-attn-recog.cc => tree-ssa-loop-attn.cc} | 42 +++++----
+ 27 files changed, 163 insertions(+), 58 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-11.c
+ rename gcc/{config/riscv/riscv-attn-recog.cc => tree-ssa-loop-attn.cc} (98%)
+
+diff --git a/gcc/Makefile.in b/gcc/Makefile.in
+index 8ecef4ccdc7..82b0e96a8a6 100644
+--- a/gcc/Makefile.in
++++ b/gcc/Makefile.in
+@@ -1762,6 +1762,7 @@ OBJS = \
+ 	tree-iterator.o \
+ 	tree-logical-location.o \
+ 	tree-loop-distribution.o \
++	tree-ssa-loop-attn.o \
+ 	crc-verification.o \
+ 	gimple-crc-optimization.o \
+ 	sym-exec/sym-exec-expression.o \
+diff --git a/gcc/common.opt b/gcc/common.opt
+index 204c8ae721b..b63df8cfe5d 100644
+--- a/gcc/common.opt
++++ b/gcc/common.opt
+@@ -3302,6 +3302,11 @@ being used in a way forbidden by a returns_nonnull or nonnull
+ attribute.  Isolate those paths from the main control flow and turn the
+ statement with erroneous or undefined behavior into a trap.
+ 
++ftree-loop-attn
++Common Var(flag_tree_loop_attn) Optimization
++Replace multi-head self-attention written as loops with one attn operation
++when the target supports it and the two are provably equivalent.
++
+ ftree-loop-distribution
+ Common Var(flag_tree_loop_distribution) Optimization
+ Enable loop distribution on trees.
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 723703d7dd6..743421768ea 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -569,7 +569,7 @@ pru-*-*)
+ 	;;
+ riscv*)
+ 	cpu_type=riscv
+-	extra_objs="riscv-builtins.o riscv-c.o riscv-sr.o riscv-shorten-memrefs.o riscv-selftests.o riscv-string.o riscv-attn-recog.o"
++	extra_objs="riscv-builtins.o riscv-c.o riscv-sr.o riscv-shorten-memrefs.o riscv-selftests.o riscv-string.o"
+ 	extra_objs="${extra_objs} riscv-v.o riscv-vsetvl.o riscv-vector-costs.o riscv-avlprop.o riscv-vect-permconst.o"
+ 	extra_objs="${extra_objs} riscv-vector-builtins.o riscv-vector-builtins-shapes.o riscv-vector-builtins-bases.o sifive-vector-builtins-bases.o andes-vector-builtins-bases.o"
+ 	extra_objs="${extra_objs} thead.o riscv-target-attr.o riscv-zicfilp.o riscv-bclr-lowest-set-bit.o riscv-opt-popretz.o"
+diff --git a/gcc/config/riscv/riscv-builtins.cc b/gcc/config/riscv/riscv-builtins.cc
+index 4327cb88c4f..e851ce21306 100644
+--- a/gcc/config/riscv/riscv-builtins.cc
++++ b/gcc/config/riscv/riscv-builtins.cc
+@@ -347,20 +347,6 @@ riscv_builtin_decl (unsigned int code, bool initialize_p ATTRIBUTE_UNUSED)
+   return error_mark_node;
+ }
+ 
+-/* The declaration of __builtin_riscv_attn for the current XLEN, or null
+-   when Xattn was not enabled when builtins were created.  */
+-
+-tree
+-riscv_attn_builtin_decl (void)
+-{
+-  enum insn_code icode = TARGET_64BIT ? CODE_FOR_riscv_attn_di
+-				      : CODE_FOR_riscv_attn_si;
+-  for (size_t i = 0; i < ARRAY_SIZE (riscv_builtins); i++)
+-    if (riscv_builtins[i].icode == icode)
+-      return riscv_builtin_decls[i];
+-  return NULL_TREE;
+-}
+-
+ /* Take argument ARGNO from EXP's argument list and convert it into
+    an expand operand.  Store the operand in *OP.  */
+ 
+diff --git a/gcc/config/riscv/riscv-passes.def b/gcc/config/riscv/riscv-passes.def
+index 24488308223..bc6b3c8b98d 100644
+--- a/gcc/config/riscv/riscv-passes.def
++++ b/gcc/config/riscv/riscv-passes.def
+@@ -24,5 +24,4 @@ INSERT_PASS_BEFORE (pass_fast_rtl_dce, 1, pass_vsetvl);
+ INSERT_PASS_BEFORE (pass_shorten_branches, 1, pass_insert_landing_pad);
+ INSERT_PASS_BEFORE (pass_shorten_branches, 1, pass_combine_popretz);
+ INSERT_PASS_AFTER (pass_cse2, 1, pass_vector_permconst);
+-INSERT_PASS_AFTER (pass_tree_loop_init, 1, pass_riscv_attn_recog);
+ 
+diff --git a/gcc/config/riscv/riscv-protos.h b/gcc/config/riscv/riscv-protos.h
+index 7a2933901f7..dd029c70413 100644
+--- a/gcc/config/riscv/riscv-protos.h
++++ b/gcc/config/riscv/riscv-protos.h
+@@ -195,7 +195,6 @@ extern bool riscv_gimple_fold_builtin (gimple_stmt_iterator *);
+ extern rtx riscv_expand_builtin (tree, rtx, rtx, machine_mode, int);
+ extern tree riscv_builtin_decl (unsigned int, bool);
+ extern void riscv_init_builtins (void);
+-extern tree riscv_attn_builtin_decl (void);
+ 
+ /* Routines implemented in riscv-common.cc.  */
+ extern std::string riscv_arch_str (bool version_p = true);
+@@ -207,8 +206,6 @@ rtl_opt_pass * make_pass_shorten_memrefs (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_avlprop (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_vsetvl (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_insert_landing_pad (gcc::context *ctxt);
+-class gimple_opt_pass;
+-gimple_opt_pass * make_pass_riscv_attn_recog (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_vector_permconst (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_bclr_lowest_set_bit (gcc::context *ctxt);
+ rtl_opt_pass * make_pass_combine_popretz (gcc::context *ctxt);
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 1fa489c9ebb..2c26ee99691 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -423,8 +423,3 @@ Specifies whether the fence.tso instruction should be used.
+ mautovec-segment
+ Target Integer Var(riscv_mautovec_segment) Init(1)
+ Enable (default) or disable generation of vector segment load/store instructions.
+-
+-mattn-recognize
+-Target Var(riscv_attn_recognize) Init(0)
+-Replace multi-head self-attention written as C loops with the Xattn attn
+-instruction when the compiler can prove the two are equivalent.
+diff --git a/gcc/config/riscv/t-riscv b/gcc/config/riscv/t-riscv
+index 04fed4a2e6f..0883a67241a 100644
+--- a/gcc/config/riscv/t-riscv
++++ b/gcc/config/riscv/t-riscv
+@@ -118,12 +118,6 @@ riscv-vector-costs.o: $(srcdir)/config/riscv/riscv-vector-costs.cc \
+ 	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
+ 		$(srcdir)/config/riscv/riscv-vector-costs.cc
+ 
+-riscv-attn-recog.o: $(srcdir)/config/riscv/riscv-attn-recog.cc \
+-  $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(TREE_H) $(GIMPLE_H) \
+-  tree-pass.h ssa.h cfgloop.h tree-cfg.h
+-	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
+-		$(srcdir)/config/riscv/riscv-attn-recog.cc
+-
+ riscv-avlprop.o: $(srcdir)/config/riscv/riscv-avlprop.cc \
+   $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) $(REGS_H) \
+   $(TARGET_H) tree-pass.h df.h rtl-ssa.h cfgcleanup.h insn-attr.h \
+diff --git a/gcc/config/riscv/xattn.md b/gcc/config/riscv/xattn.md
+index a4d5a2a2f7c..1eab8ea4460 100644
+--- a/gcc/config/riscv/xattn.md
++++ b/gcc/config/riscv/xattn.md
+@@ -32,6 +32,16 @@
+   [(set_attr "type" "attn")
+    (set_attr "mode" "<MODE>")])
+ 
++;; The attn optab, through which the middle end expands IFN_ATTN.
++(define_expand "attn<mode>"
++  [(parallel [(unspec_volatile:X [(match_operand:X 0 "register_operand")
++				  (match_operand:X 1 "register_operand")
++				  (match_operand:X 2 "register_operand")
++				  (match_operand:X 3 "register_operand")]
++				 UNSPECV_XATTN)
++	      (clobber (mem:BLK (scratch)))])]
++  "TARGET_XATTN")
++
+ ;; attn writes no register, so latency only orders it against itself.  The
+ ;; reservation is tune-independent, like "ghost", so every pipeline model
+ ;; can schedule it.
+diff --git a/gcc/internal-fn.cc b/gcc/internal-fn.cc
+index 662d1e75d2f..bcbc7b1151a 100644
+--- a/gcc/internal-fn.cc
++++ b/gcc/internal-fn.cc
+@@ -193,6 +193,7 @@ init_internal_fns ()
+ #define mask_fold_left_direct { 1, 1, false }
+ #define mask_len_fold_left_direct { 1, 1, false }
+ #define check_ptrs_direct { 0, 0, false }
++#define attn_direct { 0, 0, false }
+ #define crc_direct { 1, -1, true }
+ #define reduc_sbool_direct { 0, 0, true }
+ #define select_vl_direct { 2, 0, false }
+@@ -4323,6 +4324,16 @@ expand_reduc_sbool_optab_fn (internal_fn fn, gcall *stmt, direct_optab optab)
+ #define expand_check_ptrs_optab_fn(FN, STMT, OPTAB) \
+   expand_direct_optab_fn (FN, STMT, OPTAB, 4)
+ 
++/* Expand .ATTN, which has four inputs and no output.  */
++
++static void
++expand_attn_optab_fn (internal_fn fn, gcall *stmt, direct_optab optab)
++{
++  tree_pair types = direct_internal_fn_types (fn, stmt);
++  insn_code icode = direct_optab_handler (optab, TYPE_MODE (types.first));
++  expand_fn_using_insn (stmt, icode, 0, 4);
++}
++
+ #define expand_select_vl_optab_fn(FN, STMT, OPTAB) \
+   expand_convert_optab_fn (FN, STMT, OPTAB, 3)
+ 
+@@ -4439,6 +4450,7 @@ multi_vector_optab_supported_p (convert_optab optab, tree_pair types,
+ #define direct_mask_fold_left_optab_supported_p direct_optab_supported_p
+ #define direct_mask_len_fold_left_optab_supported_p direct_optab_supported_p
+ #define direct_check_ptrs_optab_supported_p direct_optab_supported_p
++#define direct_attn_optab_supported_p direct_optab_supported_p
+ #define direct_vec_set_optab_supported_p direct_optab_supported_p
+ #define direct_vec_extract_optab_supported_p convert_optab_supported_p
+ #define direct_reduc_sbool_optab_supported_p direct_optab_supported_p
+diff --git a/gcc/internal-fn.def b/gcc/internal-fn.def
+index d142416725a..007a26da0cc 100644
+--- a/gcc/internal-fn.def
++++ b/gcc/internal-fn.def
+@@ -82,6 +82,8 @@ along with GCC; see the file COPYING3.  If not see
+ 
+    - fold_left: for scalar = FN (scalar, vector), keyed off the vector mode
+    - check_ptrs: used for check_{raw,war}_ptrs
++   - attn: four pointer inputs and no output, keyed off the pointer mode,
++     such as attn<mode>
+ 
+    - cond_len_unary: a conditional unary optab, such as cond_len_neg<mode>
+    - cond_len_binary: a conditional binary optab, such as cond_len_add<mode>
+@@ -256,6 +258,11 @@ DEF_INTERNAL_OPTAB_FN (CHECK_RAW_PTRS, ECF_CONST | ECF_NOTHROW,
+ DEF_INTERNAL_OPTAB_FN (CHECK_WAR_PTRS, ECF_CONST | ECF_NOTHROW,
+ 		       check_war_ptrs, check_ptrs)
+ 
++/* Multi-head self-attention .ATTN (Y, X, &weights, &config).  It reads and
++   writes memory reached through pointers inside the descriptors, which no
++   fnspec can express, so it is treated as reading and clobbering memory.  */
++DEF_INTERNAL_OPTAB_FN (ATTN, ECF_LEAF | ECF_NOTHROW, attn, attn)
++
+ DEF_INTERNAL_OPTAB_FN (VEC_SHL_INSERT, ECF_CONST | ECF_NOTHROW,
+ 		       vec_shl_insert, binary)
+ 
+diff --git a/gcc/optabs.def b/gcc/optabs.def
+index 193f42a728a..ddec7763697 100644
+--- a/gcc/optabs.def
++++ b/gcc/optabs.def
+@@ -567,6 +567,7 @@ OPTAB_DC (vec_duplicate_optab, "vec_duplicate$a", VEC_DUPLICATE)
+ OPTAB_DC (vec_series_optab, "vec_series$a", VEC_SERIES)
+ OPTAB_D (vec_shl_insert_optab, "vec_shl_insert_$a")
+ OPTAB_D (len_load_optab, "len_load_$a")
++OPTAB_D (attn_optab, "attn$a")
+ OPTAB_D (len_store_optab, "len_store_$a")
+ OPTAB_D (mask_len_strided_load_optab, "mask_len_strided_load_$a")
+ OPTAB_D (mask_len_strided_store_optab, "mask_len_strided_store_$a")
+diff --git a/gcc/opts.cc b/gcc/opts.cc
+index 6658b6acd37..dd83eef49f6 100644
+--- a/gcc/opts.cc
++++ b/gcc/opts.cc
+@@ -689,6 +689,7 @@ static const struct default_options default_options_table[] =
+     { OPT_LEVELS_2_PLUS_SPEED_ONLY, OPT_freorder_blocks_algorithm_, NULL,
+       REORDER_BLOCKS_ALGORITHM_STC },
+     { OPT_LEVELS_2_PLUS_SPEED_ONLY, OPT_ftree_loop_vectorize, NULL, 1 },
++    { OPT_LEVELS_2_PLUS_SPEED_ONLY, OPT_ftree_loop_attn, NULL, 1 },
+     { OPT_LEVELS_2_PLUS_SPEED_ONLY, OPT_ftree_slp_vectorize, NULL, 1 },
+     { OPT_LEVELS_2_PLUS_SPEED_ONLY, OPT_fopenmp_target_simd_clone_, NULL,
+       OMP_TARGET_SIMD_CLONE_NOHOST },
+diff --git a/gcc/passes.def b/gcc/passes.def
+index cdddb87302f..735909c2734 100644
+--- a/gcc/passes.def
++++ b/gcc/passes.def
+@@ -293,6 +293,7 @@ along with GCC; see the file COPYING3.  If not see
+           /* Before loop_init we rewrite no longer addressed locals into SSA
+ 	     form if possible.  */
+ 	  NEXT_PASS (pass_tree_loop_init);
++	  NEXT_PASS (pass_attn_recog);
+ 	  NEXT_PASS (pass_tree_unswitch);
+ 	  NEXT_PASS (pass_loop_split);
+ 	  NEXT_PASS (pass_scev_cprop);
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
+index 5029212b129..03c9200b562 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: causal, biased.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
+index eff8eafb39f..bebb787672c 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
+@@ -1,6 +1,6 @@
+-/* Xattn attention recognizer: off without -mattn-recognize.  */
++/* Xattn attention recognizer: off with -fno-tree-loop-attn.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-tree-loop-attn" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-11.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-11.c
+new file mode 100644
+index 00000000000..1b7d91f22c7
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-11.c
+@@ -0,0 +1,87 @@
++/* Xattn attention recognizer: on by default, no extra flags needed.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fdump-tree-attn_recog-details" } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
++
++#include <math.h>
++#include <stdlib.h>
++
++void
++mha (float * restrict y, const float *restrict x, const float *restrict wq, const float *restrict wk, const float *restrict wv, const float *restrict wo, const float *restrict bq, const float *restrict bk, const float *restrict bv, const float *restrict bo, int n, int e, int h)
++{
++  int d = e / h;
++  float scale = 1.0f / sqrtf ((float) d);
++  float *q = malloc (sizeof (float) * n * e);
++  float *k = malloc (sizeof (float) * n * e);
++  float *v = malloc (sizeof (float) * n * e);
++  float *c = malloc (sizeof (float) * n * e);
++  float *p = malloc (sizeof (float) * n);
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wq[t * e + j];
++	q[i * e + j] = acc + bq[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wk[t * e + j];
++	k[i * e + j] = acc + bk[j];
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += x[i * e + t] * wv[t * e + j];
++	v[i * e + j] = acc + bv[j];
++      }
++  for (int hd = 0; hd < h; hd++)
++    for (int i = 0; i < n; i++)
++      {
++	float mx = -INFINITY;
++	for (int j = 0; j <= i; j++)
++	  {
++	    float s = 0.0f;
++	    for (int t = 0; t < d; t++)
++	      s += q[i * e + hd * d + t] * k[j * e + hd * d + t];
++	    s = s * scale;
++	    p[j] = s;
++	    if (s > mx)
++	      mx = s;
++	  }
++	float l = 0.0f;
++	for (int j = 0; j <= i; j++)
++	  {
++	    p[j] = expf (p[j] - mx);
++	    l += p[j];
++	  }
++	for (int t = 0; t < d; t++)
++	  {
++	    float acc = 0.0f;
++	    for (int j = 0; j <= i; j++)
++	      acc += p[j] * v[j * e + hd * d + t];
++	    c[i * e + hd * d + t] = acc / l;
++	  }
++      }
++  for (int i = 0; i < n; i++)
++    for (int j = 0; j < e; j++)
++      {
++	float acc = 0.0f;
++	for (int t = 0; t < e; t++)
++	  acc += c[i * e + t] * wo[t * e + j];
++	y[i * e + j] = acc + bo[j];
++      }
++  free (q);
++  free (k);
++  free (v);
++  free (c);
++  free (p);
++}
++
++/* { dg-final { scan-tree-dump "replaced with attn" "attn_recog" } } */
++/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
+index 8709a2a392a..ed6de6bc4d8 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: full, masked, constant scale, no biases.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
+index 4ca5459f8d1..45034851a31 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: row loop outside the head loop.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
+index ca6943c4a21..b02cfbfab5b 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: rv32.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv32gc_xattn -mabi=ilp32d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv32gc_xattn -mabi=ilp32d -O2 -fno-math-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
+index 5b2bf2b8e90..1f4e49e332f 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: output may alias an input.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
+index 21f70e6ab76..15795929864 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: expf may set errno.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fmath-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
+index 5b1a5930f1e..6f11fdc8b8a 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: division instead of multiplication by the scale.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
+index 22040aee040..4268171050e 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: >= is not the instruction's running maximum.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
+index becb65fcf9a..e900b91d5fa 100644
+--- a/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
++++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
+@@ -1,6 +1,6 @@
+ /* Xattn attention recognizer: scratch buffer read after the loops.  */
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -mattn-recognize -fdump-tree-attn_recog-details" } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fno-math-errno -fdump-tree-attn_recog-details" } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Og" "-Oz" "-flto" } } */
+ 
+ #include <math.h>
+diff --git a/gcc/tree-pass.h b/gcc/tree-pass.h
+index b3c97658a8f..90df9f8fbec 100644
+--- a/gcc/tree-pass.h
++++ b/gcc/tree-pass.h
+@@ -389,6 +389,7 @@ extern gimple_opt_pass *make_pass_graphite_transforms (gcc::context *ctxt);
+ extern gimple_opt_pass *make_pass_if_conversion (gcc::context *ctxt);
+ extern gimple_opt_pass *make_pass_if_to_switch (gcc::context *ctxt);
+ extern gimple_opt_pass *make_pass_loop_distribution (gcc::context *ctxt);
++extern gimple_opt_pass *make_pass_attn_recog (gcc::context *ctxt);
+ extern gimple_opt_pass *make_pass_crc_optimization (gcc::context *ctxt);
+ extern gimple_opt_pass *make_pass_vectorize (gcc::context *ctxt);
+ extern gimple_opt_pass *make_pass_simduid_cleanup (gcc::context *ctxt);
+diff --git a/gcc/config/riscv/riscv-attn-recog.cc b/gcc/tree-ssa-loop-attn.cc
+similarity index 98%
+rename from gcc/config/riscv/riscv-attn-recog.cc
+rename to gcc/tree-ssa-loop-attn.cc
+index 4e864a17a26..9cc50600f64 100644
+--- a/gcc/config/riscv/riscv-attn-recog.cc
++++ b/gcc/tree-ssa-loop-attn.cc
+@@ -1,5 +1,6 @@
+ /* Recognize multi-head self-attention written as C loops and replace it with
+-   the Xattn `attn' instruction.
++   the internal function IFN_ATTN, which targets implement through the attn
++   optab (the RISC-V Xattn `attn' instruction).
+    Copyright (C) 2026 Free Software Foundation, Inc.
+ 
+ This file is part of GCC.
+@@ -40,9 +41,10 @@ along with GCC; see the file COPYING3.  If not see
+      afterwards.
+ 
+    The region is then preceded by that runtime guard; when it holds, one
+-   `attn' replaces the whole region, otherwise the original loops run.  */
++   .ATTN call replaces the whole region, otherwise the original loops run.
++   The pass runs at -O2 and above (-ftree-loop-attn) on every target that
++   provides the attn optab.  */
+ 
+-#define IN_TARGET_CODE 1
+ #define INCLUDE_MAP
+ #define INCLUDE_SET
+ #define INCLUDE_ALGORITHM
+@@ -58,6 +60,8 @@ along with GCC; see the file COPYING3.  If not see
+ #include "tree-pass.h"
+ #include "ssa.h"
+ #include "tm_p.h"
++#include "opts.h"
++#include "internal-fn.h"
+ #include "fold-const.h"
+ #include "stor-layout.h"
+ #include "gimple-iterator.h"
+@@ -1216,11 +1220,15 @@ attn_recog::match_attention (class loop *outer, attention &at)
+   if (!stmt_in (ex, le, true) || !stmt_in (st_e, le, true))
+     return fail ("exponential loop is conditional");
+   combined_fn fn = gimple_call_combined_fn (ex);
+-  if ((fn != CFN_BUILT_IN_EXPF && fn != CFN_EXP) || gimple_vdef (ex)
++  /* The only side effect of the library expf is errno, which .ATTN does
++     not set; that is dropped unless -fmath-errno was explicitly given.  */
++  if ((fn != CFN_BUILT_IN_EXPF && fn != CFN_EXP)
++      || (gimple_vdef (ex) && (!gimple_call_builtin_p (ex, BUILT_IN_EXPF)
++			       || OPTION_SET_P (flag_errno_math)))
+       || gimple_call_num_args (ex) != 1 || !gimple_call_lhs (ex)
+       || !float_type_p (TREE_TYPE (gimple_call_lhs (ex))))
+     return fail ("exponential is not a const call to expf "
+-		 "(compile with -fno-math-errno)");
++		 "(-fmath-errno was given)");
+   tree eb;
+   poly eo;
+   if (!mem_access (gimple_assign_lhs (st_e), eb, eo) || eb != pb
+@@ -1741,9 +1749,9 @@ attn_recog::rewrite (const std::vector<class loop *> &order, matmul mm[4],
+   tree y = materialize (mm[3].out, &body, first, copies, 0);
+   tree x = materialize (mm[0].a, &body, first, copies, 0);
+   gcc_assert (y && x);
+-  gcall *call = gimple_build_call (riscv_attn_builtin_decl (), 4, y, x,
+-				   build_fold_addr_expr (wvar),
+-				   build_fold_addr_expr (cvar));
++  gcall *call = gimple_build_call_internal (IFN_ATTN, 4, y, x,
++					    build_fold_addr_expr (wvar),
++					    build_fold_addr_expr (cvar));
+   gimple_set_location (call, loc);
+   gimple_seq_add_stmt (&body, call);
+   gimple_seq_add_stmt (&body, gimple_build_assign (wvar, build_clobber (wty)));
+@@ -1986,8 +1994,6 @@ attn_recog::try_attention (class loop *att)
+ unsigned
+ attn_recog::run ()
+ {
+-  if (!riscv_attn_builtin_decl ())
+-    return 0;
+   calculate_dominance_info (CDI_DOMINATORS);
+   calculate_dominance_info (CDI_POST_DOMINATORS);
+ 
+@@ -2018,7 +2024,7 @@ attn_recog::run ()
+   return 0;
+ }
+ 
+-const pass_data pass_data_riscv_attn_recog =
++const pass_data pass_data_attn_recog =
+ {
+   GIMPLE_PASS, /* type */
+   "attn_recog", /* name */
+@@ -2031,16 +2037,18 @@ const pass_data pass_data_riscv_attn_recog =
+   0, /* todo_flags_finish */
+ };
+ 
+-class pass_riscv_attn_recog : public gimple_opt_pass
++class pass_attn_recog : public gimple_opt_pass
+ {
+ public:
+-  pass_riscv_attn_recog (gcc::context *ctxt)
+-    : gimple_opt_pass (pass_data_riscv_attn_recog, ctxt)
++  pass_attn_recog (gcc::context *ctxt)
++    : gimple_opt_pass (pass_data_attn_recog, ctxt)
+   {}
+ 
+   bool gate (function *) final override
+   {
+-    return TARGET_XATTN && riscv_attn_recognize && optimize;
++    return flag_tree_loop_attn
++	   && direct_internal_fn_supported_p (IFN_ATTN, pointer_sized_int_node,
++					      OPTIMIZE_FOR_SPEED);
+   }
+ 
+   unsigned execute (function *fun) final override
+@@ -2053,7 +2061,7 @@ public:
+ } // anon namespace
+ 
+ gimple_opt_pass *
+-make_pass_riscv_attn_recog (gcc::context *ctxt)
++make_pass_attn_recog (gcc::context *ctxt)
+ {
+-  return new pass_riscv_attn_recog (ctxt);
++  return new pass_attn_recog (ctxt);
+ }

@@ -1,0 +1,241 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Yash-Awasthi <yashawasthi12032006@gmail.com>
+Date: Tue, 13 Oct 2026 14:36:13 +0530
+Subject: [PATCH 4/4] Represent attn as its own RTL code
+
+It uses four registers, sets none and orders only memory; codes with more than three e operands now take the generic subrtx walk.
+---
+ gcc/config/riscv/riscv.md                    |  3 ---
+ gcc/config/riscv/xattn.md                    | 23 ++++++++++----------
+ gcc/dce.cc                                   |  1 +
+ gcc/rtl.def                                  |  7 ++++++
+ gcc/rtlanal.cc                               | 18 +++++++++++++--
+ gcc/sched-deps.cc                            |  7 ++++++
+ gcc/testsuite/gcc.target/riscv/xattn-rtl-1.c | 14 ++++++++++++
+ gcc/testsuite/gcc.target/riscv/xattn-rtl-2.c | 14 ++++++++++++
+ gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c | 20 +++++++++++++++++
+ 9 files changed, 90 insertions(+), 17 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-rtl-1.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-rtl-2.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c
+
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index 876c5df2d46..77b4aa0d8e8 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -152,9 +152,6 @@
+   ;; XTheadInt unspec
+   UNSPECV_XTHEADINT_PUSH
+   UNSPECV_XTHEADINT_POP
+-
+-  ;; Xattn
+-  UNSPECV_XATTN
+ ])
+ 
+ (define_constants
+diff --git a/gcc/config/riscv/xattn.md b/gcc/config/riscv/xattn.md
+index 1eab8ea4460..c442697ba7f 100644
+--- a/gcc/config/riscv/xattn.md
++++ b/gcc/config/riscv/xattn.md
+@@ -18,14 +18,14 @@
+ ;; <http://www.gnu.org/licenses/>.
+ 
+ ;; attn rd, rs1, rs2, rs3 reads X, the weight and configuration descriptors
+-;; and every buffer they point to, and writes Y.  None of those accesses is
+-;; visible through the operands, so the insn is a full memory barrier.
++;; and every buffer they point to, and writes Y.  It writes no register.
++;; None of the memory accesses is visible through the operands, so the insn
++;; is a full memory barrier, but register arithmetic may move across it.
+ (define_insn "riscv_attn_<mode>"
+-  [(unspec_volatile:X [(match_operand:X 0 "register_operand" "r")
+-		       (match_operand:X 1 "register_operand" "r")
+-		       (match_operand:X 2 "register_operand" "r")
+-		       (match_operand:X 3 "register_operand" "r")]
+-		      UNSPECV_XATTN)
++  [(attn (match_operand:X 0 "register_operand" "r")
++	 (match_operand:X 1 "register_operand" "r")
++	 (match_operand:X 2 "register_operand" "r")
++	 (match_operand:X 3 "register_operand" "r"))
+    (clobber (mem:BLK (scratch)))]
+   "TARGET_XATTN"
+   "attn\t%0,%1,%2,%3"
+@@ -34,11 +34,10 @@
+ 
+ ;; The attn optab, through which the middle end expands IFN_ATTN.
+ (define_expand "attn<mode>"
+-  [(parallel [(unspec_volatile:X [(match_operand:X 0 "register_operand")
+-				  (match_operand:X 1 "register_operand")
+-				  (match_operand:X 2 "register_operand")
+-				  (match_operand:X 3 "register_operand")]
+-				 UNSPECV_XATTN)
++  [(parallel [(attn (match_operand:X 0 "register_operand")
++		    (match_operand:X 1 "register_operand")
++		    (match_operand:X 2 "register_operand")
++		    (match_operand:X 3 "register_operand"))
+ 	      (clobber (mem:BLK (scratch)))])]
+   "TARGET_XATTN")
+ 
+diff --git a/gcc/dce.cc b/gcc/dce.cc
+index 693baab6386..568f3d7657d 100644
+--- a/gcc/dce.cc
++++ b/gcc/dce.cc
+@@ -72,6 +72,7 @@ deletable_insn_p_1 (rtx body)
+   switch (GET_CODE (body))
+     {
+     case PREFETCH:
++    case ATTN:
+     case TRAP_IF:
+       /* The UNSPEC case was added here because the ia-64 claims that
+ 	 USEs do not work after reload and generates UNSPECS rather
+diff --git a/gcc/rtl.def b/gcc/rtl.def
+index ad98fd59172..21b2d802466 100644
+--- a/gcc/rtl.def
++++ b/gcc/rtl.def
+@@ -282,6 +282,13 @@ DEF_RTL_EXPR(ADDR_DIFF_VEC, "addr_diff_vec", "eEee0", RTX_EXTRA)
+    whose prefetch instructions do not support them.  */
+ DEF_RTL_EXPR(PREFETCH, "prefetch", "eee", RTX_EXTRA)
+ 
++/* Multi-head self-attention, the attn optab.  Operands 0 to 3 are the
++   addresses of Y, X, the weights descriptor and the configuration
++   descriptor.  It sets no register; it reads and writes memory reached
++   through the descriptors, so patterns pair it with
++   (clobber (mem:BLK (scratch))), and it may trap.  */
++DEF_RTL_EXPR(ATTN, "attn", "eeee", RTX_EXTRA)
++
+ /* ----------------------------------------------------------------------
+    At the top level of an instruction (perhaps under PARALLEL).
+    ---------------------------------------------------------------------- */
+diff --git a/gcc/rtlanal.cc b/gcc/rtlanal.cc
+index 88561a54e5a..d794b84fcf8 100644
+--- a/gcc/rtlanal.cc
++++ b/gcc/rtlanal.cc
+@@ -1183,6 +1183,12 @@ reg_referenced_p (const_rtx x, const_rtx body)
+     case PREFETCH:
+       return reg_overlap_mentioned_p (x, XEXP (body, 0));
+ 
++    case ATTN:
++      for (i = 0; i < 4; i++)
++	if (reg_overlap_mentioned_p (x, XEXP (body, i)))
++	  return true;
++      return false;
++
+     case UNSPEC:
+     case UNSPEC_VOLATILE:
+       for (i = XVECLEN (body, 0) - 1; i >= 0; i--)
+@@ -2040,6 +2046,11 @@ note_uses (rtx *pbody, void (*fun) (rtx *, void *), void *data)
+       (*fun) (&XEXP (body, 0), data);
+       return;
+ 
++    case ATTN:
++      for (i = 0; i < 4; i++)
++	(*fun) (&XEXP (body, i), data);
++      return;
++
+     case UNSPEC:
+     case UNSPEC_VOLATILE:
+       for (i = XVECLEN (body, 0) - 1; i >= 0; i--)
+@@ -3142,6 +3153,7 @@ may_trap_p_1 (const_rtx x, unsigned flags)
+     case UNSPEC_VOLATILE:
+     case ASM_INPUT:
+     case TRAP_IF:
++    case ATTN:
+       return true;
+ 
+     case ASM_OPERANDS:
+@@ -6235,8 +6247,10 @@ setup_reg_subrtx_bounds (unsigned int code)
+     ++i;
+   while (format[i] == 'e');
+   rtx_all_subrtx_bounds[code].count = i - rtx_all_subrtx_bounds[code].start;
+-  /* rtl-iter.h relies on this.  */
+-  gcc_checking_assert (rtx_all_subrtx_bounds[code].count <= 3);
++  /* rtl-iter.h's fast path handles at most three; longer runs (ATTN) take
++     the generic path.  */
++  if (rtx_all_subrtx_bounds[code].count > 3)
++    return false;
+ 
+   for (; format[i]; ++i)
+     if (format[i] == 'E' || format[i] == 'V' || format[i] == 'e')
+diff --git a/gcc/sched-deps.cc b/gcc/sched-deps.cc
+index 1818a077bda..b0cd74c9d5f 100644
+--- a/gcc/sched-deps.cc
++++ b/gcc/sched-deps.cc
+@@ -2753,6 +2753,13 @@ sched_analyze_2 (class deps_desc *deps, rtx x, rtx_insn *insn)
+ 	}
+       break;
+ 
++    case ATTN:
++      /* attn reads and writes memory it does not name, but only memory:
++	 order it against every load and store, not against register
++	 arithmetic as an UNSPEC_VOLATILE would.  */
++      flush_pending_lists (deps, insn, true, true);
++      break;
++
+     case UNSPEC_VOLATILE:
+       flush_pending_lists (deps, insn, true, true);
+       /* FALLTHRU */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-rtl-1.c b/gcc/testsuite/gcc.target/riscv/xattn-rtl-1.c
+new file mode 100644
+index 00000000000..ee24a4606ae
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-rtl-1.c
+@@ -0,0 +1,14 @@
++/* attn is the RTL code (attn ...), which uses four registers and sets
++   none, not an unspec_volatile.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2 -fdump-rtl-expand" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++void
++f (float *y, const float *x, const void *w, const void *c)
++{
++  __builtin_attn (y, x, w, c);
++}
++
++/* { dg-final { scan-rtl-dump "\\(attn \\(reg" "expand" } } */
++/* { dg-final { scan-rtl-dump-not "unspec_volatile" "expand" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-rtl-2.c b/gcc/testsuite/gcc.target/riscv/xattn-rtl-2.c
+new file mode 100644
+index 00000000000..64ba061b082
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-rtl-2.c
+@@ -0,0 +1,14 @@
++/* attn orders memory only: the scheduler may hoist register arithmetic
++   above it, which an unspec_volatile barrier forbids.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++long
++g (float *y, const float *x, const void *w, const void *c, long a, long b)
++{
++  __builtin_attn (y, x, w, c);
++  return (a * b) * (a + b);
++}
++
++/* { dg-final { scan-assembler "\\tmul\\t(.|\\n)*\\tattn\\t" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c b/gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c
+new file mode 100644
+index 00000000000..61c4af35837
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c
+@@ -0,0 +1,20 @@
++/* Every one of the four attn operands is a use: the address of a local
++   descriptor in operand 3 must stay live up to the attn.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gc_xattn -mabi=lp64d -O2" } */
++/* { dg-skip-if "" { *-*-* } { "-flto" } } */
++
++struct cfg { unsigned n, e, h, h_kv, flags, dt, scale, reserved;
++	     unsigned long mask; };
++volatile unsigned long tc;
++
++void
++f (float *y, const float *x, const void *w, const struct cfg *c0)
++{
++  struct cfg c = *c0;
++  c.h = 3;
++  tc = -1;
++  __builtin_attn (y, x, w, &c);
++}
++
++/* { dg-final { scan-assembler "\\taddi\\t(\\w+),sp,\\d+\\n(.|\\n)*\\tattn\\ta0,a1,a2,\\1\\n" } } */

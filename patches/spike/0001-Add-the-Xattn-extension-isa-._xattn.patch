@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 02:57:51 +0530
-Subject: [PATCH] Add the Xattn extension (--isa=..._xattn)
+Subject: [PATCH 1/2] Add the Xattn extension (--isa=..._xattn)
 
 attn executes through attn_core.h, the definition shared with QEMU, so both simulators produce bit-identical results.
 ---

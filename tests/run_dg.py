@@ -3,7 +3,8 @@
 
 Understands the directives the Xattn tests use: dg-do compile|preprocess,
 dg-options, dg-error (on the same line), and dg-final scan-assembler,
-scan-assembler-not, scan-assembler-times and scan-tree-dump.
+scan-assembler-not, scan-assembler-times, scan-tree-dump and
+scan-rtl-dump[-not].
 
   run_dg.py [--cc PATH] FILE...
 """
@@ -59,6 +60,10 @@ def run(cc, src, tmp):
         elif kind == "scan-tree-dump":
             dumps = list(tmp.glob(src.stem + ".c.*t." + vals[1]))
             ok = dumps and re.search(pat, dumps[0].read_text())
+        elif kind in ("scan-rtl-dump", "scan-rtl-dump-not"):
+            dumps = list(tmp.glob(src.stem + ".c.*r." + vals[1]))
+            found = dumps and re.search(pat, dumps[0].read_text())
+            ok = dumps and (not found if kind.endswith("-not") else found)
         else:
             problems.append("unsupported directive " + kind)
             continue

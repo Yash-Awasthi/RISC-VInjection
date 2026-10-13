@@ -1,10 +1,18 @@
 # The attention recognizer
 
-`-mattn-recognize` makes GCC replace plain C multi-head attention with one
-`attn` instruction. The pass is `gcc/gcc/config/riscv/riscv-attn-recog.cc`
-(dump name `attn_recog`). It runs inside the loop optimizer, right after
-`pass_tree_loop_init`, before loop distribution, interchange, unrolling and
-vectorization can reshape the loops.
+GCC replaces plain C multi-head attention with one `attn` instruction at
+`-O2` and above, with no extra flags or headers. The recognizer is a
+target-independent middle-end pass, `gcc/gcc/tree-ssa-loop-attn.cc` (dump
+name `attn_recog`, flag `-ftree-loop-attn`), listed in `passes.def` right
+after `pass_tree_loop_init`, before loop distribution, interchange,
+unrolling and vectorization can reshape the loops.
+
+The pass replaces the loops with the internal function `.ATTN (y, x, &w,
+&cfg)` in GIMPLE. `expand_ATTN` in `internal-fn.cc` lowers it through the
+`attn` optab, which RISC-V provides as `attn<mode>` in `xattn.md` when Xattn
+is enabled. The pass runs only on targets where that optab exists. The
+toolchain is configured with `--with-arch=rv64gc_xattn`, so Xattn is on by
+default.
 
 The pass does not guess from surface features. It replaces code only after
 proving that the code computes exactly what the instruction computes, with
@@ -96,9 +104,11 @@ and loops that GCC has already unrolled or restructured.
 
 Requirements on the compilation:
 
-- `-march=..._xattn -O2` (or `-O3`) and `-mattn-recognize`;
-- `-fno-math-errno`: otherwise `expf` may set `errno`, which the
-  instruction does not do, so the two are not equivalent;
+- Xattn enabled (the default) and `-O2` or `-O3`. `-fno-tree-loop-attn`
+  turns the pass off;
+- not an explicit `-fmath-errno`. The library `expf` may set `errno` and
+  the instruction does not; by default the pass drops that side effect,
+  as `-fno-math-errno` would;
 - not `-frounding-math`;
 - the output must be provably distinct from every input. `restrict` on
   the parameters is the usual way.
@@ -218,8 +228,8 @@ On the instruction path, the results are those of the definition in
 `docs/spec.md`. On the loop path, they are those of the C code. These are
 the same for every input, with one exception: `expf` itself. The C code
 calls the C library's `expf`, the instruction uses its own implementation
-(within 1 ulp). That is the same freedom `-fno-math-errno` already gives
-the compiler to substitute an inline `expf`. Floating-point contraction
+(within 1 ulp) and never sets `errno`. That is the same freedom
+`-fno-math-errno` gives the compiler to substitute an inline `expf`. Floating-point contraction
 (`-ffp-contract=fast`, GCC's default) lets the C code fuse a multiply and
 an add. The instruction never does, which is also an allowed execution of
 the C code.
