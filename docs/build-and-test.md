@@ -4,6 +4,10 @@ These steps take a fresh machine to a verified `attn` instruction on both
 simulators. They were run as written on Arch Linux (16 cores, NVMe).
 Ubuntu package names are given too.
 
+`scripts/setup.sh` runs sections 1 to 4 in one go and then compiles and
+runs the demo with `scripts/attncc.sh --run demo/mha_plain.c`. The
+sections below are the same steps by hand.
+
 ## 1. Packages
 
 Arch:
@@ -84,10 +88,10 @@ make check
 
 | Target | What it proves | Count |
 |--------|----------------|-------|
-| `check-core` | `attn_core.h` matches the independent float64 model on 13 configurations (f32, bf16 in/out, causal, mask, GQA, MQA, explicit scale, no bias); reserved configurations are rejected; the C structs match the Python layout; the Spike and QEMU copies are identical | 31 |
-| `check-gcc` | builtin on rv32/rv64 under three pipeline models, error without Xattn, `__riscv_xattn`, the four recognized forms, the six rejected forms with their reasons | 18 |
+| `check-core` | `attn_core.h` matches the independent float64 model on 13 configurations (f32, bf16 in/out, causal, mask, GQA, MQA, explicit scale, no bias); reserved configurations are rejected; the C structs match the Python layout; the Spike, QEMU and libgcc copies are identical | 32 |
+| `check-gcc` | builtins on rv32/rv64 under three pipeline models, `__builtin_attn` with and without Xattn, error without Xattn, `__riscv_xattn`, the five recognized forms (one with no flags at all), the six rejected forms with their reasons, the `attn` RTL code (four register uses, scheduling across it) | 25 |
 | `check-sim` | on QEMU and on Spike (bare metal): every byte of `Y` equals the host core for 7 configurations; reserved configuration traps with `mcause 2`; a load fault traps with `mcause 5` and the right `mtval`, `Y` untouched; re-execution completes; `attn` without Xattn traps. On QEMU Linux user mode (`qemu-riscv64`): the 7 configurations again | 2 x 11 + 7 |
-| `check-recog` | recognized `attn` vs plain loops at run time on both simulators, for three source forms; guard-failing cases run the loops bit-exactly | 6 + 5 |
+| `check-recog` | recognized `attn` vs plain loops at run time on both simulators, for three source forms; libgcc `__attn` (`__builtin_attn` without Xattn) vs the loops; guard-failing cases run the loops bit-exactly | 7 + 6 |
 
 Expected tail of the output:
 
@@ -110,8 +114,7 @@ EOF
 $T/riscv64-unknown-elf-gcc -march=rv64gc_xattn -O2 -Iinclude -S t.c -o - | grep attn
 
 # recognizer
-$T/riscv64-unknown-elf-gcc -march=rv64gc_xattn -O2 -fno-math-errno \
-    -mattn-recognize -fopt-info-loop -S demo/mha_plain.c -o - | grep -w attn
+$T/riscv64-unknown-elf-gcc -O2 -fopt-info-loop -S demo/mha_plain.c -o - | grep -w attn
 
 # run a bare-metal ELF
 out/spike/bin/spike --isa=rv64gc_xattn prog.elf
@@ -130,5 +133,5 @@ build/qemu/qemu-system-riscv64 -M virt -bios none -nographic \
 | `Disk quota exceeded` writing `/tmp/cc*.s` | small `/tmp` | `export TMPDIR=$PWD/build/tmp` |
 | assembler: `extension 'xattn' required` | `-march` lacks `_xattn` | add it |
 | attn traps with `mcause 2` | Xattn disabled in the simulator, or a reserved configuration | `--isa=..._xattn` / `-cpu ...,xattn=on`; check `docs/spec.md` section 4 |
-| recognizer says `exponential is not a const call` | `expf` may set `errno` | `-fno-math-errno` |
+| recognizer says `exponential is not a const call` | explicit `-fmath-errno` | drop it |
 | recognizer says `output may alias an input` | aliasing not provable | `restrict` on the pointers |

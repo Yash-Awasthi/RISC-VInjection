@@ -33,8 +33,9 @@ The extension is implemented end to end on current upstream sources:
 | Layer | Project | What works |
 |-------|---------|------------|
 | Assembler, disassembler | binutils 2.47 branch | `attn` under `-march=..._xattn`, ELF attribute `xattn1p0`, objdump |
-| Compiler | GCC 16.2 | `-march=..._xattn`, `__riscv_xattn`, `__builtin_riscv_attn`, scheduling under every pipeline model |
-| Compiler, automatic | GCC 16.2 | `-mattn-recognize`: proves that C attention loops equal the instruction and replaces all five loop nests with **one** `attn`, behind a runtime guard |
+| Compiler, core | GCC 16.2 | built in like `fma`: generic `__builtin_attn`, internal function `.ATTN`, the `attn` optab, the RTL code `(attn ...)`, and `__attn` in libgcc when the target lacks the instruction |
+| Compiler, RISC-V | GCC 16.2 | default `-march=rv64gc_xattn`, `__riscv_xattn`, `__builtin_riscv_attn`, scheduling under every pipeline model |
+| Compiler, automatic | GCC 16.2 | middle-end pass at `-O2`, no flags or headers: proves that C attention loops equal the instruction and replaces all five loop nests with **one** `.ATTN` call behind a runtime guard |
 | Simulator | Spike | `--isa=rv64gc_xattn`, precise traps, disassembly |
 | Simulator | QEMU | `-cpu rv64,xattn=on`, system and user mode, precise traps, `-d in_asm` |
 
@@ -46,11 +47,22 @@ against an independent float64 model.
 
 ```bash
 git clone https://github.com/Yash-Awasthi/RISC-V_Injection.git && cd RISC-V_Injection
+scripts/setup.sh              # packages, submodules, patches, build, tests, demo
+scripts/attncc.sh --run my_attention.c   # bare excerpt -> one attn, run on Spike
+scripts/xattn.sh remove       # take Xattn out again (restore puts it back)
+```
+
+`setup.sh` does the steps below; each can be run on its own:
+
+```bash
 git submodule update --init gcc binutils spike qemu newlib
 scripts/patches.sh apply      # Xattn patches on the pinned upstream commits
 make                          # toolchain + simulators, about 15 minutes on 16 cores
 make check                    # every test, a few minutes
 ```
+
+[docs/walkthrough.md](docs/walkthrough.md) follows one excerpt through
+every step, from C to the executed instruction.
 
 Step-by-step instructions, package lists and troubleshooting are in
 [docs/build-and-test.md](docs/build-and-test.md).
@@ -58,20 +70,21 @@ Step-by-step instructions, package lists and troubleshooting are in
 ## From C to one instruction
 
 ```bash
-out/toolchain/bin/riscv64-unknown-elf-gcc -march=rv64gc_xattn -O2 -fno-math-errno \
-    -mattn-recognize -fopt-info-loop -S demo/mha_plain.c -o - | grep -w attn
+out/toolchain/bin/riscv64-unknown-elf-gcc -O2 -fopt-info-loop -S demo/mha_plain.c -o - | grep -w attn
 demo/mha_plain.c:53:23: optimized: multi-head self-attention (causal, biased) replaced with attn
-	attn	s6,s9,a5,a4
+	attn	s5,s4,a4,a5
 ```
 
 `demo/mha_plain.c` is ordinary C: three projection loops, the per-head
 softmax loops and the output projection, about 90 lines. Or call the
-instruction directly through `include/attn.h`:
+instruction directly, with no header:
 
 ```c
-#include "attn.h"
-attn_mha (y, x, &weights, &cfg);   /* one attn with Xattn, attn_core.h without */
+__builtin_attn (y, x, &weights, &cfg);   /* one attn with Xattn, libgcc __attn without */
 ```
+
+`include/attn.h` wraps the same call as `attn_mha()` and also builds with
+compilers that lack the builtin.
 
 ## Add any instruction
 
@@ -92,11 +105,15 @@ test:
 ```
 
 ```bash
-scripts/find_opcodes.py --inputs 2               # free encodings, checked against ~3000 known ones
-scripts/xinsn.py apply examples/insns/vsum.spec  # binutils, GCC, Spike and QEMU
-scripts/build.sh binutils gcc spike qemu         # incremental
-scripts/xinsn.py test  examples/insns/vsum.spec  # runs on QEMU and Spike
+scripts/xinsn.py new                             # asks for name, operands, C code, test; then all
+scripts/xinsn.py all examples/insns/vsum.spec    # free opcode, edit 4 trees, rebuild, test on QEMU and Spike
+scripts/xinsn.py list                            # custom instructions and their encodings
+scripts/xinsn.py remove vsum                     # or remove 0x0e00302b; reverts the edits, rebuilds
 ```
+
+Step by step: `find_opcodes.py --inputs 2` (free encodings, checked
+against ~3000 known ones), `xinsn.py apply SPEC`, `scripts/build.sh
+binutils gcc spike qemu`, `xinsn.py test SPEC`.
 
 Any number of register inputs (0–3), a result or not, with or without
 memory access. The C semantics are compiled into both simulators and the
@@ -112,6 +129,7 @@ compiler recognition).
 
 | Document | For |
 |----------|-----|
+| [docs/walkthrough.md](docs/walkthrough.md) | one excerpt from C to the executed instruction, every step, and removal |
 | [docs/theory.md](docs/theory.md) | attention, multi-head, GQA, bf16, stable softmax; RISC-V formats, custom opcodes, vendor extensions |
 | [docs/spec.md](docs/spec.md) | the normative definition: encoding, descriptors, exact semantics, exceptions |
 | [docs/implementation.md](docs/implementation.md) | every file changed in binutils, GCC, Spike and QEMU, and why |
@@ -127,7 +145,7 @@ include/        attn_abi.h (interface), attn_core.h (definition), attn.h (C API)
 demo/           mha_plain.c, the C code the compiler turns into one attn
 patches/        the Xattn change to each upstream project, as git patches
 gcc/ binutils/ spike/ qemu/ newlib/    upstream submodules (official mirrors)
-scripts/        build.sh, patches.sh, find_opcodes.py, xinsn.py
+scripts/        setup.sh, attncc.sh, xattn.sh, build.sh, patches.sh, find_opcodes.py, xinsn.py
 examples/insns/ specs for xinsn.py: 1, 2 and 3 inputs, memory read, memory write
 tests/          host model tests, bare-metal simulator tests, recognizer tests
 tools/          independent float64 model and host runner
