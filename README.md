@@ -1,4 +1,17 @@
-# RISC-V Xattn: multi-head self-attention in one instruction
+# RISC-V custom instructions, end to end
+
+Two things live here:
+
+1. **Xattn**, a complete custom extension whose one instruction, `attn`,
+   computes a whole transformer attention block. It is implemented by hand
+   in binutils, GCC (including a pass that finds attention in plain C),
+   Spike and QEMU.
+2. **A general method and script for any instruction**:
+   `scripts/xinsn.py` takes a short spec (operands, C semantics, optional
+   test), finds a free encoding and plugs the instruction into the same
+   four projects, then tests it on both simulators.
+
+## Xattn: multi-head self-attention in one instruction
 
 ```
 Y = concat_j softmax(Q_j K_j^T * scale + M) V_j  Wo + bo,   Q = X Wq + bq, K = X Wk + bk, V = X Wv + bv
@@ -60,16 +73,40 @@ instruction directly through `include/attn.h`:
 attn_mha (y, x, &weights, &cfg);   /* one attn with Xattn, attn_core.h without */
 ```
 
-## Add your own instruction
+## Add any instruction
 
-```bash
-scripts/find_opcodes.py --inputs 2            # free encodings, checked against ~3000 known ones
-scripts/xinsn.py apply examples/insns/mac.spec   # into binutils, GCC, Spike and QEMU
-scripts/build.sh binutils gcc spike qemu
-scripts/xinsn.py test examples/insns/mac.spec    # runs on QEMU and Spike
+```
+# examples/insns/vsum.spec
+name   = vsum              # -> extension Xvsum, __builtin_riscv_vsum
+inputs = 2                 # rs1, rs2
+writes = rd
+memory = yes
+semantics:
+  uint64_t s = 0;
+  for (uint64_t i = 0; i < rs2; i++)
+    s += LD32 (rs1 + 4 * i);
+  return s;
+test:
+  static uint32_t a[3] = { 1, 2, 3 };
+  CHECK (__builtin_riscv_vsum ((uintptr_t) a, 3) == 6);
 ```
 
-See [docs/new-instruction.md](docs/new-instruction.md).
+```bash
+scripts/find_opcodes.py --inputs 2               # free encodings, checked against ~3000 known ones
+scripts/xinsn.py apply examples/insns/vsum.spec  # binutils, GCC, Spike and QEMU
+scripts/build.sh binutils gcc spike qemu         # incremental
+scripts/xinsn.py test  examples/insns/vsum.spec  # runs on QEMU and Spike
+```
+
+Any number of register inputs (0–3), a result or not, with or without
+memory access. The C semantics are compiled into both simulators and the
+host model, so they agree by construction. Each of the five example
+shapes in `examples/insns/` was applied, built and passed on both
+simulators.
+[docs/new-instruction.md](docs/new-instruction.md) is the full guide: the
+automated path, what each tree needs if you do it by hand, and how `attn`
+goes beyond the generator (descriptors, precise traps, scheduling,
+compiler recognition).
 
 ## Documentation
 
@@ -80,7 +117,7 @@ See [docs/new-instruction.md](docs/new-instruction.md).
 | [docs/implementation.md](docs/implementation.md) | every file changed in binutils, GCC, Spike and QEMU, and why |
 | [docs/recognizer.md](docs/recognizer.md) | how GCC proves C loops equal to `attn` |
 | [docs/build-and-test.md](docs/build-and-test.md) | building and testing on a fresh machine |
-| [docs/new-instruction.md](docs/new-instruction.md) | the opcode finder and the instruction generator |
+| [docs/new-instruction.md](docs/new-instruction.md) | adding any instruction: shapes, encodings, the generator, the manual changes per tree, recognizing it in C |
 | [docs/study.md](docs/study.md) | a reading path through the theory and the code |
 
 ## Layout
@@ -91,7 +128,7 @@ demo/           mha_plain.c, the C code the compiler turns into one attn
 patches/        the Xattn change to each upstream project, as git patches
 gcc/ binutils/ spike/ qemu/ newlib/    upstream submodules (official mirrors)
 scripts/        build.sh, patches.sh, find_opcodes.py, xinsn.py
-examples/insns/ instruction specs for xinsn.py (1, 2 and 3 inputs)
+examples/insns/ specs for xinsn.py: 1, 2 and 3 inputs, memory read, memory write
 tests/          host model tests, bare-metal simulator tests, recognizer tests
 tools/          independent float64 model and host runner
 docs/           the documents above
