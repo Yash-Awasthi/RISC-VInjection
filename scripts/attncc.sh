@@ -36,6 +36,9 @@ RUN=0 MODEL=()
 SRC=$(realpath "$1")
 OUT=${2:-$TMPDIR/$(basename "${SRC%.c}").o}
 [ -x "$CC" ] || { echo "no toolchain at $BIN; run scripts/setup.sh" >&2; exit 1; }
+"$CC" -fno-tree-loop-attn -E -x c /dev/null -o /dev/null 2> /dev/null || {
+  echo "this toolchain has no Xattn (scripts/xattn.sh restore puts it back)" >&2
+  exit 1; }
 
 compile() { # compile OUT EXTRA-FLAGS...
   local out=$1
