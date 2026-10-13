@@ -31,8 +31,8 @@ branch and arithmetic instructions. For n = 16, e = 32, h = 4 it executes
 ## 1. One command to set everything up
 
 ```bash
-git clone https://github.com/Yash-Awasthi/RISC-V_Injection.git
-cd RISC-V_Injection
+git clone https://github.com/Yash-Awasthi/RISC-VInjection.git
+cd RISC-VInjection
 scripts/setup.sh
 ```
 

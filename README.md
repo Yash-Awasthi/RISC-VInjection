@@ -1,6 +1,6 @@
-# RISC-V custom instructions, end to end
+# RISC-VInjection
 
-Two things live here:
+RISC-VInjection adds custom instructions to the RISC-V toolchain, end to end. Two things live here:
 
 1. **Xattn**, a complete custom extension whose one instruction, `attn`,
    computes a whole transformer attention block. It is implemented by hand
@@ -46,7 +46,7 @@ against an independent float64 model.
 ## Quick start
 
 ```bash
-git clone https://github.com/Yash-Awasthi/RISC-V_Injection.git && cd RISC-V_Injection
+git clone https://github.com/Yash-Awasthi/RISC-VInjection.git && cd RISC-VInjection
 scripts/setup.sh              # packages, submodules, patches, build, tests, demo
 scripts/attncc.sh --run my_attention.c   # bare excerpt -> one attn, run on Spike
 scripts/xattn.sh remove       # take Xattn out again (restore puts it back)
@@ -143,9 +143,10 @@ compiler recognition).
 ```
 include/        attn_abi.h (interface), attn_core.h (definition), attn.h (C API)
 demo/           mha_plain.c, the C code the compiler turns into one attn
+artifacts/      that code compiled with attn and without: .s, .o, disassembly, GCC dumps, Spike run
 patches/        the Xattn change to each upstream project, as git patches
 gcc/ binutils/ spike/ qemu/ newlib/    upstream submodules (official mirrors)
-scripts/        setup.sh, attncc.sh, xattn.sh, build.sh, patches.sh, find_opcodes.py, xinsn.py
+scripts/        setup.sh, attncc.sh, artifacts.sh, xattn.sh, build.sh, patches.sh, find_opcodes.py, xinsn.py
 examples/insns/ specs for xinsn.py: 1, 2 and 3 inputs, memory read, memory write
 tests/          host model tests, bare-metal simulator tests, recognizer tests
 tools/          independent float64 model and host runner

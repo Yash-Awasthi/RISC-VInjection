@@ -1,0 +1,26 @@
+== compile: riscv64-unknown-elf-gcc -O2 excerpt.c
+artifacts/excerpt.c:51:23: optimized: multi-head self-attention (causal, biased) replaced with attn
+
+== result
+function                   attn    insns (attn on)   insns (attn off)
+mha                           1                387                345
+
+== disassembly around attn (build/tmp/artifacts-run.o)
+ 10c:	d282                	sw	zero,100(sp)
+ 10e:	da82                	sw	zero,116(sp)
+ 110:	fc82                	sd	zero,120(sp)
+ 112:	08bc                	addi	a5,sp,88
+ 114:	06f12827          	fsw	fa5,112(sp)
+ 118:	0118                	addi	a4,sp,128
+ 11a:	7eea1afb          	attn	s5,s4,a4,a5
+
+000000000000011e <.L7>:
+
+The loops that remain run only when the sizes fail the guard
+(n or e outside the instruction's limits, e % h != 0); every valid
+size executes the single attn above.
+
+== run on Spike: mha(n=16, e=32, h=4)
+instructions executed, attn build:  991
+instructions executed, loops build: 508421
+largest output difference (ulp-scale expf only): <= 1e-5, PASS

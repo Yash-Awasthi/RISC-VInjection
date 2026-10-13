@@ -35,8 +35,8 @@ history.
 ## 2. Sources
 
 ```bash
-git clone https://github.com/Yash-Awasthi/RISC-V_Injection.git
-cd RISC-V_Injection
+git clone https://github.com/Yash-Awasthi/RISC-VInjection.git
+cd RISC-VInjection
 git submodule update --init gcc binutils spike qemu newlib   # full history, ~6 GB
 scripts/patches.sh apply                                     # branch xattn in each
 scripts/patches.sh status

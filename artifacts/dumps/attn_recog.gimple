@@ -1,0 +1,818 @@
+
+;; Function mha (mha, funcdef_no=0, decl_uid=3642, cgraph_uid=1, symbol_order=0)
+
+
+Symbols to be put in SSA form
+{ D.3757 }
+Incremental SSA update started at block: 0
+Number of blocks in CFG: 78
+Number of blocks to update: 77 ( 99%)
+
+
+Merging blocks 5 and 75
+void mha (float * restrict y, const float * restrict x, const float * restrict wq, const float * restrict wk, const float * restrict wv, const float * restrict wo, const float * restrict bq, const float * restrict bk, const float * restrict bv, const float * restrict bo, int n, int e, int h)
+{
+  long long unsigned int attn_cfg.25[5];
+  long long unsigned int attn_w.24[8];
+  bool DCE_COND_LB_TEST.3;
+  float DCE_COND_LB.2;
+  int t;
+  float acc;
+  int j;
+  int i;
+  int j;
+  float acc;
+  int t;
+  int j;
+  int t;
+  float s;
+  int j;
+  float l;
+  float mx;
+  int i;
+  int hd;
+  int t;
+  float acc;
+  int j;
+  int i;
+  int t;
+  float acc;
+  int j;
+  int i;
+  int t;
+  float acc;
+  int j;
+  int i;
+  float * p;
+  float * c;
+  float * v;
+  float * k;
+  float * q;
+  float scale;
+  int d;
+  float _1;
+  float _2;
+  long unsigned int _3;
+  long unsigned int _4;
+  unsigned int _5;
+  long unsigned int _6;
+  bool _7;
+  long unsigned int _8;
+  int _9;
+  int _10;
+  long unsigned int _11;
+  long unsigned int _12;
+  const float * _13;
+  float _14;
+  int _15;
+  int _16;
+  long unsigned int _17;
+  long unsigned int _18;
+  const float * _19;
+  float _20;
+  float _21;
+  long unsigned int _22;
+  long unsigned int _23;
+  const float * _24;
+  float _25;
+  int _27;
+  long unsigned int _28;
+  long unsigned int _29;
+  float * _30;
+  float _31;
+  int _32;
+  int _33;
+  long unsigned int _34;
+  long unsigned int _35;
+  const float * _36;
+  float _37;
+  int _38;
+  int _39;
+  long unsigned int _40;
+  long unsigned int _41;
+  const float * _42;
+  float _43;
+  float _44;
+  long unsigned int _45;
+  long unsigned int _46;
+  const float * _47;
+  float _48;
+  int _50;
+  long unsigned int _51;
+  long unsigned int _52;
+  float * _53;
+  float _54;
+  int _55;
+  int _56;
+  long unsigned int _57;
+  long unsigned int _58;
+  const float * _59;
+  float _60;
+  int _61;
+  int _62;
+  long unsigned int _63;
+  long unsigned int _64;
+  const float * _65;
+  float _66;
+  float _67;
+  long unsigned int _68;
+  long unsigned int _69;
+  const float * _70;
+  float _71;
+  int _73;
+  long unsigned int _74;
+  long unsigned int _75;
+  float * _76;
+  float _77;
+  int _79;
+  int _80;
+  int _81;
+  long unsigned int _82;
+  long unsigned int _83;
+  float * _84;
+  float _85;
+  int _86;
+  int _87;
+  int _88;
+  long unsigned int _89;
+  long unsigned int _90;
+  float * _91;
+  float _92;
+  float _93;
+  long unsigned int _94;
+  long unsigned int _95;
+  float * _96;
+  long unsigned int _97;
+  long unsigned int _98;
+  float * _99;
+  float _100;
+  float _101;
+  float _102;
+  float _103;
+  long unsigned int _104;
+  long unsigned int _105;
+  float * _106;
+  float _107;
+  int _108;
+  int _110;
+  int _111;
+  long unsigned int _112;
+  long unsigned int _113;
+  float * _114;
+  float _115;
+  float _116;
+  int _117;
+  int _119;
+  int _120;
+  long unsigned int _121;
+  long unsigned int _122;
+  float * _123;
+  float _124;
+  int _125;
+  int _126;
+  long unsigned int _127;
+  long unsigned int _128;
+  float * _129;
+  float _130;
+  int _131;
+  int _132;
+  long unsigned int _133;
+  long unsigned int _134;
+  const float * _135;
+  float _136;
+  float _137;
+  long unsigned int _138;
+  long unsigned int _139;
+  const float * _140;
+  float _141;
+  int _143;
+  long unsigned int _144;
+  long unsigned int _145;
+  float * _146;
+  float _147;
+  float _256;
+  float _272;
+  unsigned int _274;
+  long unsigned int _282;
+  unsigned int _312;
+  unsigned int _316;
+  unsigned int _323;
+  unsigned int _327;
+  unsigned int _466;
+  unsigned int _467;
+  unsigned int _468;
+  float _469;
+  unsigned long _470;
+  unsigned long _471;
+  unsigned long _472;
+  unsigned long _473;
+  unsigned long _474;
+  unsigned long _475;
+  unsigned long _476;
+  unsigned long _477;
+  bool _478;
+  long long int _479;
+  long long int _480;
+  bool _481;
+  bool _482;
+  bool _483;
+  bool _484;
+  bool _485;
+  bool _486;
+  bool _487;
+  bool _488;
+  bool _489;
+  bool _490;
+  bool _491;
+  long long int _492;
+  long long int _493;
+  long long int _494;
+  unsigned int _496;
+  float _503;
+
+  <bb 2> [local count: 222998]:
+  d_190 = e_188(D) / h_189(D);
+  _1 = (float) d_190;
+  if (_1 u>= 0.0)
+    goto <bb 3>; [99.95%]
+  else
+    goto <bb 4>; [0.05%]
+
+  <bb 3> [local count: 222887]:
+  _2 = .SQRT (_1);
+  goto <bb 5>; [100.00%]
+
+  <bb 4> [local count: 111]:
+  _256 = sqrtf (_1);
+
+  <bb 5> [local count: 222998]:
+  # _272 = PHI <_256(4), _2(3)>
+  _3 = (long unsigned int) n_194(D);
+  _4 = (long unsigned int) e_188(D);
+  _282 = _3 * _4;
+  _6 = _282 * 4;
+  q_196 = malloc (_6);
+  k_198 = malloc (_6);
+  v_200 = malloc (_6);
+  c_202 = malloc (_6);
+  _8 = _3 * 4;
+  p_204 = malloc (_8);
+  _494 = (long long int) n_194(D);
+  _493 = (long long int) e_188(D);
+  _492 = (long long int) h_189(D);
+  _491 = n_194(D) > 0;
+  _490 = n_194(D) <= 4096;
+  _489 = _491 & _490;
+  _488 = e_188(D) > 0;
+  _487 = e_188(D) <= 2048;
+  _486 = _488 & _487;
+  _485 = _489 & _486;
+  _484 = h_189(D) > 0;
+  _483 = h_189(D) <= 2048;
+  _482 = _484 & _483;
+  _481 = _485 & _482;
+  if (_481 != 0)
+    goto <bb 76>; [80.00%]
+  else
+    goto <bb 74>; [20.00%]
+
+  <bb 76> [local count: 178398]:
+  _480 = (long long int) d_190;
+  _479 = _480 * _492;
+  _478 = _479 == _493;
+  if (_478 != 0)
+    goto <bb 77>; [80.00%]
+  else
+    goto <bb 74>; [20.00%]
+
+  <bb 77> [local count: 142718]:
+  _477 = (unsigned long) wq_252(D);
+  MEM <long long unsigned int> [(void *)&attn_w.24] = _477;
+  _476 = (unsigned long) wk_245(D);
+  MEM <long long unsigned int> [(void *)&attn_w.24 + 8B] = _476;
+  _475 = (unsigned long) wv_238(D);
+  MEM <long long unsigned int> [(void *)&attn_w.24 + 16B] = _475;
+  _474 = (unsigned long) wo_215(D);
+  MEM <long long unsigned int> [(void *)&attn_w.24 + 24B] = _474;
+  _473 = (unsigned long) bq_249(D);
+  MEM <long long unsigned int> [(void *)&attn_w.24 + 32B] = _473;
+  _472 = (unsigned long) bk_242(D);
+  MEM <long long unsigned int> [(void *)&attn_w.24 + 40B] = _472;
+  _471 = (unsigned long) bv_234(D);
+  MEM <long long unsigned int> [(void *)&attn_w.24 + 48B] = _471;
+  _470 = (unsigned long) bo_211(D);
+  MEM <long long unsigned int> [(void *)&attn_w.24 + 56B] = _470;
+  _469 = 1.0e+0 / _272;
+  _468 = (unsigned int) n_194(D);
+  MEM <unsigned int> [(void *)&attn_cfg.25] = _468;
+  _467 = (unsigned int) e_188(D);
+  MEM <unsigned int> [(void *)&attn_cfg.25 + 4B] = _467;
+  _466 = (unsigned int) h_189(D);
+  MEM <unsigned int> [(void *)&attn_cfg.25 + 8B] = _466;
+  MEM <unsigned int> [(void *)&attn_cfg.25 + 12B] = 0;
+  MEM <unsigned int> [(void *)&attn_cfg.25 + 16B] = 3;
+  MEM <unsigned int> [(void *)&attn_cfg.25 + 20B] = 0;
+  MEM <float> [(void *)&attn_cfg.25 + 24B] = _469;
+  MEM <unsigned int> [(void *)&attn_cfg.25 + 28B] = 0;
+  MEM <long long unsigned int> [(void *)&attn_cfg.25 + 32B] = 0;
+  .ATTN (y_212(D), x_237(D), &attn_w.24, &attn_cfg.25);
+  attn_w.24 ={v} {CLOBBER};
+  attn_cfg.25 ={v} {CLOBBER};
+  goto <bb 49>; [100.00%]
+
+  <bb 74> [local count: 222998]:
+  if (n_194(D) > 0)
+    goto <bb 54>; [89.00%]
+  else
+    goto <bb 24>; [11.00%]
+
+  <bb 54> [local count: 198468]:
+  goto <bb 10>; [100.00%]
+
+  <bb 73> [local count: 103513537]:
+
+  <bb 6> [local count: 118111600]:
+  # acc_301 = PHI <acc_253(73), 0.0(8)>
+  # t_303 = PHI <t_254(73), 0(8)>
+  _10 = _9 + t_303;
+  _11 = (long unsigned int) _10;
+  _12 = _11 * 4;
+  _13 = x_237(D) + _12;
+  _14 = *_13;
+  _15 = e_188(D) * t_303;
+  _16 = _15 + j_300;
+  _17 = (long unsigned int) _16;
+  _18 = _17 * 4;
+  _19 = wq_252(D) + _18;
+  _20 = *_19;
+  _21 = _14 * _20;
+  acc_253 = _21 + acc_301;
+  t_254 = t_303 + 1;
+  if (e_188(D) > t_254)
+    goto <bb 73>; [87.64%]
+  else
+    goto <bb 7>; [12.36%]
+
+  <bb 7> [local count: 14598063]:
+  # acc_495 = PHI <acc_253(6)>
+  _22 = (long unsigned int) j_300;
+  _23 = _22 * 4;
+  _24 = bq_249(D) + _23;
+  _25 = *_24;
+  _27 = _9 + j_300;
+  _28 = (long unsigned int) _27;
+  _29 = _28 * 4;
+  _30 = q_196 + _29;
+  _31 = _25 + acc_495;
+  *_30 = _31;
+  j_251 = j_300 + 1;
+  if (e_188(D) > j_251)
+    goto <bb 72>; [89.00%]
+  else
+    goto <bb 9>; [11.00%]
+
+  <bb 72> [local count: 12992276]:
+
+  <bb 8> [local count: 14598063]:
+  # j_300 = PHI <j_251(72), 0(11)>
+  goto <bb 6>; [100.00%]
+
+  <bb 9> [local count: 1804255]:
+  i_248 = i_299 + 1;
+  if (n_194(D) > i_248)
+    goto <bb 71>; [89.00%]
+  else
+    goto <bb 53>; [11.00%]
+
+  <bb 71> [local count: 1605787]:
+
+  <bb 10> [local count: 1804255]:
+  # i_299 = PHI <i_248(71), 0(54)>
+  if (e_188(D) > 0)
+    goto <bb 11>; [89.00%]
+  else
+    goto <bb 9>; [11.00%]
+
+  <bb 11> [local count: 1605787]:
+  _9 = e_188(D) * i_299;
+  goto <bb 8>; [100.00%]
+
+  <bb 70> [local count: 103513537]:
+
+  <bb 12> [local count: 118111600]:
+  # acc_306 = PHI <acc_246(70), 0.0(14)>
+  # t_308 = PHI <t_247(70), 0(14)>
+  _33 = _32 + t_308;
+  _34 = (long unsigned int) _33;
+  _35 = _34 * 4;
+  _36 = x_237(D) + _35;
+  _37 = *_36;
+  _38 = e_188(D) * t_308;
+  _39 = _38 + j_305;
+  _40 = (long unsigned int) _39;
+  _41 = _40 * 4;
+  _42 = wk_245(D) + _41;
+  _43 = *_42;
+  _44 = _37 * _43;
+  acc_246 = _44 + acc_306;
+  t_247 = t_308 + 1;
+  if (e_188(D) > t_247)
+    goto <bb 70>; [87.64%]
+  else
+    goto <bb 13>; [12.36%]
+
+  <bb 13> [local count: 14598063]:
+  # acc_497 = PHI <acc_246(12)>
+  _45 = (long unsigned int) j_305;
+  _46 = _45 * 4;
+  _47 = bk_242(D) + _46;
+  _48 = *_47;
+  _50 = _32 + j_305;
+  _51 = (long unsigned int) _50;
+  _52 = _51 * 4;
+  _53 = k_198 + _52;
+  _54 = _48 + acc_497;
+  *_53 = _54;
+  j_244 = j_305 + 1;
+  if (e_188(D) > j_244)
+    goto <bb 69>; [89.00%]
+  else
+    goto <bb 15>; [11.00%]
+
+  <bb 69> [local count: 12992276]:
+
+  <bb 14> [local count: 14598063]:
+  # j_305 = PHI <j_244(69), 0(17)>
+  goto <bb 12>; [100.00%]
+
+  <bb 15> [local count: 1804255]:
+  i_241 = i_304 + 1;
+  if (n_194(D) > i_241)
+    goto <bb 68>; [89.00%]
+  else
+    goto <bb 52>; [11.00%]
+
+  <bb 68> [local count: 1605787]:
+  goto <bb 16>; [100.00%]
+
+  <bb 52> [local count: 198468]:
+  goto <bb 22>; [100.00%]
+
+  <bb 53> [local count: 198468]:
+
+  <bb 16> [local count: 1804255]:
+  # i_304 = PHI <i_241(68), 0(53)>
+  if (e_188(D) > 0)
+    goto <bb 17>; [89.00%]
+  else
+    goto <bb 15>; [11.00%]
+
+  <bb 17> [local count: 1605787]:
+  _32 = e_188(D) * i_304;
+  goto <bb 14>; [100.00%]
+
+  <bb 67> [local count: 103513537]:
+
+  <bb 18> [local count: 118111600]:
+  # acc_311 = PHI <acc_239(67), 0.0(20)>
+  # t_313 = PHI <t_240(67), 0(20)>
+  _56 = _55 + t_313;
+  _57 = (long unsigned int) _56;
+  _58 = _57 * 4;
+  _59 = x_237(D) + _58;
+  _60 = *_59;
+  _61 = e_188(D) * t_313;
+  _62 = _61 + j_310;
+  _63 = (long unsigned int) _62;
+  _64 = _63 * 4;
+  _65 = wv_238(D) + _64;
+  _66 = *_65;
+  _67 = _60 * _66;
+  acc_239 = _67 + acc_311;
+  t_240 = t_313 + 1;
+  if (e_188(D) > t_240)
+    goto <bb 67>; [87.64%]
+  else
+    goto <bb 19>; [12.36%]
+
+  <bb 19> [local count: 14598063]:
+  # acc_498 = PHI <acc_239(18)>
+  _68 = (long unsigned int) j_310;
+  _69 = _68 * 4;
+  _70 = bv_234(D) + _69;
+  _71 = *_70;
+  _73 = _55 + j_310;
+  _74 = (long unsigned int) _73;
+  _75 = _74 * 4;
+  _76 = v_200 + _75;
+  _77 = _71 + acc_498;
+  *_76 = _77;
+  j_236 = j_310 + 1;
+  if (e_188(D) > j_236)
+    goto <bb 66>; [89.00%]
+  else
+    goto <bb 21>; [11.00%]
+
+  <bb 66> [local count: 12992276]:
+
+  <bb 20> [local count: 14598063]:
+  # j_310 = PHI <j_236(66), 0(23)>
+  goto <bb 18>; [100.00%]
+
+  <bb 21> [local count: 1804255]:
+  i_233 = i_309 + 1;
+  if (n_194(D) > i_233)
+    goto <bb 65>; [89.00%]
+  else
+    goto <bb 25>; [11.00%]
+
+  <bb 65> [local count: 1605787]:
+
+  <bb 22> [local count: 1804255]:
+  # i_309 = PHI <i_233(65), 0(52)>
+  if (e_188(D) > 0)
+    goto <bb 23>; [89.00%]
+  else
+    goto <bb 21>; [11.00%]
+
+  <bb 23> [local count: 1605787]:
+  _55 = e_188(D) * i_309;
+  goto <bb 20>; [100.00%]
+
+  <bb 24> [local count: 24530]:
+  if (h_189(D) > 0)
+    goto <bb 26>; [89.00%]
+  else
+    goto <bb 49>; [11.00%]
+
+  <bb 25> [local count: 198468]:
+  if (h_189(D) > 0)
+    goto <bb 26>; [89.00%]
+  else
+    goto <bb 42>; [11.00%]
+
+  <bb 26> [local count: 198468]:
+  scale_193 = 1.0e+0 / _272;
+  goto <bb 40>; [100.00%]
+
+  <bb 27> [local count: 105119324]:
+  _86 = e_188(D) * j_318;
+  _87 = _79 + _86;
+
+  <bb 28> [local count: 955630224]:
+  # s_319 = PHI <s_231(64), 0.0(27)>
+  # t_321 = PHI <t_232(64), 0(27)>
+  _81 = _80 + t_321;
+  _82 = (long unsigned int) _81;
+  _83 = _82 * 4;
+  _84 = q_196 + _83;
+  _85 = *_84;
+  _88 = _87 + t_321;
+  _89 = (long unsigned int) _88;
+  _90 = _89 * 4;
+  _91 = k_198 + _90;
+  _92 = *_91;
+  _93 = _85 * _92;
+  s_231 = _93 + s_319;
+  t_232 = t_321 + 1;
+  if (d_190 > t_232)
+    goto <bb 64>; [89.00%]
+  else
+    goto <bb 29>; [11.00%]
+
+  <bb 64> [local count: 850510900]:
+  goto <bb 28>; [100.00%]
+
+  <bb 29> [local count: 118111600]:
+  # s_320 = PHI <s_231(28), 0.0(30)>
+  s_228 = scale_193 * s_320;
+  _94 = (long unsigned int) j_318;
+  _95 = _94 * 4;
+  _96 = p_204 + _95;
+  *_96 = s_228;
+  _7 = s_228 > mx_317;
+  _103 = _7 ? s_228 : mx_317;
+  j_230 = j_318 + 1;
+  if (j_230 <= i_315)
+    goto <bb 63>; [87.64%]
+  else
+    goto <bb 51>; [12.36%]
+
+  <bb 63> [local count: 103513537]:
+
+  <bb 30> [local count: 118111600]:
+  # mx_317 = PHI <_103(63),  -Inf(38)>
+  # j_318 = PHI <j_230(63), 0(38)>
+  if (d_190 > 0)
+    goto <bb 27>; [89.00%]
+  else
+    goto <bb 29>; [11.00%]
+
+  <bb 51> [local count: 14598063]:
+  # _503 = PHI <_103(29)>
+
+  <bb 31> [local count: 118111600]:
+  # l_322 = PHI <l_226(62), 0.0(51)>
+  # j_324 = PHI <j_227(62), 0(51)>
+  _97 = (long unsigned int) j_324;
+  _98 = _97 * 4;
+  _99 = p_204 + _98;
+  _100 = *_99;
+  _101 = _100 - _503;
+  _102 = expf (_101);
+  *_99 = _102;
+  l_226 = _102 + l_322;
+  j_227 = j_324 + 1;
+  if (j_227 <= i_315)
+    goto <bb 62>; [87.64%]
+  else
+    goto <bb 32>; [12.36%]
+
+  <bb 62> [local count: 103513537]:
+  goto <bb 31>; [100.00%]
+
+  <bb 32> [local count: 14598063]:
+  # l_500 = PHI <l_226(31)>
+  if (d_190 > 0)
+    goto <bb 33>; [89.00%]
+  else
+    goto <bb 37>; [11.00%]
+
+  <bb 33> [local count: 12992276]:
+  _117 = e_188(D) * i_315;
+  _119 = _79 + _117;
+  goto <bb 36>; [100.00%]
+
+  <bb 61> [local count: 837518623]:
+
+  <bb 34> [local count: 955630224]:
+  # acc_326 = PHI <acc_222(61), 0.0(36)>
+  # j_328 = PHI <j_223(61), 0(36)>
+  _104 = (long unsigned int) j_328;
+  _105 = _104 * 4;
+  _106 = p_204 + _105;
+  _107 = *_106;
+  _108 = e_188(D) * j_328;
+  _110 = _79 + _108;
+  _111 = _110 + t_325;
+  _112 = (long unsigned int) _111;
+  _113 = _112 * 4;
+  _114 = v_200 + _113;
+  _115 = *_114;
+  _116 = _107 * _115;
+  acc_222 = _116 + acc_326;
+  j_223 = j_328 + 1;
+  if (j_223 <= i_315)
+    goto <bb 61>; [87.64%]
+  else
+    goto <bb 35>; [12.36%]
+
+  <bb 35> [local count: 118111600]:
+  # acc_499 = PHI <acc_222(34)>
+  _120 = _119 + t_325;
+  _121 = (long unsigned int) _120;
+  _122 = _121 * 4;
+  _123 = c_202 + _122;
+  _124 = acc_499 / l_500;
+  *_123 = _124;
+  t_221 = t_325 + 1;
+  if (d_190 > t_221)
+    goto <bb 60>; [89.00%]
+  else
+    goto <bb 37>; [11.00%]
+
+  <bb 60> [local count: 105119324]:
+
+  <bb 36> [local count: 118111600]:
+  # t_325 = PHI <t_221(60), 0(33)>
+  goto <bb 34>; [100.00%]
+
+  <bb 37> [local count: 14598063]:
+  i_219 = i_315 + 1;
+  if (n_194(D) > i_219)
+    goto <bb 59>; [89.00%]
+  else
+    goto <bb 39>; [11.00%]
+
+  <bb 59> [local count: 12992276]:
+
+  <bb 38> [local count: 14598063]:
+  # i_315 = PHI <i_219(59), 0(41)>
+  _274 = (unsigned int) i_315;
+  _5 = _274 * _496;
+  _312 = _5 + _316;
+  _80 = (int) _312;
+  goto <bb 30>; [100.00%]
+
+  <bb 39> [local count: 1804255]:
+  hd_218 = hd_314 + 1;
+  if (h_189(D) > hd_218)
+    goto <bb 58>; [89.00%]
+  else
+    goto <bb 42>; [11.00%]
+
+  <bb 58> [local count: 1605787]:
+
+  <bb 40> [local count: 1804255]:
+  # hd_314 = PHI <hd_218(58), 0(26)>
+  if (n_194(D) > 0)
+    goto <bb 41>; [89.00%]
+  else
+    goto <bb 39>; [11.00%]
+
+  <bb 41> [local count: 1605787]:
+  _327 = (unsigned int) d_190;
+  _323 = (unsigned int) hd_314;
+  _316 = _327 * _323;
+  _79 = (int) _316;
+  _496 = (unsigned int) e_188(D);
+  goto <bb 38>; [100.00%]
+
+  <bb 42> [local count: 220300]:
+  if (n_194(D) > 0)
+    goto <bb 50>; [90.09%]
+  else
+    goto <bb 49>; [9.91%]
+
+  <bb 50> [local count: 198468]:
+  goto <bb 47>; [100.00%]
+
+  <bb 57> [local count: 103513537]:
+
+  <bb 43> [local count: 118111600]:
+  # acc_331 = PHI <acc_216(57), 0.0(45)>
+  # t_333 = PHI <t_217(57), 0(45)>
+  _126 = _125 + t_333;
+  _127 = (long unsigned int) _126;
+  _128 = _127 * 4;
+  _129 = c_202 + _128;
+  _130 = *_129;
+  _131 = e_188(D) * t_333;
+  _132 = _131 + j_330;
+  _133 = (long unsigned int) _132;
+  _134 = _133 * 4;
+  _135 = wo_215(D) + _134;
+  _136 = *_135;
+  _137 = _130 * _136;
+  acc_216 = _137 + acc_331;
+  t_217 = t_333 + 1;
+  if (e_188(D) > t_217)
+    goto <bb 57>; [87.64%]
+  else
+    goto <bb 44>; [12.36%]
+
+  <bb 44> [local count: 14598063]:
+  # acc_504 = PHI <acc_216(43)>
+  _138 = (long unsigned int) j_330;
+  _139 = _138 * 4;
+  _140 = bo_211(D) + _139;
+  _141 = *_140;
+  _143 = _125 + j_330;
+  _144 = (long unsigned int) _143;
+  _145 = _144 * 4;
+  _146 = y_212(D) + _145;
+  _147 = _141 + acc_504;
+  *_146 = _147;
+  j_214 = j_330 + 1;
+  if (e_188(D) > j_214)
+    goto <bb 56>; [89.00%]
+  else
+    goto <bb 46>; [11.00%]
+
+  <bb 56> [local count: 12992276]:
+
+  <bb 45> [local count: 14598063]:
+  # j_330 = PHI <j_214(56), 0(48)>
+  goto <bb 43>; [100.00%]
+
+  <bb 46> [local count: 1804255]:
+  i_210 = i_329 + 1;
+  if (n_194(D) > i_210)
+    goto <bb 55>; [89.00%]
+  else
+    goto <bb 49>; [11.00%]
+
+  <bb 55> [local count: 1605787]:
+
+  <bb 47> [local count: 1804255]:
+  # i_329 = PHI <i_210(55), 0(50)>
+  if (e_188(D) > 0)
+    goto <bb 48>; [89.00%]
+  else
+    goto <bb 46>; [11.00%]
+
+  <bb 48> [local count: 1605787]:
+  _125 = e_188(D) * i_329;
+  goto <bb 45>; [100.00%]
+
+  <bb 49> [local count: 222998]:
+  free (q_196);
+  free (k_198);
+  free (v_200);
+  free (c_202);
+  free (p_204);
+  return;
+
+}
+
+
