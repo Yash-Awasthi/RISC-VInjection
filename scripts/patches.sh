@@ -6,6 +6,10 @@
 #                                              git am patches/<component>/*
 #   scripts/patches.sh export [component...]   rewrite patches/<component>/
 #                                              from the commits on xattn
+#   scripts/patches.sh remove [component...]   leave branch xattn intact and
+#                                              check out the pinned upstream
+#                                              commit: the tree has no Xattn
+#   scripts/patches.sh restore [component...]  check out branch xattn again
 #   scripts/patches.sh status                  show pinned commit and branch
 #
 # Components: binutils gcc spike qemu (default: all).  The pinned commit is
@@ -55,6 +59,28 @@ do_export() {
   echo "$c: $(ls "$REPO/patches/$c" | wc -l) patch(es) from ${base:0:12}"
 }
 
+clean_or_die() {
+  if [ -n "$(git -C "$REPO/$1" status --porcelain --untracked-files=no)" ]; then
+    echo "error: $1 has uncommitted changes; commit or stash them first" >&2
+    exit 1
+  fi
+}
+
+do_remove() {
+  local c=$1 base
+  base=$(base_of "$c")
+  clean_or_die "$c"
+  git -C "$REPO/$c" checkout -q --detach "$base"
+  echo "$c: upstream ${base:0:12}, Xattn removed (branch $BRANCH kept)"
+}
+
+do_restore() {
+  local c=$1
+  clean_or_die "$c"
+  git -C "$REPO/$c" checkout -q "$BRANCH"
+  echo "$c: back on branch $BRANCH"
+}
+
 do_status() {
   local c=$1
   printf '%-9s pinned %s  on %s\n' "$c" "$(pinned "$c" | cut -c1-12)" \
@@ -69,6 +95,8 @@ comps=("$@")
 case $cmd in
   apply) for c in "${comps[@]}"; do do_apply "$c"; done ;;
   export) for c in "${comps[@]}"; do do_export "$c"; done ;;
+  remove) for c in "${comps[@]}"; do do_remove "$c"; done ;;
+  restore) for c in "${comps[@]}"; do do_restore "$c"; done ;;
   status) for c in "${comps[@]}"; do do_status "$c"; done ;;
-  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

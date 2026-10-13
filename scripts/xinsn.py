@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 """Plug a new custom RISC-V instruction into binutils, GCC, Spike and QEMU.
 
+  xinsn.py new   [SPEC]    ask for the instruction (name, operands, C code,
+                           test), write SPEC, then do "all"
   xinsn.py show  SPEC      encoding and the files that would change
   xinsn.py apply SPEC      edit the four source trees (idempotent)
   xinsn.py test  SPEC      build a test for it and run it on Spike and QEMU
                            (after scripts/build.sh has rebuilt the trees)
+  xinsn.py all   SPEC      apply, rebuild, test: every step in one go
+  xinsn.py list            every custom instruction in the trees, with its
+                           encoding
+  xinsn.py remove WHAT     take one out again and rebuild; WHAT is a name,
+                           an opcode (MATCH or any instruction word, 0x...)
+                           or a SPEC.  "attn" removes Xattn
+                           (scripts/xattn.sh remove)
 
 A SPEC file holds "key = value" lines, then a "semantics:" line followed by
 the C body of the instruction:
@@ -118,8 +127,12 @@ class Spec:
 # ---------------------------------------------------------------- editing
 
 class Editor:
-    def __init__(self, dry):
+    """Applies edits, or with remove=True takes the same edits out again:
+    inserted text is cut, written files are deleted."""
+
+    def __init__(self, dry, remove=False):
         self.dry = dry
+        self.remove = remove
         self.touched = []
 
     def insert(self, path, anchor, text, after=True, present=None):
@@ -127,6 +140,13 @@ class Editor:
         unless PRESENT (default: TEXT) is already in the file."""
         p = REPO / path
         s = p.read_text()
+        if self.remove:
+            # A PRESENT check marks text other instructions may share.
+            if present is None and text in s:
+                self.touched.append(path)
+                if not self.dry:
+                    p.write_text(s.replace(text, "", 1))
+            return
         if (present or text.strip()) in s:
             return
         i = s.find(anchor)
@@ -142,6 +162,12 @@ class Editor:
 
     def write(self, path, text):
         p = REPO / path
+        if self.remove:
+            if p.exists():
+                self.touched.append(path)
+                if not self.dry:
+                    p.unlink()
+            return
         if p.exists() and p.read_text() == text:
             return
         self.touched.append(path)
@@ -351,6 +377,32 @@ DEFINE_RISCV_EXT(
              f'RISCV_BUILTIN ({sp.name}_di, "{sp.name}", {kind}, {ftname("DI")}, {sp.name}64),\n')
     ed.insert(g + "riscv-builtins.cc", '  #include "andes.def"',
               '  #include "%s.def"\n' % sp.name)
+    if ed.remove:
+        drop_unused_ftypes(sp, ed, g, ftname)
+
+
+def drop_unused_ftypes(sp, ed, g, ftname):
+    """Take out the builtin function types this instruction added once no
+    other builtin still names them."""
+    riscv = REPO / g
+    users = "".join(p.read_text() for p in riscv.glob("*.def")
+                    if p.name != "riscv-ftypes.def"
+                    and not (p.name == sp.name + ".def" and not ed.dry))
+    users += (riscv / "riscv-builtins.cc").read_text()
+    n = len(sp.sources)
+    for mode in ("SI", "DI"):
+        if ftname(mode) in users:
+            continue
+        t = "U" + mode
+        line = "DEF_RISCV_FTYPE (%d, (%s%s))\n" % (
+            n, t if sp.writes_rd else "VOID",
+            ", " + ", ".join([t] * n) if n else "")
+        p = riscv / "riscv-ftypes.def"
+        text = p.read_text()
+        if line in text:
+            ed.touched.append(g + "riscv-ftypes.def")
+            if not ed.dry:
+                p.write_text(text.replace(line, "", 1))
 
 
 # ---------------------------------------------------------------- spike
@@ -726,31 +778,197 @@ main (void)
 
 # ---------------------------------------------------------------- main
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawTextHelpFormatter)
-    ap.add_argument("cmd", choices=["show", "apply", "test"])
-    ap.add_argument("spec")
-    a = ap.parse_args()
-    sp = Spec(a.spec)
-    if a.cmd == "test":
-        run_test(sp)
-        return
-    match, mask, where = sp.encoding()
-    print("%s: format %s, %s, MATCH=0x%08x MASK=0x%08x, -march=..._%s"
-          % (sp.name, sp.format, where, match, mask, sp.ext))
-    ed = Editor(dry=a.cmd == "show")
+def edit_all(sp, ed, match, mask):
     apply_binutils(sp, ed, match, mask)
     apply_gcc(sp, ed)
     apply_spike(sp, ed, match, mask)
     apply_qemu(sp, ed, match)
+
+
+def rebuild():
+    subprocess.run([REPO / "scripts/build.sh", "binutils", "gcc", "spike",
+                    "qemu"], check=True)
+
+
+def cmd_apply(spec, dry):
+    sp = Spec(spec)
+    match, mask, where = sp.encoding()
+    print("%s: format %s, %s, MATCH=0x%08x MASK=0x%08x, -march=..._%s"
+          % (sp.name, sp.format, where, match, mask, sp.ext))
+    ed = Editor(dry=dry)
+    edit_all(sp, ed, match, mask)
     for p in dict.fromkeys(ed.touched):
         print(("would change " if ed.dry else "changed ") + p)
     if not ed.touched:
         print("already applied")
-    elif not ed.dry:
-        print("next: scripts/build.sh binutils gcc spike qemu && "
-              "scripts/xinsn.py test " + a.spec)
+    if not dry:
+        # remove NAME finds the spec here later.
+        keep = REPO / "build/xinsn/specs" / (sp.name + ".spec")
+        keep.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(spec, keep)
+    return sp
+
+
+def ask(prompt, default=None, check=None):
+    while True:
+        v = input("%s%s: " % (prompt, " [%s]" % default if default else ""))
+        v = v.strip() or (default or "")
+        if not check or check(v):
+            return v
+        print("  not valid, try again")
+
+
+def ask_block(prompt):
+    print(prompt + " (end with a line holding only '.')")
+    lines = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        if line.strip() == ".":
+            break
+        lines.append(line)
+    return "\n".join("  " + l if l and not l.startswith("  ") else l
+                     for l in lines)
+
+
+def cmd_new(spec):
+    print("New custom RISC-V instruction.  The C code sees uint64_t rd, rs1,"
+          "\nrs2, rs3, unsigned xlen, LD8..LD64(addr), ST8..ST64(addr, v) and"
+          "\nILLEGAL(); it returns the value for rd.")
+    name = ask("name (lower case, e.g. mac)", None,
+               lambda v: re.fullmatch(r"[a-z][a-z0-9]{1,15}", v))
+    inputs = ask("source registers rs1..rs3 (0-3)", "2",
+                 lambda v: v in ("0", "1", "2", "3"))
+    writes = ask("writes rd? rd = result, none = rd is an input", "rd",
+                 lambda v: v in ("rd", "none"))
+    memory = ask("uses LD*/ST*? (yes/no)", "no", lambda v: v in ("yes", "no"))
+    slot = ask("encoding slot (auto finds a free one)", "auto")
+    body = ask_block("C code of the instruction")
+    test = ask_block("test: body of main(), CHECK (cond) per check; "
+                     "empty for automatic vectors")
+    spec = Path(spec or REPO / "examples/insns" / (name + ".spec"))
+    spec.write_text(f"""# Written by xinsn.py new.
+name   = {name}
+inputs = {inputs}
+writes = {writes}
+memory = {memory}
+slot   = {slot}
+semantics:
+{body}
+""" + ("test:\n%s\n" % test if test.strip() else ""))
+    print("wrote %s" % spec)
+    if ask("apply, rebuild and test now? (y/n)", "y") == "y":
+        cmd_all(spec)
+
+
+def cmd_all(spec):
+    sp = cmd_apply(spec, dry=False)
+    rebuild()
+    run_test(sp)
+
+
+def custom_insns():
+    """[(name, match, mask, generated_by_xinsn)] for every custom instruction
+    in the trees: Xattn and everything xinsn.py added."""
+    h = (REPO / "binutils/include/opcode/riscv-opc.h").read_text()
+    out = []
+    riscv = REPO / "gcc/gcc/config/riscv"
+    for d in sorted(riscv.glob("riscv-ext-x*.def")):
+        ext = d.stem[len("riscv-ext-"):]
+        name = "attn" if ext == "xattn" else ext[1:]
+        mm = [re.search(r"#define %s_%s (0x[0-9a-f]+)" % (k, name.upper()), h)
+              for k in ("MATCH", "MASK")]
+        if not all(mm):
+            continue
+        out.append((name, int(mm[0].group(1), 16), int(mm[1].group(1), 16),
+                    "xinsn.py" in d.read_text()))
+    return out
+
+
+def cmd_list():
+    rows = custom_insns()
+    if not rows:
+        print("no custom instructions in the trees")
+    for name, match, mask, gen in rows:
+        print("%-12s MATCH=0x%08x MASK=0x%08x  %s" % (
+            name, match, mask,
+            "added by xinsn.py" if gen else "Xattn (scripts/xattn.sh)"))
+
+
+def find_spec(name):
+    for p in (REPO / "examples/insns" / (name + ".spec"),
+              REPO / "build/xinsn/specs" / (name + ".spec")):
+        if p.exists():
+            return p
+    sys.exit("no spec found for %s (looked in examples/insns and "
+             "build/xinsn/specs); pass the spec file instead" % name)
+
+
+def cmd_remove(what):
+    rows = custom_insns()
+    if Path(what).is_file():
+        spec = Path(what)
+        name = Spec(spec).name
+    else:
+        name = what
+        if re.fullmatch(r"0x[0-9a-fA-F]+", what):
+            word = int(what, 16)
+            hit = [r for r in rows if word & r[2] == r[1]]
+            if not hit:
+                sys.exit("no custom instruction has opcode %s" % what)
+            name = hit[0][0]
+            print("%s is %s" % (what, name))
+        spec = None
+    row = next((r for r in rows if r[0] == name), None)
+    if row is None:
+        sys.exit("%s is not a custom instruction in the trees "
+                 "(see: xinsn.py list)" % name)
+    if not row[3]:
+        subprocess.run([REPO / "scripts/xattn.sh", "remove"], check=True)
+        return
+    sp = Spec(spec or find_spec(name))
+    ed = Editor(dry=False, remove=True)
+    # The encoding in the trees, so the cut text matches what was inserted.
+    edit_all(sp, ed, row[1], row[2])
+    for p in dict.fromkeys(ed.touched):
+        print("changed " + p)
+    rebuild()
+    gas = subprocess.run(
+        [REPO / "out/toolchain/bin/riscv64-unknown-elf-as",
+         "-march=rv64gc", "-o", "/dev/null", "-"],
+        input="\t%s\n" % sp.name, text=True, capture_output=True)
+    print("%s removed: the assembler %s it" % (
+        name, "rejects" if gas.returncode else "still accepts"))
+    if not gas.returncode:
+        sys.exit(1)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawTextHelpFormatter)
+    ap.add_argument("cmd", choices=["new", "show", "apply", "test", "all",
+                                    "list", "remove"])
+    ap.add_argument("arg", nargs="?")
+    a = ap.parse_args()
+    if a.cmd in ("show", "apply", "test", "all", "remove") and not a.arg:
+        ap.error("%s needs an argument" % a.cmd)
+    if a.cmd == "new":
+        cmd_new(a.arg)
+    elif a.cmd == "list":
+        cmd_list()
+    elif a.cmd == "remove":
+        cmd_remove(a.arg)
+    elif a.cmd == "all":
+        cmd_all(a.arg)
+    elif a.cmd == "test":
+        run_test(Spec(a.arg))
+    else:
+        cmd_apply(a.arg, dry=a.cmd == "show")
+        if a.cmd == "apply":
+            print("next: scripts/build.sh binutils gcc spike qemu && "
+                  "scripts/xinsn.py test " + a.arg)
 
 
 if __name__ == "__main__":
