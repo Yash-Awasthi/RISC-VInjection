@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Emit cases.h: attn inputs plus the exact bytes Y must hold afterwards.
 
 Expected bytes come from include/attn_core.h run on the host, and are also

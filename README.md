@@ -1,5 +1,14 @@
 # RISC-VInjection
 
+[![CI](https://github.com/Yash-Awasthi/RISC-VInjection/actions/workflows/ci.yml/badge.svg)](https://github.com/Yash-Awasthi/RISC-VInjection/actions/workflows/ci.yml)
+[![Full](https://github.com/Yash-Awasthi/RISC-VInjection/actions/workflows/full.yml/badge.svg)](https://github.com/Yash-Awasthi/RISC-VInjection/actions/workflows/full.yml)
+
+The CI badges are the evidence for every claim below: the `CI` job checks the
+host model and the general method against the pinned upstream sources on every
+push, and the `Full` job builds the toolchain and the simulators and runs
+`make check`, publishing the five submodule SHAs it built from as an artefact
+(`build/CI-TRACE.txt`).
+
 RISC-VInjection adds custom instructions to the RISC-V toolchain, end to end. Two things live here:
 
 1. **Xattn**, a complete custom extension whose one instruction, `attn`,
@@ -152,3 +161,39 @@ tests/          host model tests, bare-metal simulator tests, recognizer tests
 tools/          independent float64 model and host runner
 docs/           the documents above
 ```
+
+## Provenance and licence
+
+Original work, this repository's own (GPL-3.0-or-later, `LICENSE`):
+
+```
+include/                  the C API, the descriptor layout, the semantics
+scripts/                  setup, build, patch, artefact, compiler wrappers, xinsn.py
+tests/ tools/ demo/       tests, the float64 reference model, the demo kernel
+docs/                     the documentation
+examples/                 the xinsn.py specs
+patches/                  the diffs listed below
+```
+
+Derived work. `patches/` are diffs against five upstream projects, and each
+patched file keeps its upstream copyright header and licence; the diffs carry
+the same licence as the file they change. `NOTICE` has the full table.
+
+| Submodule | Licence of the patched files |
+|-----------|------------------------------|
+| binutils | GPL-3.0-or-later |
+| gcc | GPL-3.0-or-later (docs GFDL-1.3-or-later, libgcc GCC Runtime Library Exception) |
+| spike | BSD-3-Clause |
+| qemu | GPL-2.0-or-later |
+| newlib | per file; `newlib/COPYING.NEWLIB` |
+
+Two consequences, both enforced by `make check` and by review:
+
+* `tests/test_core.py::test_simulator_cores_match_include` keeps
+  `include/attn_core.h` and its three copies in the submodules byte-identical,
+  so the file that defines the instruction has one owner.
+* SPDX lines are added to this project's files only. A patched upstream file
+  keeps its own header: the patch cannot grant a licence the upstream did not.
+
+No upstream binary is redistributed. `out/` and `build/` are build output and
+are not tracked.

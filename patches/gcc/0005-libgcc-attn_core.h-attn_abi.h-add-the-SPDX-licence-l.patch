@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Yash Vaibhav Awasthi <132498904+Yash-Awasthi@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 12:29:25 +0530
+Subject: [PATCH 5/5] libgcc: attn_core.h, attn_abi.h: add the SPDX licence
+ line
+
+Signed-off-by: Yash Vaibhav Awasthi <132498904+Yash-Awasthi@users.noreply.github.com>
+---
+ libgcc/attn_abi.h  | 1 +
+ libgcc/attn_core.h | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/libgcc/attn_abi.h b/libgcc/attn_abi.h
+index b31582d13..2cff5d2d7 100644
+--- a/libgcc/attn_abi.h
++++ b/libgcc/attn_abi.h
+@@ -1,3 +1,4 @@
++/* SPDX-License-Identifier: GPL-3.0-or-later */
+ /* attn_abi.h -- architectural interface of the RISC-V Xattn extension.
+ 
+    One instruction computes a complete multi-head self-attention block:
+diff --git a/libgcc/attn_core.h b/libgcc/attn_core.h
+index 8501d1488..37ef8ddc5 100644
+--- a/libgcc/attn_core.h
++++ b/libgcc/attn_core.h
+@@ -1,3 +1,4 @@
++/* SPDX-License-Identifier: GPL-3.0-or-later */
+ /* attn_core.h -- the one executable definition of the attn instruction.
+ 
+    Included unchanged by the Spike and QEMU execution models and by the host

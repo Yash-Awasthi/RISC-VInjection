@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Executes attn on Spike or QEMU and checks every byte of Y against the
    host-computed reference, then checks the trap behaviour.  Exit code 0 means
    every check passed.  */
@@ -57,6 +58,50 @@ filled (const uint8_t *p, size_t n, uint8_t v)
   return 1;
 }
 
+/* Largest |Y - reference| over the elements, as a float, printed as its IEEE
+   bits because there is no printf here.  A zero bit pattern is exact
+   equality, which is what the three executions are expected to show.  */
+static uint32_t
+max_abs_diff (const uint8_t *y, const uint8_t *expect, size_t bytes, int is_f32,
+	      int is_bf16)
+{
+  float worst = 0.0f;
+  size_t n = is_f32 ? bytes / 4 : bytes / 2;
+
+  for (size_t i = 0; i < n; i++)
+    {
+      float a, b;
+      if (is_f32)
+	{
+	  uint32_t ua, ub;
+	  __builtin_memcpy (&ua, y + 4 * i, 4);
+	  __builtin_memcpy (&ub, expect + 4 * i, 4);
+	  __builtin_memcpy (&a, &ua, 4);
+	  __builtin_memcpy (&b, &ub, 4);
+	}
+      else if (is_bf16)
+	{
+	  uint32_t ua = 0, ub = 0;
+	  __builtin_memcpy (&ua, y + 2 * i, 2);
+	  __builtin_memcpy (&ub, expect + 2 * i, 2);
+	  ua <<= 16;
+	  ub <<= 16;
+	  __builtin_memcpy (&a, &ua, 4);
+	  __builtin_memcpy (&b, &ub, 4);
+	}
+      else
+	return 0xffffffffu;
+      float d = a - b;
+      if (d < 0.0f)
+	d = -d;
+      if (d > worst)
+	worst = d;
+    }
+  uint32_t bits;
+  __builtin_memcpy (&bits, &worst, 4);
+  return bits;
+}
+
 int
 main (void)
 {
@@ -75,7 +120,22 @@ main (void)
 	    bad = j;
 	    break;
 	  }
-      check (bm_trap_cause == ~0ull && bad == t->bytes, t->name);
+      int ok = bm_trap_cause == ~0ull && bad == t->bytes;
+      bm_puts (ok ? "PASS " : "FAIL ");
+      bm_puts (t->name);
+      bm_puts (" maxdiff=");
+      bm_puthex (max_abs_diff (t->y, t->expect, t->bytes,
+			       t->c->out_dtype == ATTN_DT_F32,
+			       t->c->out_dtype == ATTN_DT_BF16));
+      if (!ok)
+	{
+	  bm_puts (" mcause=");
+	  bm_puthex (bm_trap_cause);
+	  bm_puts (" mtval=");
+	  bm_puthex (bm_trap_tval);
+	}
+      bm_puts ("\n");
+      failures += !ok;
     }
 
 #ifndef BM_LINUX
@@ -112,6 +172,68 @@ main (void)
     for (size_t j = 0; j < t->bytes; j++)
       ok &= t->y[j] == t->expect[j];
     check (bm_trap_cause == ~0ull && ok, "reexecute_after_fault");
+  }
+
+  /* A dimension beyond this implementation's limit is a reserved
+     configuration: illegal instruction, Y untouched (spec section 4).  */
+  {
+    const struct attn_case *t = &cases[0];
+    struct attn_cfg c = *t->c;
+    c.n = ATTN_MAX_N + 1;
+    for (size_t j = 0; j < t->bytes; j++)
+      t->y[j] = 0x5a;
+    bm_trap_cause = ~0ull;
+    ATTN (t->y, t->x, t->w, &c);
+    check (bm_trap_cause == 2 && filled (t->y, t->bytes, 0x5a),
+	   "dims_out_of_range_trap");
+    c.n = 1;
+    c.e = ATTN_MAX_E + 1;
+    bm_trap_cause = ~0ull;
+    ATTN (t->y, t->x, t->w, &c);
+    check (bm_trap_cause == 2 && filled (t->y, t->bytes, 0x5a),
+	   "element_size_out_of_range_trap");
+  }
+
+  /* A descriptor pointer that is not mapped faults on the load, with the
+     address in mtval, before anything is written (spec section 5).  */
+  {
+    const struct attn_case *t = &cases[0];
+    const uintptr_t bad = 0x200000000ull;
+    for (size_t j = 0; j < t->bytes; j++)
+      t->y[j] = 0x5a;
+    bm_trap_cause = ~0ull;
+    ATTN (t->y, t->x, t->w, (const struct attn_cfg *) bad);
+    check ((bm_trap_cause == 5 || bm_trap_cause == 7
+	    || bm_trap_cause == 13)
+	   && bm_trap_tval == bad && filled (t->y, t->bytes, 0x5a),
+	   "descriptor_fault_is_precise");
+  }
+
+  /* A descriptor that is not naturally aligned: either the platform traps
+     (the spec allows that) with Y untouched, or it completes with the same
+     bytes as the aligned run.  A third outcome is a bug.  */
+  {
+    const struct attn_case *t = &cases[0];
+    static uint8_t unaligned[sizeof (struct attn_cfg) + 8]
+      __attribute__((aligned(8)));
+    __builtin_memcpy (unaligned + 2, t->c, sizeof (struct attn_cfg));
+    const struct attn_cfg *uc = (const struct attn_cfg *) (unaligned + 2);
+    size_t same = 1;
+
+    for (size_t j = 0; j < t->bytes; j++)
+      t->y[j] = 0x5a;
+    bm_trap_cause = ~0ull;
+    ATTN (t->y, t->x, t->w, uc);
+    if (bm_trap_cause != ~0ull)
+      check ((bm_trap_cause == 4 || bm_trap_cause == 6)
+	     && filled (t->y, t->bytes, 0x5a),
+	     "misaligned_descriptor_traps");
+    else
+      {
+	for (size_t j = 0; j < t->bytes; j++)
+	  same &= t->y[j] == t->expect[j];
+	check (same, "misaligned_descriptor_completes");
+      }
   }
 #endif
 

@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 02:57:51 +0530
-Subject: [PATCH 1/2] target/riscv: add the Xattn extension
+Subject: [PATCH 1/3] target/riscv: add the Xattn extension
 
 The attn helper runs attn_core.h over guest memory with precise faults; -cpu ...,xattn=on enables it and the disassembler decodes it.
 ---
@@ -32,7 +32,7 @@ The attn helper runs attn_core.h over guest memory with precise faults; -cpu ...
  create mode 100644 target/riscv/xattn.decode
 
 diff --git a/disas/meson.build b/disas/meson.build
-index b382550e41..0cffeec4f6 100644
+index b382550..0cffeec 100644
 --- a/disas/meson.build
 +++ b/disas/meson.build
 @@ -8,7 +8,8 @@ common_ss.add(when: 'CONFIG_RISCV_DIS', if_true: files(
@@ -47,7 +47,7 @@ index b382550e41..0cffeec4f6 100644
  common_ss.add(when: 'CONFIG_SPARC_DIS', if_true: files('sparc.c'))
 diff --git a/disas/riscv-xattn.c b/disas/riscv-xattn.c
 new file mode 100644
-index 0000000000..b46e899b0e
+index 0000000..b46e899
 --- /dev/null
 +++ b/disas/riscv-xattn.c
 @@ -0,0 +1,22 @@
@@ -75,7 +75,7 @@ index 0000000000..b46e899b0e
 +}
 diff --git a/disas/riscv-xattn.h b/disas/riscv-xattn.h
 new file mode 100644
-index 0000000000..d03c61a764
+index 0000000..d03c61a
 --- /dev/null
 +++ b/disas/riscv-xattn.h
 @@ -0,0 +1,14 @@
@@ -94,7 +94,7 @@ index 0000000000..d03c61a764
 +
 +#endif /* DISAS_RISCV_XATTN_H */
 diff --git a/disas/riscv.c b/disas/riscv.c
-index e85dbac035..680e8009a7 100644
+index e85dbac..680e800 100644
 --- a/disas/riscv.c
 +++ b/disas/riscv.c
 @@ -27,6 +27,7 @@
@@ -124,7 +124,7 @@ index e85dbac035..680e8009a7 100644
  
          for (size_t i = 0; i < ARRAY_SIZE(decoders); i++) {
 diff --git a/disas/riscv.h b/disas/riscv.h
-index b0269bb709..1a7c0f10b1 100644
+index b0269bb..1a7c0f1 100644
 --- a/disas/riscv.h
 +++ b/disas/riscv.h
 @@ -217,6 +217,7 @@ typedef struct {
@@ -137,7 +137,7 @@ index b0269bb709..1a7c0f10b1 100644
  #define rv_fmt_frd_frs1               "O\t3,4"
 diff --git a/target/riscv/attn_abi.h b/target/riscv/attn_abi.h
 new file mode 100644
-index 0000000000..b31582d135
+index 0000000..b31582d
 --- /dev/null
 +++ b/target/riscv/attn_abi.h
 @@ -0,0 +1,77 @@
@@ -220,7 +220,7 @@ index 0000000000..b31582d135
 +#endif /* ATTN_ABI_H */
 diff --git a/target/riscv/attn_core.h b/target/riscv/attn_core.h
 new file mode 100644
-index 0000000000..03c0746be0
+index 0000000..03c0746
 --- /dev/null
 +++ b/target/riscv/attn_core.h
 @@ -0,0 +1,249 @@
@@ -474,7 +474,7 @@ index 0000000000..03c0746be0
 +
 +#endif /* ATTN_CORE_H */
 diff --git a/target/riscv/cpu.c b/target/riscv/cpu.c
-index da4c1a090b..0d7256992b 100644
+index da4c1a0..0d72569 100644
 --- a/target/riscv/cpu.c
 +++ b/target/riscv/cpu.c
 @@ -295,6 +295,7 @@ const RISCVIsaExtData isa_edata_arr[] = {
@@ -486,7 +486,7 @@ index da4c1a090b..0d7256992b 100644
      ISA_EXT_DATA_ENTRY(xmipscbop, PRIV_VERSION_1_12_0, ext_xmipscbop),
      ISA_EXT_DATA_ENTRY(xmipscmov, PRIV_VERSION_1_12_0, ext_xmipscmov),
 diff --git a/target/riscv/cpu_cfg.h b/target/riscv/cpu_cfg.h
-index 211d0708ba..88934091ae 100644
+index 211d070..8893409 100644
 --- a/target/riscv/cpu_cfg.h
 +++ b/target/riscv/cpu_cfg.h
 @@ -70,5 +70,6 @@ MATERIALISE_EXT_PREDICATE(xtheadmempair)
@@ -497,7 +497,7 @@ index 211d0708ba..88934091ae 100644
  
  #endif
 diff --git a/target/riscv/cpu_cfg_fields.h.inc b/target/riscv/cpu_cfg_fields.h.inc
-index f91c780299..68280b4fb0 100644
+index f91c780..68280b4 100644
 --- a/target/riscv/cpu_cfg_fields.h.inc
 +++ b/target/riscv/cpu_cfg_fields.h.inc
 @@ -159,6 +159,7 @@ BOOL_FIELD(ext_xmipscbop)
@@ -509,7 +509,7 @@ index f91c780299..68280b4fb0 100644
  BOOL_FIELD(big_endian)
  BOOL_FIELD(mmu)
 diff --git a/target/riscv/helper.h b/target/riscv/helper.h
-index aab92bf132..e1659db5de 100644
+index aab92bf..e1659db 100644
 --- a/target/riscv/helper.h
 +++ b/target/riscv/helper.h
 @@ -86,6 +86,9 @@ DEF_HELPER_FLAGS_2(xperm8, TCG_CALL_NO_RWG_SE, tl, tl, tl)
@@ -523,7 +523,7 @@ index aab92bf132..e1659db5de 100644
  DEF_HELPER_FLAGS_3(fadd_h, TCG_CALL_NO_RWG, i64, env, i64, i64)
  DEF_HELPER_FLAGS_3(fsub_h, TCG_CALL_NO_RWG, i64, env, i64, i64)
 diff --git a/target/riscv/meson.build b/target/riscv/meson.build
-index e1b51d2bd4..7a9560314c 100644
+index e1b51d2..7a95603 100644
 --- a/target/riscv/meson.build
 +++ b/target/riscv/meson.build
 @@ -6,6 +6,7 @@ gen = [
@@ -536,7 +536,7 @@ index e1b51d2bd4..7a9560314c 100644
  riscv_ss = ss.source_set()
 diff --git a/target/riscv/tcg/attn_helper.c b/target/riscv/tcg/attn_helper.c
 new file mode 100644
-index 0000000000..f750d7968e
+index 0000000..f750d79
 --- /dev/null
 +++ b/target/riscv/tcg/attn_helper.c
 @@ -0,0 +1,76 @@
@@ -618,7 +618,7 @@ index 0000000000..f750d7968e
 +}
 diff --git a/target/riscv/tcg/insn_trans/trans_xattn.c.inc b/target/riscv/tcg/insn_trans/trans_xattn.c.inc
 new file mode 100644
-index 0000000000..a2ce13037c
+index 0000000..a2ce130
 --- /dev/null
 +++ b/target/riscv/tcg/insn_trans/trans_xattn.c.inc
 @@ -0,0 +1,19 @@
@@ -642,7 +642,7 @@ index 0000000000..a2ce13037c
 +    return true;
 +}
 diff --git a/target/riscv/tcg/meson.build b/target/riscv/tcg/meson.build
-index a05ab642f4..043f9a033b 100644
+index a05ab64..043f9a0 100644
 --- a/target/riscv/tcg/meson.build
 +++ b/target/riscv/tcg/meson.build
 @@ -15,7 +15,8 @@ riscv_ss.add(files(
@@ -656,7 +656,7 @@ index a05ab642f4..043f9a033b 100644
  
  riscv_system_ss.add(files(
 diff --git a/target/riscv/tcg/translate.c b/target/riscv/tcg/translate.c
-index cce3b6dc72..31cd9af7a1 100644
+index cce3b6d..31cd9af 100644
 --- a/target/riscv/tcg/translate.c
 +++ b/target/riscv/tcg/translate.c
 @@ -1246,10 +1246,12 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
@@ -682,7 +682,7 @@ index cce3b6dc72..31cd9af7a1 100644
  const size_t decoder_table_size = ARRAY_SIZE(decoder_table);
 diff --git a/target/riscv/xattn.decode b/target/riscv/xattn.decode
 new file mode 100644
-index 0000000000..c4f1955f8d
+index 0000000..c4f1955
 --- /dev/null
 +++ b/target/riscv/xattn.decode
 @@ -0,0 +1,16 @@

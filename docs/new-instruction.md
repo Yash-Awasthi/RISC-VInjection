@@ -113,6 +113,12 @@ tested automatically against the host model on 64 vectors (27 edge
 values and 37 random ones). Memory instructions and instructions that
 write no register need a `test:` block.
 
+The spec is checked before anything is written: an unknown key (a typo
+like `writse = rd`), a missing `name`, `semantics:` or `test:` block
+where one is required, and a value outside the documented range each
+stop the run with exit code 1 and a message naming the spec file and
+the expected text.
+
 `examples/insns/` has one spec for each shape: `bitrev` (1 input),
 `avgu` (2), `mac` (3), `vsum` (memory read, result), `fill` (memory
 write, no result).
@@ -125,6 +131,12 @@ scripts/xinsn.py apply examples/insns/vsum.spec   # edits the trees; safe to rep
 scripts/build.sh binutils gcc spike qemu          # incremental, a few minutes
 scripts/xinsn.py test  examples/insns/vsum.spec
 ```
+
+To take it out again without rebuilding: `scripts/xinsn.py remove vsum
+--no-rebuild` edits the four trees back and leaves them clean
+(`git -C gcc status --porcelain` is empty); without the flag `remove`
+also runs `scripts/build.sh` and checks that the assembler now rejects
+the mnemonic.
 
 ```
 qemu  vsum: all checks passed

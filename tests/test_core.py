@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """attn_core.h (the code Spike and QEMU run) against tools/attn_model.py."""
 
 import ctypes

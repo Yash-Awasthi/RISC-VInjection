@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Plug a new custom RISC-V instruction into binutils, GCC, Spike and QEMU.
 
   xinsn.py new   [SPEC]    ask for the instruction (name, operands, C code,
@@ -13,7 +14,9 @@
   xinsn.py remove WHAT     take one out again and rebuild; WHAT is a name,
                            an opcode (MATCH or any instruction word, 0x...)
                            or a SPEC.  "attn" removes Xattn
-                           (scripts/xattn.sh remove)
+                           (scripts/xattn.sh remove).  --no-rebuild edits
+                           the trees and skips scripts/build.sh and the
+                           toolchain check (used by tests/test_xinsn.py).
 
 A SPEC file holds "key = value" lines, then a "semantics:" line followed by
 the C body of the instruction:
@@ -64,7 +67,9 @@ FORMAT_FIELDS = {"R0": ("funct3", "funct7"), "R1": ("funct3", "funct7"),
 # ---------------------------------------------------------------- spec
 
 class Spec:
-    def __init__(self, path):
+    KEYS = ("name", "inputs", "writes", "memory", "slot")
+
+    def __init__(self, path, need_test=True):
         text = Path(path).read_text()
         head, sep, body = text.partition("\nsemantics:")
         if not sep:
@@ -75,18 +80,41 @@ class Spec:
             if line:
                 k, _, v = line.partition("=")
                 kv[k.strip()] = v.strip()
+        for k in kv:
+            if k not in self.KEYS:
+                sys.exit("%s: unknown key '%s' (the keys are %s)"
+                         % (path, k, ", ".join(self.KEYS)))
         self.name = kv.get("name", "")
+        if not self.name:
+            sys.exit("%s: missing 'name = ...'" % path)
         if not re.fullmatch(r"[a-z][a-z0-9]{1,15}", self.name):
-            sys.exit("name must match [a-z][a-z0-9]{1,15}")
+            sys.exit("%s: name '%s' must match [a-z][a-z0-9]{1,15}"
+                     % (path, self.name))
+        if kv.get("inputs", "2") not in ("0", "1", "2", "3"):
+            sys.exit("%s: inputs must be 0..3, not '%s'"
+                     % (path, kv.get("inputs")))
         self.inputs = int(kv.get("inputs", "2"))
-        if not 0 <= self.inputs <= 3:
-            sys.exit("inputs must be 0..3")
+        if kv.get("writes", "rd") not in ("rd", "none"):
+            sys.exit("%s: writes must be 'rd' or 'none', not '%s'"
+                     % (path, kv.get("writes")))
+        if kv.get("memory", "no") not in ("yes", "no"):
+            sys.exit("%s: memory must be 'yes' or 'no', not '%s'"
+                     % (path, kv.get("memory")))
         self.writes_rd = kv.get("writes", "rd") == "rd"
         self.memory = kv.get("memory", "no") == "yes"
         self.slot = kv.get("slot", "auto")
         body, _, test = body.partition("\ntest:")
         self.body = body.strip("\n")
         self.test = test.strip("\n")
+        if need_test and not self.test:
+            if self.memory:
+                sys.exit("%s: 'memory = yes' needs a 'test:' block: a "
+                         "model alone cannot check what the instruction "
+                         "loads or stores" % path)
+            if not self.writes_rd:
+                sys.exit("%s: 'writes = none' needs a 'test:' block: the "
+                         "result is in memory, so there is nothing to "
+                         "compare against the model" % path)
         self.ext = "x" + self.name
         self.EXT = self.ext.upper()
         self.N = self.name.upper()
@@ -906,7 +934,7 @@ def find_spec(name):
              "build/xinsn/specs); pass the spec file instead" % name)
 
 
-def cmd_remove(what):
+def cmd_remove(what, build=True):
     rows = custom_insns()
     if Path(what).is_file():
         spec = Path(what)
@@ -928,12 +956,15 @@ def cmd_remove(what):
     if not row[3]:
         subprocess.run([REPO / "scripts/xattn.sh", "remove"], check=True)
         return
-    sp = Spec(spec or find_spec(name))
+    sp = Spec(spec or find_spec(name), need_test=False)
     ed = Editor(dry=False, remove=True)
     # The encoding in the trees, so the cut text matches what was inserted.
     edit_all(sp, ed, row[1], row[2])
     for p in dict.fromkeys(ed.touched):
         print("changed " + p)
+    if not build:
+        print("%s removed from the trees; not rebuilt" % name)
+        return
     rebuild()
     gas = subprocess.run(
         [REPO / "out/toolchain/bin/riscv64-unknown-elf-as",
@@ -951,6 +982,9 @@ def main():
     ap.add_argument("cmd", choices=["new", "show", "apply", "test", "all",
                                     "list", "remove"])
     ap.add_argument("arg", nargs="?")
+    ap.add_argument("--no-rebuild", action="store_true",
+                    help="remove: edit the trees but do not run\n"
+                         "scripts/build.sh, and skip the toolchain check")
     a = ap.parse_args()
     if a.cmd in ("show", "apply", "test", "all", "remove") and not a.arg:
         ap.error("%s needs an argument" % a.cmd)
@@ -959,7 +993,7 @@ def main():
     elif a.cmd == "list":
         cmd_list()
     elif a.cmd == "remove":
-        cmd_remove(a.arg)
+        cmd_remove(a.arg, build=not a.no_rebuild)
     elif a.cmd == "all":
         cmd_all(a.arg)
     elif a.cmd == "test":

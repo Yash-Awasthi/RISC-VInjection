@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 14:36:13 +0530
-Subject: [PATCH 3/4] Add the generic __builtin_attn and libgcc's __attn
+Subject: [PATCH 3/5] Add the generic __builtin_attn and libgcc's __attn
 
 It expands through IFN_ATTN when the target has the optab, otherwise it calls __attn, which runs the shared attn_core.h definition.
 ---
@@ -24,7 +24,7 @@ It expands through IFN_ATTN when the target has the optab, otherwise it calls __
  create mode 100644 libgcc/attn_core.h
 
 diff --git a/gcc/builtin-types.def b/gcc/builtin-types.def
-index ab0cbc65cfc..8c1abf7e977 100644
+index ab0cbc65c..8c1abf7e9 100644
 --- a/gcc/builtin-types.def
 +++ b/gcc/builtin-types.def
 @@ -898,6 +898,8 @@ DEF_FUNCTION_TYPE_4 (BT_FN_UINT_OMPFN_PTR_UINT_UINT,
@@ -37,7 +37,7 @@ index ab0cbc65cfc..8c1abf7e977 100644
  		     BT_VOLATILE_PTR, BT_PTR, BT_INT)
  DEF_FUNCTION_TYPE_4 (BT_FN_VOID_SIZE_CONST_VPTR_PTR_INT, BT_VOID, BT_SIZE,
 diff --git a/gcc/builtins.cc b/gcc/builtins.cc
-index 3b0db24d4e6..649dc1ff4a7 100644
+index 3b0db24d4..649dc1ff4 100644
 --- a/gcc/builtins.cc
 +++ b/gcc/builtins.cc
 @@ -110,6 +110,7 @@ static int apply_args_size (void);
@@ -93,7 +93,7 @@ index 3b0db24d4e6..649dc1ff4a7 100644
        return expand_builtin_classify_type (exp);
  
 diff --git a/gcc/builtins.def b/gcc/builtins.def
-index 8ab0599b17f..3fa4c907838 100644
+index 8ab0599b1..3fa4c9078 100644
 --- a/gcc/builtins.def
 +++ b/gcc/builtins.def
 @@ -1020,6 +1020,7 @@ DEF_GCC_BUILTIN        (BUILT_IN_AGGREGATE_INCOMING_ADDRESS, "aggregate_incoming
@@ -106,7 +106,7 @@ index 8ab0599b17f..3fa4c907838 100644
  DEF_GCC_BUILTIN        (BUILT_IN_BSWAP64, "bswap64", BT_FN_UINT64_UINT64, ATTR_CONST_NOTHROW_LEAF_LIST)
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-generic-1.c b/gcc/testsuite/gcc.target/riscv/xattn-generic-1.c
 new file mode 100644
-index 00000000000..1eb8a03593d
+index 000000000..1eb8a0359
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-generic-1.c
 @@ -0,0 +1,14 @@
@@ -126,7 +126,7 @@ index 00000000000..1eb8a03593d
 +/* { dg-final { scan-assembler-not "__attn" } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-generic-2.c b/gcc/testsuite/gcc.target/riscv/xattn-generic-2.c
 new file mode 100644
-index 00000000000..e903fd0f567
+index 000000000..e903fd0f5
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-generic-2.c
 @@ -0,0 +1,12 @@
@@ -144,7 +144,7 @@ index 00000000000..e903fd0f567
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-generic-3.c b/gcc/testsuite/gcc.target/riscv/xattn-generic-3.c
 new file mode 100644
-index 00000000000..78b5b67c1b8
+index 000000000..78b5b67c1
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-generic-3.c
 @@ -0,0 +1,13 @@
@@ -162,7 +162,7 @@ index 00000000000..78b5b67c1b8
 +/* { dg-final { scan-assembler "\\t(call|tail)\\t__attn" } } */
 +/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
 diff --git a/libgcc/Makefile.in b/libgcc/Makefile.in
-index 8b8fe6e9a28..7ec58d38702 100644
+index 8b8fe6e9a..7ec58d387 100644
 --- a/libgcc/Makefile.in
 +++ b/libgcc/Makefile.in
 @@ -436,6 +436,9 @@ endif
@@ -177,7 +177,7 @@ index 8b8fe6e9a28..7ec58d38702 100644
  
 diff --git a/libgcc/attn.c b/libgcc/attn.c
 new file mode 100644
-index 00000000000..cac8f97edf7
+index 000000000..cac8f97ed
 --- /dev/null
 +++ b/libgcc/attn.c
 @@ -0,0 +1,95 @@
@@ -278,7 +278,7 @@ index 00000000000..cac8f97edf7
 +}
 diff --git a/libgcc/attn_abi.h b/libgcc/attn_abi.h
 new file mode 100644
-index 00000000000..b31582d1359
+index 000000000..b31582d13
 --- /dev/null
 +++ b/libgcc/attn_abi.h
 @@ -0,0 +1,77 @@
@@ -361,7 +361,7 @@ index 00000000000..b31582d1359
 +#endif /* ATTN_ABI_H */
 diff --git a/libgcc/attn_core.h b/libgcc/attn_core.h
 new file mode 100644
-index 00000000000..8501d148816
+index 000000000..8501d1488
 --- /dev/null
 +++ b/libgcc/attn_core.h
 @@ -0,0 +1,256 @@

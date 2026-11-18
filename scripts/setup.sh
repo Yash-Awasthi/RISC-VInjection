@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # One command from a fresh clone to a working Xattn toolchain:
 #
 #   scripts/setup.sh
@@ -6,7 +7,8 @@
 #  1. checks the build tools and, if some are missing, prints the package
 #     command for this distribution (apt, dnf, pacman, zypper, brew) and runs
 #     it after asking;
-#  2. fetches the upstream submodules (gcc, binutils, spike, qemu, newlib);
+#  2. fetches the upstream submodules (gcc, binutils, spike, qemu, newlib)
+#     and asserts they are the commits versions.env names;
 #  3. applies patches/ (skipped for a submodule already on branch xattn);
 #  4. builds binutils, GCC, newlib, libgcc, Spike and QEMU (scripts/build.sh);
 #  5. runs every test (make check);
@@ -30,9 +32,7 @@ done
 for h in gmp.h mpfr.h mpc.h zlib.h; do
   echo "#include <$h>" | cc -E -x c - > /dev/null 2>&1 || need+=("$h")
 done
-for p in glib-2.0; do
-  pkg-config --exists "$p" 2> /dev/null || need+=("$p")
-done
+pkg-config --exists glib-2.0 2> /dev/null || need+=(glib-2.0)
 python3 -c 'import venv' 2> /dev/null || need+=(python3-venv)
 
 if [ ${#need[@]} -gt 0 ]; then
@@ -78,6 +78,7 @@ for c in gcc binutils spike qemu newlib; do
 done
 
 step "3/6 Xattn patches"
+scripts/check-pins.sh
 for c in binutils gcc spike qemu; do
   if [ "$(git -C "$c" rev-parse --abbrev-ref HEAD)" = xattn ]; then
     echo "$c: already on branch xattn"

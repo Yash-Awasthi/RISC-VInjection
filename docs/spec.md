@@ -134,6 +134,13 @@ nothing, when any of these holds:
 - Element addresses must be aligned to the element size where the
   platform requires naturally aligned accesses.
 
+Measured difference between the two simulators here, both conforming: a
+`struct attn_cfg` placed at an 8-byte-aligned address plus 2 completes
+correctly on QEMU, which handles unaligned loads, and raises a misaligned
+load (cause 4) on Spike, which does not. Portable code puts the descriptors
+on their natural boundary (`_Alignas(8)`); `tests/baremetal/attn_test.c`
+checks whichever of the two outcomes the platform takes.
+
 ## 6. Software interface
 
 - `-march=..._xattn` enables the extension in GCC and binutils and

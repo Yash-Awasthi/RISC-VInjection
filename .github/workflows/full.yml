@@ -1,0 +1,159 @@
+# Full job: build the toolchain and the simulators from the submodules and
+# run every test.  Nightly, on a manual dispatch, and on any push that touches
+# the patches, the shared header, the scripts or the tests — the parts that a
+# fast check cannot cover.
+#
+# The fast job in ci.yml runs in a couple of minutes without a build; this one
+# is the only place the README's claims ("make check green", "one attn in the
+# assembly") are exercised end to end.
+
+name: Full
+
+on:
+  push:
+    paths:
+      - patches/**
+      - include/**
+      - scripts/**
+      - tests/**
+      - examples/**
+      - demo/**
+      - Makefile
+      - .github/workflows/full.yml
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      # The cache keys name the exact inputs: the pinned commits and the patch
+      # series.  A bump to either starts from an empty cache.
+      - name: Key the caches on the submodule SHAs and the patches
+        id: pins
+        run: |
+          shas=$(git ls-tree HEAD binutils gcc spike qemu newlib \
+                 | awk '{print $3}' | tr '\n' ' ')
+          sub=$(printf '%s' "$shas" | sha256sum | cut -c1-12)
+          patches=$(cat patches/*/*.patch | sha256sum | cut -c1-12)
+          echo "submodules=$sub" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$sub-$patches" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the upstream git objects
+        uses: actions/cache@v4
+        with:
+          path: .git/modules
+          key: submodules-${{ steps.pins.outputs.submodules }}
+
+      # The expensive half of the build: binutils, gcc, newlib and the libgcc
+      # built with them.  Spike and QEMU are left out; they are the cheap half
+      # and their build trees are several GB.
+      - name: Restore the built toolchain
+        id: toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            out/toolchain
+            build/binutils
+            build/gcc
+            build/newlib
+          key: toolchain-${{ steps.pins.outputs.toolchain }}
+
+      # The pinned QEMU refuses Python < 3.12 (configure: "Python >= 3.12 is
+      # required"), and QEMU's meson needs bzip2 and git at configure time.
+      - name: Build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bison flex texinfo gawk ninja-build meson \
+            pkg-config libgmp-dev libmpfr-dev libmpc-dev zlib1g-dev \
+            libglib2.0-dev libpixman-1-dev device-tree-compiler bzip2 \
+            python3-venv python3-pip
+          python3 --version
+          nproc
+
+      - name: Sources and patches
+        run: |
+          git submodule update --init --depth 1
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+          scripts/patches.sh apply
+          scripts/patches.sh status
+
+      # A restored cache is a guess about a build.  Prove it: the compiler
+      # knows Xattn, and the assembler knows attn.  Anything else and the
+      # cache goes, so the build below is a real build.
+      - name: Validate a restored toolchain
+        id: validate
+        if: steps.toolchain.outputs.cache-hit == 'true'
+        continue-on-error: true
+        run: |
+          gcc=out/toolchain/bin/riscv64-unknown-elf-gcc
+          "$gcc" --version | head -1
+          "$gcc" -march=rv64gc_xattn -E -x c /dev/null -o /dev/null
+          printf '\tattn a3, a0, a1, a2\n' \
+            | out/toolchain/bin/riscv64-unknown-elf-as -march=rv64gc_xattn -o /dev/null -
+
+      - name: Drop a cache that failed validation
+        if: steps.toolchain.outputs.cache-hit == 'true' && steps.validate.outcome == 'failure'
+        run: |
+          echo "the cached toolchain does not build Xattn: rebuilding"
+          rm -rf out/toolchain build/binutils build/gcc build/newlib
+
+      - name: Build (six steps)
+        run: |
+          start=$(date +%s)
+          JOBS=$(nproc) scripts/build.sh
+          echo "build.sh: $(( $(date +%s) - start ))s on $(nproc) cores"
+
+      - name: Tests
+        run: |
+          start=$(date +%s)
+          make check
+          echo "make check: $(( $(date +%s) - start ))s"
+
+      # The claim "verified on these sources" needs the names of the sources.
+      # Pinned (superproject) and checked out (submodule) are printed side by
+      # side, so a drift between them is visible in the artefact.
+      - name: Record the submodule SHAs and the tool versions
+        if: always()
+        run: |
+          mkdir -p build
+          {
+            echo "commit:  $(git rev-parse HEAD)"
+            echo "date:    $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner:  $(uname -srm), $(nproc) cores, $(python3 --version)"
+            echo
+            echo "pinned (superproject) and checked out (submodule):"
+            git ls-tree HEAD binutils gcc spike qemu newlib \
+              | awk '{printf "  %-8s %s\n", $4, $3}'
+            git submodule status | sed 's/^/  /'
+            echo
+            out/toolchain/bin/riscv64-unknown-elf-gcc --version 2>&1 | head -1
+            out/spike/bin/spike --version 2>&1 | head -1
+            build/qemu/qemu-system-riscv64 --version 2>&1 | head -1
+          } > build/CI-TRACE.txt 2>&1 || true
+          cat build/CI-TRACE.txt
+
+      - name: Upload the artefacts and the build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xattn-${{ github.sha }}
+          path: |
+            artifacts/
+            build/CI-TRACE.txt
+            build/*.log
+            build/*/*.log
+          if-no-files-found: warn

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* attn_core.h -- the one executable definition of the attn instruction.
 
    Included unchanged by the Spike and QEMU execution models and by the host

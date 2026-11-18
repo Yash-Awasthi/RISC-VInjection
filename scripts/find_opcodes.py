@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """List free RISC-V encodings for a new custom instruction.
 
 Every MATCH/MASK pair already defined in the checked-out binutils

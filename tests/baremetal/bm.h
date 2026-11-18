@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Minimal bare-metal runtime for Spike (HTIF) and QEMU virt.  */
 
 #ifndef BM_H

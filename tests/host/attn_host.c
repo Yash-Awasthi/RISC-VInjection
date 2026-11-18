@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Host build of attn_core.h over a flat byte array, loaded by the Python
    tests through ctypes.  Guest address A maps to mem[A].  */
 

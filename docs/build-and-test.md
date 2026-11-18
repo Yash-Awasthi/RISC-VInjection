@@ -90,8 +90,11 @@ make check
 |--------|----------------|-------|
 | `check-core` | `attn_core.h` matches the independent float64 model on 13 configurations (f32, bf16 in/out, causal, mask, GQA, MQA, explicit scale, no bias); reserved configurations are rejected; the C structs match the Python layout; the Spike, QEMU and libgcc copies are identical | 32 |
 | `check-gcc` | builtins on rv32/rv64 under three pipeline models, `__builtin_attn` with and without Xattn, error without Xattn, `__riscv_xattn`, the five recognized forms (one with no flags at all), the six rejected forms with their reasons, the `attn` RTL code (four register uses, scheduling across it) | 25 |
-| `check-sim` | on QEMU and on Spike (bare metal): every byte of `Y` equals the host core for 7 configurations; reserved configuration traps with `mcause 2`; a load fault traps with `mcause 5` and the right `mtval`, `Y` untouched; re-execution completes; `attn` without Xattn traps. On QEMU Linux user mode (`qemu-riscv64`): the 7 configurations again | 2 x 11 + 7 |
+| `check-sim` | on QEMU and on Spike (bare metal), 14 checks each: every byte of `Y` equals the host core for 7 configurations; reserved configuration traps with `mcause 2` (bad `e % h`, `n > 4096`, `e > 2048`); a load fault and a descriptor fault trap with `mtval` = the bad address and `Y` untouched; re-execution completes; a misaligned descriptor either traps or completes with identical bytes; `attn` without Xattn traps. On QEMU Linux user mode (`qemu-riscv64`): the 7 configurations again | 2 x 15 + 7 |
 | `check-recog` | recognized `attn` vs plain loops at run time on both simulators, for three source forms; libgcc `__attn` (`__builtin_attn` without Xattn) vs the loops; guard-failing cases run the loops bit-exactly | 7 + 6 |
+| `check-three-way` | the same bare-metal image on QEMU and on Spike, compared with the host core case by case: prints the largest absolute difference and requires it to be exactly 0 for all 7 configurations | 1 |
+| `check-sched` | `attn` is scheduled under every pipeline model of this GCC port — 13 models, 26 `-mtune` names read from `gcc/gcc/config/riscv/riscv-cores.def`; for each, both `attn` lines carry the `riscv_attn_di` annotation in `-dp` output | 26 |
+| `check-demo` | `demo/mha_plain.c` at `-O2`: with `-fno-tree-loop-attn` the loops stay (`.ATTN` 0, `attn` 0); with the default the GIMPLE has one `.ATTN` and the assembly one `attn`, and the loops survive only as the guard's fallback (same 6 float ops, 333 → 375 instructions; the gain is run time: 508421 → 991 instructions executed) | 1 |
 
 Expected tail of the output:
 
@@ -99,6 +102,16 @@ Expected tail of the output:
 attn_test: all passed
 PASS attn_without_xattn_is_illegal
 recog_test: all passed
+```
+
+`check-three-way` prints the comparison it asserts, so a difference is visible
+rather than only fatal:
+
+```
+case                               QEMU        Spike  verdict
+bf16_bf16_causal                      0            0  PASS
+f32_causal_mask                       0            0  PASS
+f32_gqa                               0            0  PASS
 ```
 
 ## 5. Use it

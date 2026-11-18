@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Build the Xattn toolchain and simulators from the submodules.
 #
 #   scripts/build.sh [step...]
@@ -11,6 +12,7 @@
 #   dtc       device-tree compiler Spike needs    -> out/host/bin
 #   spike     Spike with Xattn                    -> out/spike
 #   qemu      QEMU riscv64/riscv32 system + user  -> build/qemu
+#   info      write out/BUILD-INFO, build nothing  -> out/BUILD-INFO
 #
 # Every step configures once and rebuilds incrementally afterwards, so
 # re-running after a source edit only recompiles what changed.  JOBS sets
@@ -20,7 +22,7 @@ set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 B=$REPO/build
-OUT=$REPO/out
+OUT=${XATTN_OUT:-$REPO/out}   # XATTN_OUT lets a test write BUILD-INFO elsewhere
 TC=$OUT/toolchain
 JOBS=${JOBS:-$(nproc)}
 TARGET=riscv64-unknown-elf
@@ -31,6 +33,52 @@ mkdir -p "$TMPDIR"
 export PATH=$TC/bin:$OUT/host/bin:$PATH
 
 log() { printf '\n== %s\n' "$*"; }
+
+# The record of what produced out/: five submodule SHAs, host tools, versions.
+# Written at the end of every build and by `scripts/build.sh info`; `make
+# check` copies it into artifacts/ so a result always names its inputs.
+write_build_info() {
+  local file=$OUT/BUILD-INFO c var
+  mkdir -p "$OUT"
+  {
+    printf 'xattn build information\n'
+    printf 'date:     %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'host:     %s, %s core(s), JOBS=%s\n' \
+      "$(uname -sm)" "$(nproc)" "$JOBS"
+    printf 'host cc:  %s\n' "$(cc --version 2> /dev/null | head -1)"
+    printf 'host c++: %s\n' "$(c++ --version 2> /dev/null | head -1)"
+    printf 'python:   %s\n' "$(python3 --version 2>&1 | head -1)"
+    printf 'numpy:    %s\n' \
+      "$(python3 -c 'import numpy; print(numpy.__version__)' 2> /dev/null || echo none)"
+    printf '\nsubmodules (pinned = versions.env, built = what is checked out):\n'
+    for c in binutils gcc newlib qemu spike; do
+      var=$(printf '%s_SHA' "$c" | tr '[:lower:]' '[:upper:]')
+      local built
+      if [ -e "$REPO/$c/.git" ]; then
+        built=$(git -C "$REPO/$c" rev-parse HEAD 2> /dev/null || echo unknown)
+      else
+        built='no git checkout'
+      fi
+      printf '  %-8s pinned %s  built %s\n' "$c" "$(pin_of "$var")" "$built"
+    done
+    printf '\noutputs:\n'
+    printf '  gcc    %s\n' \
+      "$($TC/bin/riscv64-unknown-elf-gcc --version 2> /dev/null | head -1 || echo none)"
+    # Spike has no --version; its configure-time stamp is the next best record.
+    printf '  spike  %s\n' \
+      "$(git -C "$REPO/spike" describe --always --dirty 2> /dev/null || echo none)"
+    printf '  qemu   %s\n' \
+      "$($B/qemu/qemu-system-riscv64 --version 2> /dev/null | head -1 || echo none)"
+  } > "$file"
+  log "$file"
+  sed 's/^/   /' "$file"
+}
+
+pin_of() {
+  local var=$1 value
+  value=$(sed -n "s/^$var=//p" "$REPO/versions.env" 2> /dev/null | head -1)
+  printf '%s' "${value:-none}"
+}
 
 # configure_once DIR CONFIGURE ARGS... : run configure for a new DIR, or
 # from scratch when ARGS differ from the last run (e.g. after Xattn was
@@ -146,7 +194,9 @@ steps=("$@")
 for s in "${steps[@]}"; do
   case $s in
     binutils|gcc|newlib|libgcc|dtc|spike|qemu) "step_$s" ;;
+    info) : ;;  # nothing to build; the final write_build_info records the run
     *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
   esac
 done
+write_build_info
 log "done"

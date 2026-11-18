@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* attn.h -- C interface to the Xattn multi-head self-attention instruction.
 
    Compile with -march=..._xattn and attn_mha() becomes the single

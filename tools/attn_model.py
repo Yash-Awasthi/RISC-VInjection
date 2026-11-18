@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Independent model of the attn instruction (docs/01-instruction-spec.md).
 
 Written from the specification in float64 with NumPy, without looking at

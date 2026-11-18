@@ -1,0 +1,63 @@
+# Fast checks: no toolchain build, a few minutes.
+#
+# Everything here runs against the pinned upstream sources with the Xattn
+# patches applied, so a patch that no longer applies, a copy of attn_core.h
+# that drifts from include/, or a shell script that stops being clean fails
+# on the commit that broke it.
+#
+# The toolchain build and the simulator tests live in full.yml: they need
+# out/toolchain and are too slow for every push.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  fast:
+    name: Fast checks (no build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      # The pinned commits from the superproject; the cache key changes when
+      # one of them does, so a bump never reuses the old trees.
+      - name: Key the source cache on the submodule SHAs
+        id: pins
+        run: |
+          shas=$(git ls-tree HEAD binutils gcc spike qemu \
+                 | awk '{print $3}' | tr '\n' ' ')
+          echo "value=$(printf '%s' "$shas" | sha256sum | cut -c1-16)" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Cache the upstream git objects
+        uses: actions/cache@v4
+        with:
+          path: .git/modules
+          key: submodules-${{ steps.pins.outputs.value }}
+
+      - name: Fetch and patch the upstream trees
+        run: |
+          git submodule update --init --depth 1 binutils gcc spike qemu
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+          scripts/patches.sh apply binutils gcc spike qemu
+          scripts/patches.sh status
+
+      - name: Python deps
+        # Unpinned here on purpose; M3.1.2 replaces this with a hashed file.
+        run: python3 -m pip install -q numpy pytest
+
+      - name: Host model against the float64 model
+        run: python3 -m pytest -q tests/
+
+      - name: Shell scripts
+        run: shellcheck -x scripts/*.sh

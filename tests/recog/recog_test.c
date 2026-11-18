@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* demo/mha_plain.c built twice: mha() at plain -O2 (one attn
    instruction plus the guarded loop fallback) and mha_loops() with
    -fno-tree-loop-attn.  mha_builtin() calls __builtin_attn without Xattn.

@@ -1,0 +1,47 @@
+RISC-VInjection (Xattn) — what comes from where, and under which licence
+=======================================================================
+
+This repository is a set of changes to five upstream projects plus a small
+amount of original code.  The licence of each part follows its origin; the
+original parts are GPL-3.0-or-later (see LICENSE).
+
+Original work (GPL-3.0-or-later)
+--------------------------------
+  include/attn.h            C API over the builtin
+  include/attn_abi.h        the descriptor layout: interface between C and
+  include/attn_core.h       the instruction, and the one definition of its
+                            semantics, compiled into Spike, QEMU and the
+                            host model
+  scripts/*.sh              setup, build, patch, artefact, compiler wrappers
+  scripts/*.py              xinsn.py (any instruction), find_opcodes.py
+  scripts/attncc-driver.c   the driver that replaces attention loops
+  tests/, tools/, demo/     tests, the float64 reference model, the demo
+  docs/                     the documentation
+  patches/                  the diffs listed below
+
+Derived work (the patches)
+--------------------------
+`patches/` contains diffs against upstream sources.  Each patched file keeps
+its upstream copyright header and licence; the diffs are derivative works of
+those files and carry the same licence.
+
+| Upstream | Taken from | Licence | Copyright |
+|---|---|---|---|
+| binutils (GNU Binutils) | `gnutools/binutils-gdb`, `binutils-2_47-branch` @ `781713d` | GPL-3.0-or-later (sources name COPYING3) | Free Software Foundation, Inc. |
+| GCC (GNU Compiler Collection) | `gcc-mirror/gcc`, `releases/gcc-16` @ `041359f` | GPL-3.0-or-later (COPYING3), GFDL-1.3-or-later for the docs, GCC Runtime Library Exception for libgcc | Free Software Foundation, Inc. |
+| Spike (RISC-V ISA Simulator) | `riscv-software-src/riscv-isa-sim` @ `89c7471` | BSD-3-Clause | The Regents of the University of California |
+| QEMU | `qemu/qemu` @ `615ece3` | GPL-2.0-or-later (COPYING, COPYING.LIB); generated decode tables are GPL-2.0-or-later | Fabrice Bellard and the QEMU contributors |
+| newlib | `cygwin/cygwin`, `main` @ `06add56` | per-file; `newlib/COPYING.NEWLIB` lists the notices (BSD-style, Red Hat, and others) | Red Hat Inc. and the listed contributors |
+
+Each submodule contains the upstream licence files in full: `COPYING`,
+`COPYING3`, `COPYING.LIB`, `LICENSE`, `COPYING.NEWLIB`.  Nothing here
+relicenses them.
+
+Generated files
+---------------
+`scripts/xinsn.py` and the GCC generators write files marked "generated" in
+their header.  Files it writes into a submodule belong to that submodule's
+licence; the generator itself is original work.
+
+No binary of an upstream project is distributed here.  `out/` and `build/`
+are build outputs and are not tracked.
