@@ -4,6 +4,12 @@ Date: Tue, 13 Oct 2026 14:36:13 +0530
 Subject: [PATCH 2/5] Move the attention recognizer into the middle end
 
 It runs at -O2 on any target with the new attn optab and emits IFN_ATTN; -mattn-recognize is gone and errno from expf no longer blocks it.
+
+Without this patch the recognizer only exists behind a RISC-V-only option and bails whenever the loop calls a maths function, so ordinary -O2 code never reaches it and no other target can use it. The patch moves the pass to the middle end, gates it on the attn optab and returns an IFN_ATTN call, removing the option; xattn-recog-11.c covers the -O2 path.
+
+Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 041359f347cb, the series re-applies to the same tree and the export matches. The testsuite files are run by make check-gcc.
+
+Upstream review list: gcc-patches@gcc.gnu.org (gcc/.b4-config send-series-to). Submitted: no.
 ---
  gcc/Makefile.in                               |  1 +
  gcc/common.opt                                |  5 ++

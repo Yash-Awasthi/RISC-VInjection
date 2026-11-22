@@ -5,6 +5,12 @@ Subject: [PATCH 1/5] RISC-V: add Xattn, its builtin and the attention
  recognizer
 
 __builtin_riscv_attn emits attn; -mattn-recognize proves C multi-head attention loops equivalent and replaces them behind a runtime guard.
+
+Without this patch the instruction cannot be reached from C: there is no builtin and no recognizer, so every attention loop stays scalar even on a core that implements attn. The patch defines the extension in riscv-ext-xattn.def, adds __builtin_riscv_attn, adds -mattn-recognize with its runtime guard, and covers both with xattn-1..8 and xattn-recog-1..10 in the testsuite.
+
+Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 041359f347cb, the series re-applies to the same tree and the export matches. The testsuite files are run by make check-gcc.
+
+Upstream review list: gcc-patches@gcc.gnu.org (gcc/.b4-config send-series-to). Submitted: no.
 ---
  gcc/config.gcc                                |    2 +-
  gcc/config/riscv/riscv-attn-recog.cc          | 2059 +++++++++++++++++

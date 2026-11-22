@@ -4,6 +4,12 @@ Date: Tue, 13 Oct 2026 14:36:13 +0530
 Subject: [PATCH 4/5] Represent attn as its own RTL code
 
 It uses four registers, sets none and orders only memory; codes with more than three e operands now take the generic subrtx walk.
+
+Without this patch attn is a plain unspec, so the scheduler has no register or memory model for it and the RTL analysers have to walk it as an opaque expression. The patch adds the code to rtl.def and teaches rtlanal, dce and sched-deps about it, with xattn-rtl-1..3.c covering the resulting patterns.
+
+Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 041359f347cb, the series re-applies to the same tree and the export matches. The testsuite files are run by make check-gcc.
+
+Upstream review list: gcc-patches@gcc.gnu.org (gcc/.b4-config send-series-to). Submitted: no.
 ---
  gcc/config/riscv/riscv.md                    |  3 ---
  gcc/config/riscv/xattn.md                    | 23 ++++++++++----------

@@ -11,6 +11,10 @@
 #                                              check out the pinned upstream
 #                                              commit: the tree has no Xattn
 #   scripts/patches.sh restore [component...]  check out branch xattn again
+#   scripts/patches.sh check   [component...]  prove the series: every patch
+#                                              applies to the pinned commit in
+#                                              order, and export on xattn
+#                                              reproduces patches/<c>/ exactly
 #   scripts/patches.sh status                  show pinned commit and branch
 #
 # Components: binutils gcc spike qemu (default: all).  The pinned commit is
@@ -89,6 +93,20 @@ do_remove() {
   echo "$c: upstream ${base:0:12}, Xattn removed (branch $BRANCH kept)"
 }
 
+# A second remove is a no-op that would hide a leaked change, so it is an
+# error.  Checked for every component before any tree moves: a failure
+# leaves all of them as they were.
+check_removable() {
+  local c=$1 base
+  base=$(base_of "$c")
+  if [ "$(git -C "$REPO/$c" rev-parse HEAD)" = "$base" ] &&
+     [ "$(git -C "$REPO/$c" rev-parse --abbrev-ref HEAD)" = HEAD ]; then
+    echo "error: $c: already at the pinned upstream commit ${base:0:12};" \
+      "nothing to remove" >&2
+    exit 1
+  fi
+}
+
 do_restore() {
   local c=$1
   clean_or_die "$c"
@@ -102,6 +120,112 @@ do_status() {
     "$(git -C "$REPO/$c" rev-parse --abbrev-ref HEAD)"
 }
 
+# The series is replayed the way it is shipped: a temporary worktree at the
+# pinned commit, each patch checked with `git apply --check` and then applied in
+# order (no three-way fallback), then the same series replayed twice with
+# `git am` and the resulting tree compared with branch xattn.  Re-applying from
+# the same pin must give the same tree, which is what "idempotent" means here;
+# the branch is re-exported and compared with the committed patch files.
+# Patches are read from the index, not from the checkout, so a CRLF checkout
+# cannot change the result.  Nothing in the repository's own worktree is touched.
+do_check() {
+  local c=$1 base tmp n rc=0 b p tree branch_tree again
+  base=$(base_of "$c")
+  shopt -s nullglob
+  local patches=("$REPO/patches/$c"/*.patch)
+  n=${#patches[@]}
+  if [ "$n" -eq 0 ]; then
+    echo "$c: no patches"
+    return
+  fi
+
+  tmp=$(mktemp -d)
+  if ! git -C "$REPO/$c" worktree add -q --detach "$tmp/w" "$base" \
+       2> "$tmp/wt.log"; then
+    echo "error: $c: cannot make a worktree at ${base:0:12}" >&2
+    sed 's/^/    /' "$tmp/wt.log" >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  # The committed blobs, byte for byte, whatever the checkout did to them.
+  mkdir -p "$tmp/series"
+  for p in "${patches[@]}"; do
+    b=$(basename "$p")
+    git -C "$REPO" show ":patches/$c/$b" > "$tmp/series/$b"
+  done
+  local series=("$tmp/series"/*.patch)
+
+  # The plan's literal gate, one patch at a time so that files created by an
+  # earlier patch exist when the next one is checked.
+  for p in "${series[@]}"; do
+    if git -C "$tmp/w" apply --check "$p" > "$tmp/apply.log" 2>&1 &&
+       git -C "$tmp/w" apply "$p" >> "$tmp/apply.log" 2>&1; then
+      continue
+    fi
+    echo "error: $c: $(basename "$p") does not apply to ${base:0:12}" >&2
+    sed 's/^/    /' "$tmp/apply.log" >&2
+    rc=1
+    break
+  done
+  # The applied files are untracked, so reset --hard alone leaves them behind
+  # and the `git am` below would refuse to overwrite them.  Scratch worktree
+  # only, never the repository's own.
+  git -C "$tmp/w" reset -q --hard "$base"
+  git -C "$tmp/w" clean -qfd
+
+  if ! git -C "$tmp/w" am -q --3way "${series[@]}" > "$tmp/am.log" 2>&1
+  then
+    echo "error: $c: the series does not apply to ${base:0:12}" >&2
+    sed 's/^/    /' "$tmp/am.log" >&2
+    rc=1
+  else
+    tree=$(git -C "$tmp/w" rev-parse "HEAD^{tree}")
+    branch_tree=$(git -C "$REPO/$c" rev-parse "$BRANCH^{tree}")
+    if [ "$tree" != "$branch_tree" ]; then
+      echo "error: $c: the series builds $tree, branch $BRANCH holds" \
+	   "$branch_tree" >&2
+      rc=1
+    else
+      git -C "$tmp/w" reset -q --hard "$base"
+      if ! git -C "$tmp/w" am -q --3way "${series[@]}" \
+	   > "$tmp/am2.log" 2>&1; then
+	echo "error: $c: the second application failed" >&2
+	sed 's/^/    /' "$tmp/am2.log" >&2
+	rc=1
+      else
+	again=$(git -C "$tmp/w" rev-parse "HEAD^{tree}")
+	[ "$again" = "$tree" ] || {
+	  echo "error: $c: re-applying gave $again, not $tree" >&2
+	  rc=1
+	}
+      fi
+
+      # patches/ must be exactly what the branch exports.
+      mkdir -p "$tmp/exp" "$tmp/committed"
+      git -C "$REPO/$c" format-patch -q --no-signature --zero-commit \
+	-o "$tmp/exp" "$base..$BRANCH" > /dev/null 2>&1
+      cp "${series[@]}" "$tmp/committed/"
+      # The abbreviated blob hashes in "index <a>..<b>" depend on core.abbrev;
+      # they are informational, so the comparison ignores them.  A trailing CR
+      # is a checkout artifact and not part of the patch, so it is ignored too.
+      sed -i -e 's/^index [0-9a-f]*\.\.[0-9a-f]*/index/' -e 's/\r$//' \
+	"$tmp/exp"/*.patch "$tmp/committed"/*.patch
+      if ! diff -r -q "$tmp/committed" "$tmp/exp" > /dev/null; then
+	echo "error: $c: patches/$c is not what $BRANCH exports" >&2
+	diff -r "$tmp/committed" "$tmp/exp" | sed 's/^/    /' >&2 || true
+	rc=1
+      fi
+    fi
+  fi
+
+  git -C "$REPO/$c" worktree remove --force "$tmp/w" 2> /dev/null || true
+  rm -rf "$tmp"
+  [ "$rc" -eq 0 ] && echo "$c: $n patch(es) apply to ${base:0:12}," \
+    "re-apply the same tree, export matches"
+  return $rc
+}
+
 cmd=${1:-}
 shift || true
 comps=("$@")
@@ -110,8 +234,15 @@ comps=("$@")
 case $cmd in
   apply) for c in "${comps[@]}"; do do_apply "$c"; done ;;
   export) for c in "${comps[@]}"; do do_export "$c"; done ;;
-  remove) for c in "${comps[@]}"; do do_remove "$c"; done ;;
+  remove)
+    for c in "${comps[@]}"; do check_removable "$c"; done
+    for c in "${comps[@]}"; do do_remove "$c"; done ;;
   restore) for c in "${comps[@]}"; do do_restore "$c"; done ;;
+  check)
+    rc=0
+    for c in "${comps[@]}"; do do_check "$c" || rc=1; done
+    exit $rc
+    ;;
   status) for c in "${comps[@]}"; do do_status "$c"; done ;;
-  *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

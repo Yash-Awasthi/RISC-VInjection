@@ -4,7 +4,13 @@ Date: Tue, 24 Nov 2026 12:29:23 +0530
 Subject: [PATCH 3/3] target/riscv: attn_core.h, attn_abi.h: add the SPDX
  licence line
 
+Without this patch the two headers carry no licence identifier, so a downstream copy cannot tell what terms they are under. The patch adds the SPDX-License-Identifier line to target/riscv/attn_core.h and target/riscv/attn_abi.h and changes nothing else.
+
+Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 615ece3c406b, the series re-applies to the same tree and the export matches. The line is visible in both files after apply.
+
 Signed-off-by: Yash Vaibhav Awasthi <132498904+Yash-Awasthi@users.noreply.github.com>
+
+Upstream review list: qemu-devel@nongnu.org (qemu/docs/devel/submitting-a-patch.rst). Submitted: no.
 ---
  target/riscv/attn_abi.h  | 1 +
  target/riscv/attn_core.h | 1 +
