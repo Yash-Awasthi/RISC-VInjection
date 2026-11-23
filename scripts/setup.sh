@@ -30,9 +30,7 @@ done
 for h in gmp.h mpfr.h mpc.h zlib.h; do
   echo "#include <$h>" | cc -E -x c - > /dev/null 2>&1 || need+=("$h")
 done
-for p in glib-2.0; do
-  pkg-config --exists "$p" 2> /dev/null || need+=("$p")
-done
+pkg-config --exists glib-2.0 2> /dev/null || need+=(glib-2.0)
 python3 -c 'import venv' 2> /dev/null || need+=(python3-venv)
 
 if [ ${#need[@]} -gt 0 ]; then

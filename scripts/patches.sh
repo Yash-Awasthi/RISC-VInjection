@@ -56,7 +56,9 @@ do_export() {
   mkdir -p "$REPO/patches/$c"
   git -C "$REPO/$c" format-patch -q --no-signature --zero-commit \
     -o "$REPO/patches/$c" "$base..$BRANCH"
-  echo "$c: $(ls "$REPO/patches/$c" | wc -l) patch(es) from ${base:0:12}"
+  local n
+  n=$(find "$REPO/patches/$c" -maxdepth 1 -name '*.patch' | wc -l)
+  echo "$c: $n patch(es) from ${base:0:12}"
 }
 
 clean_or_die() {
