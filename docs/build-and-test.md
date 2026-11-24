@@ -94,6 +94,7 @@ make check
 | `check-recog` | recognized `attn` vs plain loops at run time on both simulators, for three source forms; libgcc `__attn` (`__builtin_attn` without Xattn) vs the loops; guard-failing cases run the loops bit-exactly | 7 + 6 |
 | `check-three-way` | the same bare-metal image on QEMU and on Spike, compared with the host core case by case: prints the largest absolute difference and requires it to be exactly 0 for all 7 configurations | 1 |
 | `check-sched` | `attn` is scheduled under every pipeline model of this GCC port — 13 models, 26 `-mtune` names read from `gcc/gcc/config/riscv/riscv-cores.def`; for each, both `attn` lines carry the `riscv_attn_di` annotation in `-dp` output | 26 |
+| `check-demo` | `demo/mha_plain.c` at `-O2`: with `-fno-tree-loop-attn` the loops stay (`.ATTN` 0, `attn` 0); with the default the GIMPLE has one `.ATTN` and the assembly one `attn`, and the loops survive only as the guard's fallback (same 6 float ops, 333 → 375 instructions; the gain is run time: 508421 → 991 instructions executed) | 1 |
 
 Expected tail of the output:
 
