@@ -6,6 +6,7 @@
 #   make check-gcc   GCC testsuite files for Xattn (compile only)
 #   make check-sim   bare-metal tests on QEMU and Spike
 #   make check-recog recognizer: recognized loops vs plain loops, at run time
+#   make check-xinsn-sim  a generated instruction run on QEMU and Spike (slow)
 
 PY      := .venv/bin/python
 GCC     := $(CURDIR)/out/toolchain/bin/riscv64-unknown-elf-gcc
@@ -34,4 +35,10 @@ check-sim: $(PY)
 check-recog:
 	$(MAKE) -C tests/recog check
 
-.PHONY: all check check-core check-gcc check-sim check-recog
+# Slow: applies examples/insns/mac.spec to the four trees, rebuilds them and
+# runs the generated test on QEMU and Spike.  Needs scripts/build.sh first.
+check-xinsn-sim: $(PY)
+	XATTN_XINSN_SIM=1 $(PY) -m pytest -q tests/test_xinsn.py \
+	  -k both_simulators
+
+.PHONY: all check check-core check-gcc check-sim check-recog check-xinsn-sim

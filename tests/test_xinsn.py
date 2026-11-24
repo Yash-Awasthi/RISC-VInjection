@@ -9,12 +9,14 @@ qemu/, so they need `git submodule update --init` and
 `scripts/patches.sh apply` (no toolchain build).
 """
 
-import pytest
+import os
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 XINSN = REPO / "scripts" / "xinsn.py"
@@ -274,3 +276,27 @@ def test_a_bad_spec_is_refused(tmp_path, text, want):
     assert r.returncode == 1, r.stdout
     assert want in r.stderr, r.stderr
     assert str(spec) in r.stderr
+
+
+# ------------------------------------------------- the same on both simulators
+
+TOOLCHAIN = REPO / "out/toolchain/bin/riscv64-unknown-elf-gcc"
+SPIKE = REPO / "out/spike/bin/spike"
+QEMU = REPO / "build/qemu/qemu-system-riscv64"
+
+
+@pytest.mark.skipif(
+    os.environ.get("XATTN_XINSN_SIM") != "1"
+    or not all(p.exists() for p in (TOOLCHAIN, SPIKE, QEMU)),
+    reason="slow: needs a built toolchain and XATTN_XINSN_SIM=1 "
+           "(make check-xinsn-sim)")
+def test_generated_instruction_runs_on_both_simulators():
+    """Apply `mac` to the real trees, rebuild, and run the generated test
+    program on QEMU and on Spike: the CHECK lines pass on both, and
+    objdump finds the instruction in the program."""
+    r = xinsn("all", str(REPO / "examples/insns" / "mac.spec"))
+    assert r.returncode == 0, r.stdout[-4000:] + r.stderr[-4000:]
+    assert "qemu  mac: all checks passed" in r.stdout, r.stdout
+    assert "spike mac: all checks passed" in r.stdout, r.stdout
+    assert re.search(r"objdump: [1-9]\d* mac instruction\(s\)", r.stdout), \
+        r.stdout
