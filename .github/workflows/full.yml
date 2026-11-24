@@ -1,0 +1,97 @@
+# Full job: build the toolchain and the simulators from the submodules and
+# run every test.  Nightly, on a manual dispatch, and on any push that touches
+# the patches, the shared header, the scripts or the tests — the parts that a
+# fast check cannot cover.
+#
+# The fast job in ci.yml runs in a couple of minutes without a build; this one
+# is the only place the README's claims ("make check green", "one attn in the
+# assembly") are exercised end to end.
+
+name: Full
+
+on:
+  push:
+    paths:
+      - patches/**
+      - include/**
+      - scripts/**
+      - tests/**
+      - examples/**
+      - demo/**
+      - Makefile
+      - .github/workflows/full.yml
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Key the source cache on the submodule SHAs
+        id: pins
+        run: |
+          shas=$(git ls-tree HEAD binutils gcc spike qemu newlib \
+                 | awk '{print $3}' | tr '\n' ' ')
+          echo "value=$(printf '%s' "$shas" | sha256sum | cut -c1-16)" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Cache the upstream git objects
+        uses: actions/cache@v4
+        with:
+          path: .git/modules
+          key: submodules-${{ steps.pins.outputs.value }}
+
+      # The pinned QEMU refuses Python < 3.12 (configure: "Python >= 3.12 is
+      # required"), and QEMU's meson needs bzip2 and git at configure time.
+      - name: Build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bison flex texinfo gawk ninja-build meson \
+            pkg-config libgmp-dev libmpfr-dev libmpc-dev zlib1g-dev \
+            libglib2.0-dev libpixman-1-dev device-tree-compiler bzip2 \
+            python3-venv python3-pip
+          python3 --version
+          nproc
+
+      - name: Sources and patches
+        run: |
+          git submodule update --init --depth 1
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+          scripts/patches.sh apply
+          scripts/patches.sh status
+
+      - name: Build (six steps)
+        run: |
+          start=$(date +%s)
+          JOBS=$(nproc) scripts/build.sh
+          echo "build.sh: $(( $(date +%s) - start ))s on $(nproc) cores"
+
+      - name: Tests
+        run: |
+          start=$(date +%s)
+          make check
+          echo "make check: $(( $(date +%s) - start ))s"
+
+      - name: Upload the artefacts and the build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xattn-${{ github.sha }}
+          path: |
+            artifacts/
+            build/*.log
+            build/*/*.log
+          if-no-files-found: warn

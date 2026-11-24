@@ -74,7 +74,9 @@ visible on the commit that broke it.
   - verified-here: `.github/workflows/ci.yml` job `fast`; each step re-run here in a `python:3.12` container against the pinned trees: `scripts/patches.sh apply binutils gcc spike qemu` → 4 lines, 7.8 s; `python3 -m pytest -q tests/` → `32 passed in 3.90s`; `shellcheck -x scripts/*.sh` → no output, exit 0; `actionlint` → no findings.
   - corrected: `python -m pytest tools/` measured `no tests ran`, exit 5 (`tools/` holds no tests) — the step is `pytest tests/`.
   - corrected: `check-gcc` needs `out/toolchain/bin/riscv64-unknown-elf-gcc` (`Makefile`), i.e. a build, so it moved to the full job (M1.1.2); the fast job does not build.
-- [ ] Full job (nightly + on a change under `patches/`, `include/`, `scripts/`): submodules, `scripts/patches.sh apply`, `scripts/build.sh`, `make check`, artifacts uploaded. `[C]`
+- [x] Full job (nightly + on a change under `patches/`, `include/`, `scripts/`): submodules, `scripts/patches.sh apply`, `scripts/build.sh`, `make check`, artifacts uploaded. `[C]`
+  - verified-here: `.github/workflows/full.yml`; `actionlint` → no findings; every step was run here in containers against the pinned trees: `scripts/patches.sh apply` → 4 components, 7.8 s; `scripts/build.sh` (all six steps) → `== done`; `make check` → exit 0 in 97 s (`check-core`, 30+ `PASS xattn-*.c` dg files, bare-metal on Spike+QEMU, recognizer on both). Ubuntu 24.04 is the host because the pinned QEMU's `configure` refuses Python < 3.12 (`Cannot use '/usr/bin/python3', Python >= 3.12 is required` on Debian 12's 3.11).
+  - needs-verify: the workflow has not run on a GitHub runner from this machine; the commands and the exit codes were reproduced in `debian:bookworm` + `python:3.12-slim-bookworm` containers, not on the runner image.
 - [ ] Cache the built toolchain and ccache between full runs by patch SHA; a cache hit must be validated by `make check`, never trusted blindly. `[C]`
 - [ ] Publish the job result and the six submodule SHAs as a badge/artefact so the README's claim carries evidence. `[C]`
 
@@ -473,3 +475,4 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 - 2026-11-24 m1.2.3 [x] encoding safety | proof: `python3 -m pytest -q tests/test_xinsn.py` → 7 passed; 5 examples applied in turn → 5 distinct encodings | next: m1.2.4
 - 2026-11-24 m1.2.5 [x] spec validation + 8 failure-path tests | proof: `python3 -m pytest -q tests/test_xinsn.py` → 15 passed in 157.45s | next: m1.2.4
 - 2026-11-24 m1.2.4 [x] generated instruction on QEMU and Spike (slow job) | proof: `make check-xinsn-sim` under the hood → `qemu mac: all checks passed`, `spike mac: all checks passed`, `objdump: 1 mac instruction(s)`; pytest → 1 passed | deviation: qemu binary built in a py3.12 container (pinned QEMU needs Python≥3.12) | next: m1.1.2
+- 2026-11-24 m1.1.2 [x] full CI job (build + make check + artefacts) | proof: `make check` → exit 0 in 97s; `scripts/patches.sh apply` → 7.8s; `actionlint` → no findings | needs-verify: not yet run on a GitHub runner | next: m1.1.3
