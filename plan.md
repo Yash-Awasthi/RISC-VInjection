@@ -112,7 +112,8 @@ GPLv3 works. With no `LICENSE`, no `COPYING` and no statement of derivative-work
 status, nobody may legally reuse this and the author has no clear grant.
 **Done when:** the terms are stated and the obligations are met.
 
-- [ ] Add `LICENSE` (GPL-3.0-or-later, matching the patched upstreams) and a `NOTICE` naming the five upstream projects and their licences. `[C]`
+- [x] Add `LICENSE` (GPL-3.0-or-later, matching the patched upstreams) and a `NOTICE` naming the five upstream projects and their licences. `[C]`
+  - verified-here: `ls -la LICENSE NOTICE` → 35147 bytes (the canonical GPLv3 text, byte-identical to `gcc/COPYING3`) and 2815 bytes; `NOTICE` names binutils (`binutils-2_47-branch` @ `781713d`, GPL-3.0-or-later per COPYING3), GCC (`releases/gcc-16` @ `041359f`, GPL-3.0-or-later + GFDL + Runtime Library Exception), Spike (`89c7471`, BSD-3-Clause), QEMU (`615ece3`, GPL-2.0-or-later), newlib (`cygwin/cygwin` `main` @ `06add56`, per-file per `COPYING.NEWLIB`). Measured: `binutils/bfd/elfxx-riscv.c` and `binutils/opcodes/riscv-opc.c` both say "either version 3 of the License, or (at your option) any later version" and point at COPYING3.
 - [ ] `CONTRIBUTING.md`: DCO sign-off, the patch-series format, and the rule that a semantic change updates `docs/spec.md` and the golden vectors together. `[C]`
 - [ ] SPDX headers on the files this project owns (`include/`, `scripts/`, `tests/`, `tools/`); never add headers to patched upstream files. `[C]`
 - [ ] State in README which parts are original and which are derived from GPLv3 upstreams. `[C]`
@@ -483,3 +484,4 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 - 2026-11-24 m1.1.2 [x] full CI job (build + make check + artefacts) | proof: `make check` → exit 0 in 97s; `scripts/patches.sh apply` → 7.8s; `actionlint` → no findings | needs-verify: not yet run on a GitHub runner | next: m1.1.3
 - 2026-11-24 m1.1.3 [x] toolchain cache by patch SHA + validation before use | proof: cache set compresses to 810 MB; validation `gcc 16.2.1 -march=rv64gc_xattn` + `as` accepts `attn`; without the extension → `extension 'xattn' required` | next: m1.1.4
 - 2026-11-24 m1.1.4 [x] CI badges + SHAs artefact | proof: README badges; `full.yml` → `build/CI-TRACE.txt` with pinned vs checked-out SHAs (5 submodules) + versions; `actionlint` clean | next: m1.3.1
+- 2026-11-24 m1.3.1 [x] LICENSE (GPLv3) + NOTICE with the five upstreams | proof: `ls -la LICENSE NOTICE` → 35147 + 2815 bytes; byte-identical to gcc/COPYING3 | next: m1.3.2
