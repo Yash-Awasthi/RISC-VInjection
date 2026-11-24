@@ -10,6 +10,7 @@ qemu/, so they need `git submodule update --init` and
 """
 
 import pytest
+import re
 import shutil
 import subprocess
 import sys
@@ -131,7 +132,7 @@ def git(root, *args):
                           capture_output=True, text=True)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def scratch(tmp_path_factory):
     """A commit-clean copy of the touched parts of the four trees."""
     root = tmp_path_factory.mktemp("scratch")
@@ -184,3 +185,56 @@ def test_remove_restores_a_clean_tree(scratch, tmp_path):
     assert "mac removed from the trees" in removed.stdout
     status = git(scratch, "status", "--porcelain").stdout
     assert status == "", "remove left the trees dirty:\n" + status
+
+
+# ------------------------------------------------------------ encoding safety
+
+sys.path.insert(0, str(REPO / "scripts"))
+import find_opcodes as fo  # noqa: E402
+
+ENCODING = re.compile(r"MATCH=0x([0-9a-f]{8}) MASK=0x([0-9a-f]{8})")
+
+
+def encoding_of(text):
+    m = ENCODING.search(text)
+    assert m, "no encoding in:\n" + text
+    return int(m.group(1), 16), int(m.group(2), 16)
+
+
+def test_every_example_slot_is_free(tmp_path):
+    """Each example spec lands in the custom opcode space and overlaps no
+    encoding already in the trees (3006 at the pinned commits)."""
+    defs = fo.load_defs(fo.default_sources(REPO))
+    assert len(defs) > 1000, "no upstream encodings found"
+    for spec in sorted((REPO / "examples/insns").glob("*.spec")):
+        r = xinsn("show", str(spec))
+        assert r.returncode == 0, r.stderr
+        match, mask = encoding_of(r.stdout)
+        assert match & 0x7F in fo.MAJORS.values(), spec.name
+        hits = [n for n, e in defs.items() if fo.collides((match, mask), e)]
+        assert hits == [], "%s collides with %s" % (spec.name, hits)
+
+
+EXAMPLE_ORDER = ["vsum", "fill", "avgu", "mac", "bitrev"]
+
+
+def test_two_instructions_never_share_a_slot(scratch):
+    """An instruction already in the trees moves the next `slot = auto`
+    choice, so five instructions applied one after another have five
+    different encodings."""
+    taken = []
+    for name in EXAMPLE_ORDER:
+        spec = REPO / "examples/insns" / (name + ".spec")
+        shown = scratch_xinsn(scratch, "show", str(spec))
+        assert shown.returncode == 0, shown.stderr
+        enc = encoding_of(shown.stdout)
+        for other_name, other in taken:
+            assert not fo.collides(enc, other), \
+                "%s and %s share an encoding" % (name, other_name)
+        applied = scratch_xinsn(scratch, "apply", str(spec))
+        assert applied.returncode == 0, applied.stderr
+        taken.append((name, enc))
+    listed = scratch_xinsn(scratch, "list")
+    assert listed.returncode == 0
+    for name in EXAMPLE_ORDER:
+        assert re.search(r"^%s +MATCH=0x" % name, listed.stdout, re.M), name
