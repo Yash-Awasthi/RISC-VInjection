@@ -9,7 +9,8 @@ qemu/, so they need `git submodule update --init` and
 `scripts/patches.sh apply` (no toolchain build).
 """
 
-import re
+import pytest
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -105,3 +106,81 @@ def test_show_is_a_dry_run(tmp_path):
     assert a.returncode == 0 and b.returncode == 0
     assert a.stdout == b.stdout
     assert {p: (REPO / p).read_bytes() for p in FILES[:4]} == before
+
+
+# ---------------------------------------------------- apply, remove, round trip
+
+# The parts of the four trees xinsn.py edits.  A scratch copy of these is
+# the same input the real trees give it, without the gigabytes the rest of
+# gcc and qemu would cost.
+SCRATCH_DIRS = ["gcc/gcc/config/riscv", "spike/riscv", "qemu/target/riscv"]
+SCRATCH_FILES = [
+    "binutils/include/opcode/riscv-opc.h",
+    "binutils/include/opcode/riscv.h",
+    "binutils/bfd/elfxx-riscv.c",
+    "binutils/opcodes/riscv-opc.c",
+    "gcc/gcc/doc/riscv-ext.texi",   # written by gen-riscv-ext-texi
+    ".gitignore",
+]
+
+
+def git(root, *args):
+    return subprocess.run(["git", "-c", "user.name=test",
+                           "-c", "user.email=test@example.invalid",
+                           "-C", str(root), *args],
+                          capture_output=True, text=True)
+
+
+@pytest.fixture(scope="module")
+def scratch(tmp_path_factory):
+    """A commit-clean copy of the touched parts of the four trees."""
+    root = tmp_path_factory.mktemp("scratch")
+    for d in SCRATCH_DIRS:
+        shutil.copytree(REPO / d, root / d)
+    for f in SCRATCH_FILES:
+        (root / f).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(REPO / f, root / f)
+    shutil.copytree(REPO / "scripts", root / "scripts",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    assert git(root, "init", "-q").returncode == 0
+    assert git(root, "add", "-A").returncode == 0
+    assert git(root, "commit", "-qm", "scratch trees").returncode == 0
+    return root
+
+
+def scratch_xinsn(root, *args):
+    return subprocess.run(
+        [sys.executable, str(root / "scripts/xinsn.py"), *args],
+        capture_output=True, text=True, cwd=root)
+
+
+def test_apply_changes_the_trees_and_repeats_nothing(scratch, tmp_path):
+    spec = write_spec(tmp_path, "mac", MAC_SPEC)
+    first = scratch_xinsn(scratch, "apply", str(spec))
+    assert first.returncode == 0, first.stderr
+    changed = [l.split(" ", 1)[1] for l in first.stdout.splitlines()
+               if l.startswith("changed ")]
+    assert changed == FILES
+    for created in ("binutils/gas/testsuite/gas/riscv/x-mac.s",
+                    "gcc/gcc/config/riscv/riscv-ext-xmac.def",
+                    "spike/riscv/xmac.cc",
+                    "qemu/target/riscv/tcg/mac_helper.c"):
+        assert (scratch / created).is_file(), created
+    dirty = git(scratch, "status", "--porcelain").stdout
+
+    again = scratch_xinsn(scratch, "apply", str(spec))
+    assert again.returncode == 0, again.stderr
+    assert "already applied" in again.stdout
+    assert "changed " not in again.stdout
+    assert git(scratch, "status", "--porcelain").stdout == dirty
+
+
+def test_remove_restores_a_clean_tree(scratch, tmp_path):
+    spec = write_spec(tmp_path, "mac", MAC_SPEC)
+    applied = scratch_xinsn(scratch, "apply", str(spec))
+    assert applied.returncode == 0, applied.stderr
+    removed = scratch_xinsn(scratch, "remove", "mac", "--no-rebuild")
+    assert removed.returncode == 0, removed.stderr
+    assert "mac removed from the trees" in removed.stdout
+    status = git(scratch, "status", "--porcelain").stdout
+    assert status == "", "remove left the trees dirty:\n" + status

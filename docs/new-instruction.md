@@ -126,6 +126,12 @@ scripts/build.sh binutils gcc spike qemu          # incremental, a few minutes
 scripts/xinsn.py test  examples/insns/vsum.spec
 ```
 
+To take it out again without rebuilding: `scripts/xinsn.py remove vsum
+--no-rebuild` edits the four trees back and leaves them clean
+(`git -C gcc status --porcelain` is empty); without the flag `remove`
+also runs `scripts/build.sh` and checks that the assembler now rejects
+the mnemonic.
+
 ```
 qemu  vsum: all checks passed
 spike vsum: all checks passed

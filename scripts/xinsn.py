@@ -13,7 +13,9 @@
   xinsn.py remove WHAT     take one out again and rebuild; WHAT is a name,
                            an opcode (MATCH or any instruction word, 0x...)
                            or a SPEC.  "attn" removes Xattn
-                           (scripts/xattn.sh remove)
+                           (scripts/xattn.sh remove).  --no-rebuild edits
+                           the trees and skips scripts/build.sh and the
+                           toolchain check (used by tests/test_xinsn.py).
 
 A SPEC file holds "key = value" lines, then a "semantics:" line followed by
 the C body of the instruction:
@@ -906,7 +908,7 @@ def find_spec(name):
              "build/xinsn/specs); pass the spec file instead" % name)
 
 
-def cmd_remove(what):
+def cmd_remove(what, build=True):
     rows = custom_insns()
     if Path(what).is_file():
         spec = Path(what)
@@ -934,6 +936,9 @@ def cmd_remove(what):
     edit_all(sp, ed, row[1], row[2])
     for p in dict.fromkeys(ed.touched):
         print("changed " + p)
+    if not build:
+        print("%s removed from the trees; not rebuilt" % name)
+        return
     rebuild()
     gas = subprocess.run(
         [REPO / "out/toolchain/bin/riscv64-unknown-elf-as",
@@ -951,6 +956,9 @@ def main():
     ap.add_argument("cmd", choices=["new", "show", "apply", "test", "all",
                                     "list", "remove"])
     ap.add_argument("arg", nargs="?")
+    ap.add_argument("--no-rebuild", action="store_true",
+                    help="remove: edit the trees but do not run\n"
+                         "scripts/build.sh, and skip the toolchain check")
     a = ap.parse_args()
     if a.cmd in ("show", "apply", "test", "all", "remove") and not a.arg:
         ap.error("%s needs an argument" % a.cmd)
@@ -959,7 +967,7 @@ def main():
     elif a.cmd == "list":
         cmd_list()
     elif a.cmd == "remove":
-        cmd_remove(a.arg)
+        cmd_remove(a.arg, build=not a.no_rebuild)
     elif a.cmd == "all":
         cmd_all(a.arg)
     elif a.cmd == "test":
