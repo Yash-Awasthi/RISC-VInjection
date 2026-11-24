@@ -3,3 +3,6 @@
 /.venv/
 __pycache__/
 *.core
+
+# Written by `make check` from out/BUILD-INFO: a build record, not source.
+artifacts/BUILD-INFO
