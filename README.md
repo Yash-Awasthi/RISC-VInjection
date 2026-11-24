@@ -1,5 +1,14 @@
 # RISC-VInjection
 
+[![CI](https://github.com/Yash-Awasthi/RISC-VInjection/actions/workflows/ci.yml/badge.svg)](https://github.com/Yash-Awasthi/RISC-VInjection/actions/workflows/ci.yml)
+[![Full](https://github.com/Yash-Awasthi/RISC-VInjection/actions/workflows/full.yml/badge.svg)](https://github.com/Yash-Awasthi/RISC-VInjection/actions/workflows/full.yml)
+
+The CI badges are the evidence for every claim below: the `CI` job checks the
+host model and the general method against the pinned upstream sources on every
+push, and the `Full` job builds the toolchain and the simulators and runs
+`make check`, publishing the five submodule SHAs it built from as an artefact
+(`build/CI-TRACE.txt`).
+
 RISC-VInjection adds custom instructions to the RISC-V toolchain, end to end. Two things live here:
 
 1. **Xattn**, a complete custom extension whose one instruction, `attn`,

@@ -123,6 +123,29 @@ jobs:
           make check
           echo "make check: $(( $(date +%s) - start ))s"
 
+      # The claim "verified on these sources" needs the names of the sources.
+      # Pinned (superproject) and checked out (submodule) are printed side by
+      # side, so a drift between them is visible in the artefact.
+      - name: Record the submodule SHAs and the tool versions
+        if: always()
+        run: |
+          mkdir -p build
+          {
+            echo "commit:  $(git rev-parse HEAD)"
+            echo "date:    $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner:  $(uname -srm), $(nproc) cores, $(python3 --version)"
+            echo
+            echo "pinned (superproject) and checked out (submodule):"
+            git ls-tree HEAD binutils gcc spike qemu newlib \
+              | awk '{printf "  %-8s %s\n", $4, $3}'
+            git submodule status | sed 's/^/  /'
+            echo
+            out/toolchain/bin/riscv64-unknown-elf-gcc --version 2>&1 | head -1
+            out/spike/bin/spike --version 2>&1 | head -1
+            build/qemu/qemu-system-riscv64 --version 2>&1 | head -1
+          } > build/CI-TRACE.txt 2>&1 || true
+          cat build/CI-TRACE.txt
+
       - name: Upload the artefacts and the build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -130,6 +153,7 @@ jobs:
           name: xattn-${{ github.sha }}
           path: |
             artifacts/
+            build/CI-TRACE.txt
             build/*.log
             build/*/*.log
           if-no-files-found: warn

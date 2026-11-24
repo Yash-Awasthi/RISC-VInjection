@@ -56,7 +56,7 @@ Invariants:
 3. **The encoding is normative.** `MATCH/MASK`, the descriptor layouts in `docs/spec.md`, and the ELF attribute `xattn1p0` do not change without a spec version bump.
 4. **Illegal without the extension.** Encoding when `_xattn` is absent raises an illegal-instruction trap in both simulators.
 5. **Patches are the only delta.** `scripts/xattn.sh remove` restores a pristine tree; a difference in `git -C <sub> status` after remove is a bug.
-6. **No silent upstream drift.** Submodules are pinned by commit; the build records the six SHAs it used.
+6. **No silent upstream drift.** Submodules are pinned by commit; the build records the five submodule SHAs it used.
 
 ---
 
@@ -80,7 +80,10 @@ visible on the commit that broke it.
 - [x] Cache the built toolchain and ccache between full runs by patch SHA; a cache hit must be validated by `make check`, never trusted blindly. `[C]`
   - verified-here: `full.yml` keys both caches on `sha256(submodule SHAs)` and `sha256(patches/*/*.patch)`, caches `out/toolchain` + `build/{binutils,gcc,newlib}` and validates a hit before the build: `riscv64-unknown-elf-gcc --version` → `GCC 16.2.1`, `-march=rv64gc_xattn -E` → ok, `as` accepts `attn` → ok; without the extension the same line fails (`Error: unrecognized opcode \`attn a3,a0,a1,a2', extension \`xattn' required`), so a stale toolchain drops the cache and rebuilds. Cached set compresses to 810 MB (`tar -czf`), then `make check` (exit 0) is the real validation. `actionlint` → no findings.
   - deviation: ccache is not wired into `scripts/build.sh` yet (that is m3.2.1), so only the toolchain trees are cached here.
-- [ ] Publish the job result and the six submodule SHAs as a badge/artefact so the README's claim carries evidence. `[C]`
+- [x] Publish the job result and the five submodule SHAs as a badge/artefact so the README's claim carries evidence. `[C]`
+  - verified-here: `README.md` carries both workflow badges (`ci.yml`, `full.yml`); `full.yml` writes `build/CI-TRACE.txt` (commit, date, runner, pinned SHA and checked-out SHA side by side, plus the gcc/Spike/QEMU versions) and uploads it. The git half run here → `binutils 781713d`, `gcc 041359f`, `newlib 06add56`, `qemu 615ece3`, `spike 89c7471` pinned, and `heads/xattn` for the four patched trees. `actionlint` → no findings.
+  - corrected: the repository has **five** submodules, not six; every "six SHAs" in this file now says five (the six-step build is a different six).
+  - needs-verify: the badge images resolve only once the workflows have run on GitHub.
 
 ### M1.2 The general method is untested
 
@@ -116,9 +119,9 @@ status, nobody may legally reuse this and the author has no clear grant.
 
 ### M1.4 Pin the inputs and record them
 
-- [ ] Write the six commit SHAs into `versions.env`; `scripts/setup.sh` asserts `git submodule status` matches before building. `[C]`
+- [ ] Write the five submodule SHAs into `versions.env`; `scripts/setup.sh` asserts `git submodule status` matches before building. `[C]`
 - [ ] Fix `.gitmodules`: Spike/QEMU `branch = master` invites `--remote` drift — pin the branch names to the release lines actually used, and correct the newlib remote (upstream newlib is not `cygwin/cygwin`; verify the intended source and say why). `[C]`
-- [ ] `scripts/build.sh` writes `out/BUILD-INFO` (six SHAs, host gcc/clang, Python, numpy, date) and `make check` copies it into the artefacts. `[C]`
+- [ ] `scripts/build.sh` writes `out/BUILD-INFO` (five submodule SHAs, host gcc/clang, Python, numpy, date) and `make check` copies it into the artefacts. `[C]`
 
 ### M1.5 Make the README's claims executable
 
@@ -446,7 +449,7 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 ## Appendix B — Definition of done
 
 1. The failing case exists as a test before the fix; a semantics change also re-freezes the golden vectors.
-2. `make check` green, or the full CI job green, with the output pasted; the six submodule SHAs recorded.
+2. `make check` green, or the full CI job green, with the output pasted; the five submodule SHAs recorded.
 3. No invariant in §0 broken: one definition in `attn_core.h`, bit-exact agreement, normative encoding, illegal when disabled, clean `remove`, pinned inputs.
 4. `docs/spec.md` updated for any semantic change; the README claim updated or removed with the command that proves it.
 5. Licence headers present on original files; no header added to upstream-derived patches.
@@ -479,3 +482,4 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 - 2026-11-24 m1.2.4 [x] generated instruction on QEMU and Spike (slow job) | proof: `make check-xinsn-sim` under the hood → `qemu mac: all checks passed`, `spike mac: all checks passed`, `objdump: 1 mac instruction(s)`; pytest → 1 passed | deviation: qemu binary built in a py3.12 container (pinned QEMU needs Python≥3.12) | next: m1.1.2
 - 2026-11-24 m1.1.2 [x] full CI job (build + make check + artefacts) | proof: `make check` → exit 0 in 97s; `scripts/patches.sh apply` → 7.8s; `actionlint` → no findings | needs-verify: not yet run on a GitHub runner | next: m1.1.3
 - 2026-11-24 m1.1.3 [x] toolchain cache by patch SHA + validation before use | proof: cache set compresses to 810 MB; validation `gcc 16.2.1 -march=rv64gc_xattn` + `as` accepts `attn`; without the extension → `extension 'xattn' required` | next: m1.1.4
+- 2026-11-24 m1.1.4 [x] CI badges + SHAs artefact | proof: README badges; `full.yml` → `build/CI-TRACE.txt` with pinned vs checked-out SHAs (5 submodules) + versions; `actionlint` clean | next: m1.3.1
