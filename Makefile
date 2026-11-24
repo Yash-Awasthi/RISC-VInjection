@@ -8,6 +8,7 @@
 #   make check-sim   bare-metal tests on QEMU and Spike
 #   make check-recog recognizer: recognized loops vs plain loops, at run time
 #   make check-xinsn-sim  a generated instruction run on QEMU and Spike (slow)
+#   make check-three-way  Spike, QEMU and the host model agree bit for bit
 
 PY      := .venv/bin/python
 GCC     := $(CURDIR)/out/toolchain/bin/riscv64-unknown-elf-gcc
@@ -53,4 +54,9 @@ check-xinsn-sim: $(PY)
 	XATTN_XINSN_SIM=1 $(PY) -m pytest -q tests/test_xinsn.py \
 	  -k both_simulators
 
-.PHONY: all check check-info check-core check-gcc check-sim check-recog check-xinsn-sim
+# Spike, QEMU and the host model, case by case, printing the largest
+# absolute difference.  Needs scripts/build.sh first.
+check-three-way: $(PY)
+	XATTN_SIM=1 $(PY) -m pytest -q -s tests/test_three_way.py
+
+.PHONY: all check check-info check-core check-gcc check-sim check-recog check-xinsn-sim check-three-way

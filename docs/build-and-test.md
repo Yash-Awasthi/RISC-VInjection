@@ -92,6 +92,7 @@ make check
 | `check-gcc` | builtins on rv32/rv64 under three pipeline models, `__builtin_attn` with and without Xattn, error without Xattn, `__riscv_xattn`, the five recognized forms (one with no flags at all), the six rejected forms with their reasons, the `attn` RTL code (four register uses, scheduling across it) | 25 |
 | `check-sim` | on QEMU and on Spike (bare metal): every byte of `Y` equals the host core for 7 configurations; reserved configuration traps with `mcause 2`; a load fault traps with `mcause 5` and the right `mtval`, `Y` untouched; re-execution completes; `attn` without Xattn traps. On QEMU Linux user mode (`qemu-riscv64`): the 7 configurations again | 2 x 11 + 7 |
 | `check-recog` | recognized `attn` vs plain loops at run time on both simulators, for three source forms; libgcc `__attn` (`__builtin_attn` without Xattn) vs the loops; guard-failing cases run the loops bit-exactly | 7 + 6 |
+| `check-three-way` | the same bare-metal image on QEMU and on Spike, compared with the host core case by case: prints the largest absolute difference and requires it to be exactly 0 for all 7 configurations | 1 |
 
 Expected tail of the output:
 
@@ -99,6 +100,16 @@ Expected tail of the output:
 attn_test: all passed
 PASS attn_without_xattn_is_illegal
 recog_test: all passed
+```
+
+`check-three-way` prints the comparison it asserts, so a difference is visible
+rather than only fatal:
+
+```
+case                               QEMU        Spike  verdict
+bf16_bf16_causal                      0            0  PASS
+f32_causal_mask                       0            0  PASS
+f32_gqa                               0            0  PASS
 ```
 
 ## 5. Use it

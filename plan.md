@@ -143,7 +143,9 @@ status, nobody may legally reuse this and the author has no clear grant.
 
 Each claim gets one command; a claim without one is deleted.
 
-- [ ] "All three executions agree bit for bit" → a test that prints the max absolute difference and asserts exact equality for the five vector shapes. `[C]`
+- [x] "All three executions agree bit for bit" → a test that prints the max absolute difference and asserts exact equality for the five vector shapes. `[C]`
+  - verified-here: `make check-three-way` → `1 passed`, and the printed table is seven rows of `0  0  PASS` (QEMU, Spike) against the host reference; the simulators now report `PASS <case> maxdiff=<16 hex digits>`, the IEEE bits of the largest `|Y - reference|` (`max_abs_diff()` in `tests/baremetal/attn_test.c`, f32 or bf16 read as float). The bare-metal run prints `maxdiff=0000000000000000` for all seven cases on both simulators; `make -C tests/baremetal check` still passes (traps, re-execution, Linux user mode).
+  - corrected: the vector set is **seven** configurations, not five (`tests/baremetal/gen_cases.py`: `f32_1head`, `f32_4head_bias`, `f32_causal_mask`, `f32_gqa`, `f32_scale`, `bf16_bf16_causal`, `bf16_f32_gpt2ish`); all seven are asserted. `docs/build-and-test.md` gained the target and a sample of its table.
 - [ ] "Precise traps" → a test per simulator for illegal-when-disabled, misaligned descriptor, out-of-range dims, and a faulting descriptor pointer. `[C]`
 - [ ] "Scheduling under every pipeline model" → assert the `attn` pattern appears in `-dp` output for the pipeline models the GCC port supports, and state which ones were checked. `[C]`
 - [ ] "Replaces all five loop nests with one `.ATTN`" → assert the `.ATTN` count in the generated assembly for `demo/mha_plain.c` at `-O2`, before and after. `[C]`
@@ -506,3 +508,4 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 - 2026-11-24 m1.4.1 [x] versions.env + check-pins.sh asserted by setup.sh | proof: drifted tree → exit 1 naming SHA and pin; restored pointers → exit 0, 5 pins | fix: m1.3.3's `git add -A` had committed the patched submodule commits as pins | next: m1.4.2
 - 2026-11-24 m1.4.2 [x] .gitmodules: no `branch` keys, newlib → sourceware canonical | proof: no branch key (rc 1); both newlib remotes serve 06add56 (fetch --depth 1 OK); `submodule sync` keeps the pin; 6 pins tests pass | next: m1.4.3
 - 2026-11-24 m1.4.3 [x] out/BUILD-INFO written by build.sh, copied by make check | proof: `scripts/build.sh info` → 17-line record (pins + host + versions); `make check` → exit 0, 67 PASS, artifacts/BUILD-INFO 954 bytes; 9 tests pass | note: Spike has no --version, `git describe` used | next: m1.5.1
+- 2026-11-24 m1.5.1 [x] three executions agree bit for bit, with the max abs difference printed | proof: `make check-three-way` → 7 cases × {QEMU, Spike} all maxdiff=0 vs the host core; bare-metal `check` still green | corrected: seven shapes, not five | next: m1.5.2

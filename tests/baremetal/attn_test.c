@@ -58,6 +58,50 @@ filled (const uint8_t *p, size_t n, uint8_t v)
   return 1;
 }
 
+/* Largest |Y - reference| over the elements, as a float, printed as its IEEE
+   bits because there is no printf here.  A zero bit pattern is exact
+   equality, which is what the three executions are expected to show.  */
+static uint32_t
+max_abs_diff (const uint8_t *y, const uint8_t *expect, size_t bytes, int is_f32,
+	      int is_bf16)
+{
+  float worst = 0.0f;
+  size_t n = is_f32 ? bytes / 4 : bytes / 2;
+
+  for (size_t i = 0; i < n; i++)
+    {
+      float a, b;
+      if (is_f32)
+	{
+	  uint32_t ua, ub;
+	  __builtin_memcpy (&ua, y + 4 * i, 4);
+	  __builtin_memcpy (&ub, expect + 4 * i, 4);
+	  __builtin_memcpy (&a, &ua, 4);
+	  __builtin_memcpy (&b, &ub, 4);
+	}
+      else if (is_bf16)
+	{
+	  uint32_t ua = 0, ub = 0;
+	  __builtin_memcpy (&ua, y + 2 * i, 2);
+	  __builtin_memcpy (&ub, expect + 2 * i, 2);
+	  ua <<= 16;
+	  ub <<= 16;
+	  __builtin_memcpy (&a, &ua, 4);
+	  __builtin_memcpy (&b, &ub, 4);
+	}
+      else
+	return 0xffffffffu;
+      float d = a - b;
+      if (d < 0.0f)
+	d = -d;
+      if (d > worst)
+	worst = d;
+    }
+  uint32_t bits;
+  __builtin_memcpy (&bits, &worst, 4);
+  return bits;
+}
+
 int
 main (void)
 {
@@ -76,7 +120,22 @@ main (void)
 	    bad = j;
 	    break;
 	  }
-      check (bm_trap_cause == ~0ull && bad == t->bytes, t->name);
+      int ok = bm_trap_cause == ~0ull && bad == t->bytes;
+      bm_puts (ok ? "PASS " : "FAIL ");
+      bm_puts (t->name);
+      bm_puts (" maxdiff=");
+      bm_puthex (max_abs_diff (t->y, t->expect, t->bytes,
+			       t->c->out_dtype == ATTN_DT_F32,
+			       t->c->out_dtype == ATTN_DT_BF16));
+      if (!ok)
+	{
+	  bm_puts (" mcause=");
+	  bm_puthex (bm_trap_cause);
+	  bm_puts (" mtval=");
+	  bm_puthex (bm_trap_tval);
+	}
+      bm_puts ("\n");
+      failures += !ok;
     }
 
 #ifndef BM_LINUX
