@@ -1,20 +1,27 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The submodules are pinned to exact commits (see versions.env), not to a
+# branch tip, so no `branch =` key is set here: it is only consulted by
+# `git submodule update --remote`, which would move a submodule to a branch
+# head and stop patches/ from applying.  Use scripts/patches.sh instead.
+#
+# newlib: the canonical source is sourceware's newlib-cygwin, the tree the
+# Cygwin project develops in (https://sourceware.org/newlib/download.html).
+# The GitHub repository cygwin/cygwin carries the same commits; both were
+# checked to serve the pinned commit.
+#
 [submodule "binutils"]
 	path = binutils
 	url = https://github.com/gnutools/binutils-gdb.git
-	branch = binutils-2_47-branch
 [submodule "gcc"]
 	path = gcc
 	url = https://github.com/gcc-mirror/gcc.git
-	branch = releases/gcc-16
 [submodule "spike"]
 	path = spike
 	url = https://github.com/riscv-software-src/riscv-isa-sim.git
-	branch = master
 [submodule "qemu"]
 	path = qemu
 	url = https://github.com/qemu/qemu.git
-	branch = master
 [submodule "newlib"]
 	path = newlib
-	url = https://github.com/cygwin/cygwin.git
-	branch = main
+	url = https://sourceware.org/git/newlib-cygwin.git

@@ -92,3 +92,28 @@ def test_a_missing_key_is_refused(tmp_path):
     r = run_check(partial)
     assert r.returncode == 1, r.stdout
     assert "GCC_SHA" in r.stderr
+
+
+def test_gitmodules_pins_commits_not_branches():
+    """A `branch =` key only feeds `git submodule update --remote`, which would
+    move a submodule to a branch tip and stop patches/ from applying."""
+    text = (REPO / ".gitmodules").read_text(encoding="utf-8")
+    asserts = [l.strip() for l in text.splitlines() if l.strip().startswith("branch")]
+    assert asserts == [], asserts
+    urls = [
+        l.split(" = ", 1)[1].strip()
+        for l in text.splitlines()
+        if l.strip().startswith("url")
+    ]
+    assert len(urls) == len(SUBMODULES), urls
+    for url in urls:
+        assert url.startswith("https://"), url
+
+
+def test_newlib_remote_is_the_canonical_source():
+    url = subprocess.run(
+        ["git", "-C", str(REPO), "config", "-f", ".gitmodules",
+         "--get", "submodule.newlib.url"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    assert url == "https://sourceware.org/git/newlib-cygwin.git", url
