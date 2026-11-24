@@ -38,19 +38,37 @@ jobs:
         with:
           submodules: false
 
-      - name: Key the source cache on the submodule SHAs
+      # The cache keys name the exact inputs: the pinned commits and the patch
+      # series.  A bump to either starts from an empty cache.
+      - name: Key the caches on the submodule SHAs and the patches
         id: pins
         run: |
           shas=$(git ls-tree HEAD binutils gcc spike qemu newlib \
                  | awk '{print $3}' | tr '\n' ' ')
-          echo "value=$(printf '%s' "$shas" | sha256sum | cut -c1-16)" \
-            >> "$GITHUB_OUTPUT"
+          sub=$(printf '%s' "$shas" | sha256sum | cut -c1-12)
+          patches=$(cat patches/*/*.patch | sha256sum | cut -c1-12)
+          echo "submodules=$sub" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$sub-$patches" >> "$GITHUB_OUTPUT"
 
       - name: Cache the upstream git objects
         uses: actions/cache@v4
         with:
           path: .git/modules
-          key: submodules-${{ steps.pins.outputs.value }}
+          key: submodules-${{ steps.pins.outputs.submodules }}
+
+      # The expensive half of the build: binutils, gcc, newlib and the libgcc
+      # built with them.  Spike and QEMU are left out; they are the cheap half
+      # and their build trees are several GB.
+      - name: Restore the built toolchain
+        id: toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            out/toolchain
+            build/binutils
+            build/gcc
+            build/newlib
+          key: toolchain-${{ steps.pins.outputs.toolchain }}
 
       # The pinned QEMU refuses Python < 3.12 (configure: "Python >= 3.12 is
       # required"), and QEMU's meson needs bzip2 and git at configure time.
@@ -72,6 +90,26 @@ jobs:
           git config --global user.email "ci@example.invalid"
           scripts/patches.sh apply
           scripts/patches.sh status
+
+      # A restored cache is a guess about a build.  Prove it: the compiler
+      # knows Xattn, and the assembler knows attn.  Anything else and the
+      # cache goes, so the build below is a real build.
+      - name: Validate a restored toolchain
+        id: validate
+        if: steps.toolchain.outputs.cache-hit == 'true'
+        continue-on-error: true
+        run: |
+          gcc=out/toolchain/bin/riscv64-unknown-elf-gcc
+          "$gcc" --version | head -1
+          "$gcc" -march=rv64gc_xattn -E -x c /dev/null -o /dev/null
+          printf '\tattn a3, a0, a1, a2\n' \
+            | out/toolchain/bin/riscv64-unknown-elf-as -march=rv64gc_xattn -o /dev/null -
+
+      - name: Drop a cache that failed validation
+        if: steps.toolchain.outputs.cache-hit == 'true' && steps.validate.outcome == 'failure'
+        run: |
+          echo "the cached toolchain does not build Xattn: rebuilding"
+          rm -rf out/toolchain build/binutils build/gcc build/newlib
 
       - name: Build (six steps)
         run: |
