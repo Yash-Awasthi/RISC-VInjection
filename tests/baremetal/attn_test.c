@@ -173,6 +173,68 @@ main (void)
       ok &= t->y[j] == t->expect[j];
     check (bm_trap_cause == ~0ull && ok, "reexecute_after_fault");
   }
+
+  /* A dimension beyond this implementation's limit is a reserved
+     configuration: illegal instruction, Y untouched (spec section 4).  */
+  {
+    const struct attn_case *t = &cases[0];
+    struct attn_cfg c = *t->c;
+    c.n = ATTN_MAX_N + 1;
+    for (size_t j = 0; j < t->bytes; j++)
+      t->y[j] = 0x5a;
+    bm_trap_cause = ~0ull;
+    ATTN (t->y, t->x, t->w, &c);
+    check (bm_trap_cause == 2 && filled (t->y, t->bytes, 0x5a),
+	   "dims_out_of_range_trap");
+    c.n = 1;
+    c.e = ATTN_MAX_E + 1;
+    bm_trap_cause = ~0ull;
+    ATTN (t->y, t->x, t->w, &c);
+    check (bm_trap_cause == 2 && filled (t->y, t->bytes, 0x5a),
+	   "element_size_out_of_range_trap");
+  }
+
+  /* A descriptor pointer that is not mapped faults on the load, with the
+     address in mtval, before anything is written (spec section 5).  */
+  {
+    const struct attn_case *t = &cases[0];
+    const uintptr_t bad = 0x200000000ull;
+    for (size_t j = 0; j < t->bytes; j++)
+      t->y[j] = 0x5a;
+    bm_trap_cause = ~0ull;
+    ATTN (t->y, t->x, t->w, (const struct attn_cfg *) bad);
+    check ((bm_trap_cause == 5 || bm_trap_cause == 7
+	    || bm_trap_cause == 13)
+	   && bm_trap_tval == bad && filled (t->y, t->bytes, 0x5a),
+	   "descriptor_fault_is_precise");
+  }
+
+  /* A descriptor that is not naturally aligned: either the platform traps
+     (the spec allows that) with Y untouched, or it completes with the same
+     bytes as the aligned run.  A third outcome is a bug.  */
+  {
+    const struct attn_case *t = &cases[0];
+    static uint8_t unaligned[sizeof (struct attn_cfg) + 8]
+      __attribute__((aligned(8)));
+    __builtin_memcpy (unaligned + 2, t->c, sizeof (struct attn_cfg));
+    const struct attn_cfg *uc = (const struct attn_cfg *) (unaligned + 2);
+    size_t same = 1;
+
+    for (size_t j = 0; j < t->bytes; j++)
+      t->y[j] = 0x5a;
+    bm_trap_cause = ~0ull;
+    ATTN (t->y, t->x, t->w, uc);
+    if (bm_trap_cause != ~0ull)
+      check ((bm_trap_cause == 4 || bm_trap_cause == 6)
+	     && filled (t->y, t->bytes, 0x5a),
+	     "misaligned_descriptor_traps");
+    else
+      {
+	for (size_t j = 0; j < t->bytes; j++)
+	  same &= t->y[j] == t->expect[j];
+	check (same, "misaligned_descriptor_completes");
+      }
+  }
 #endif
 
   bm_puts (failures ? "attn_test: FAILED\n" : "attn_test: all passed\n");
