@@ -86,7 +86,8 @@ four projects". It has no test, so a change to it is only checked by hand on a
 **Done when:** a scratch instruction is created, applied, listed, tested and
 removed by an automated test.
 
-- [ ] `tests/test_xinsn.py`: create a SPEC (`mac`, `rs1*rs2+rs3`) in a temp dir, `show`, assert the chosen encoding and the file list. `[C]`
+- [x] `tests/test_xinsn.py`: create a SPEC (`mac`, `rs1*rs2+rs3`) in a temp dir, `show`, assert the chosen encoding and the file list. `[C]`
+  - verified-here: `python3 -m pytest -q tests/test_xinsn.py` → `3 passed in 1.43s`; pinned encoding `mac: format R4, custom-3 funct3=3 funct2=2, MATCH=0x0400307b MASK=0x0600707f`, 29 files.
 - [ ] Apply to a scratch copy of the trees, assert idempotence (second apply is a no-op), then `remove` and assert `git status --porcelain` is empty. `[C]`
 - [ ] Encoding safety: assert the allocated MATCH/MASK never collides with a standard opcode, another custom extension in the tree, or a second user instruction (uses `find_opcodes.py`). `[C]`
 - [ ] Slow job: run the generated instruction on Spike and QEMU and assert the `CHECK` lines pass. `[C]`
@@ -462,3 +463,4 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 ## 13. Journal
 
 - 2026-11-24 m1.1.1 [x] fast CI job | proof: `python3 -m pytest -q tests/` → 32 passed in 3.90s; `shellcheck -x scripts/*.sh` → exit 0; `actionlint` → no findings | next: m1.1.2
+- 2026-11-24 m1.2.1 [x] xinsn.py show/encoding/file-list test | proof: `python3 -m pytest -q tests/test_xinsn.py` → 3 passed | next: m1.2.2
