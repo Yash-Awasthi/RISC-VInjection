@@ -93,7 +93,8 @@ removed by an automated test.
 - [x] Encoding safety: assert the allocated MATCH/MASK never collides with a standard opcode, another custom extension in the tree, or a second user instruction (uses `find_opcodes.py`). `[C]`
   - verified-here: `python3 -m pytest -q tests/test_xinsn.py` → `7 passed in 142.70s`; 3006 known encodings, every example slot free; five instructions applied in turn to one scratch tree get five distinct encodings (`vsum`, `fill`, `avgu` all start at `0x0600302b` until the previous one is applied).
 - [ ] Slow job: run the generated instruction on Spike and QEMU and assert the `CHECK` lines pass. `[C]`
-- [ ] Failure paths: malformed SPEC (missing name, `writes = none` without a test, memory semantics without a test) each exit non-zero with a specific message. `[C]`
+- [x] Failure paths: malformed SPEC (missing name, `writes = none` without a test, memory semantics without a test) each exit non-zero with a specific message. `[C]`
+  - verified-here: `python3 -m pytest -q tests/test_xinsn.py` → `15 passed in 157.45s`; the 8 `test_a_bad_spec_is_refused` cases exit 1 and name the spec file: `missing 'name = ...'`, `must match [a-z][a-z0-9]{1,15}`, `missing 'semantics:' block`, `unknown key 'writse'`, `needs a 'test:' block` (twice), `inputs must be 0..3`, `writes must be 'rd' or 'none'`.
 
 ### M1.3 Licence and contribution terms are missing
 
@@ -468,3 +469,4 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 - 2026-11-24 m1.2.1 [x] xinsn.py show/encoding/file-list test | proof: `python3 -m pytest -q tests/test_xinsn.py` → 3 passed | next: m1.2.2
 - 2026-11-24 m1.2.2 [x] apply/idempotence/remove round trip on a scratch tree | proof: `python3 -m pytest -q tests/test_xinsn.py` → 5 passed; `remove mac --no-rebuild` → `git status --porcelain` empty | next: m1.2.3
 - 2026-11-24 m1.2.3 [x] encoding safety | proof: `python3 -m pytest -q tests/test_xinsn.py` → 7 passed; 5 examples applied in turn → 5 distinct encodings | next: m1.2.4
+- 2026-11-24 m1.2.5 [x] spec validation + 8 failure-path tests | proof: `python3 -m pytest -q tests/test_xinsn.py` → 15 passed in 157.45s | next: m1.2.4

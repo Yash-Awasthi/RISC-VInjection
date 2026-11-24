@@ -238,3 +238,39 @@ def test_two_instructions_never_share_a_slot(scratch):
     assert listed.returncode == 0
     for name in EXAMPLE_ORDER:
         assert re.search(r"^%s +MATCH=0x" % name, listed.stdout, re.M), name
+
+
+# ------------------------------------------------------------- failure paths
+
+BAD_SPECS = {
+    "no name": ("inputs = 2\nsemantics:\n  return rs1;\n",
+                "missing 'name = ...'"),
+    "bad name": ("name = MAC\ninputs = 2\nsemantics:\n  return rs1;\n",
+                 "must match [a-z][a-z0-9]{1,15}"),
+    "no semantics": ("name = mac\ninputs = 2\n", "missing 'semantics:' block"),
+    "unknown key": ("name = mac\nwritse = rd\nsemantics:\n  return rs1;\n",
+                    "unknown key 'writse'"),
+    "no test, writes none": ("name = fill\ninputs = 2\nwrites = none\n"
+                             "memory = yes\nsemantics:\n  return 0;\n",
+                             "needs a 'test:' block"),
+    "no test, memory": ("name = vsum\ninputs = 2\nmemory = yes\n"
+                        "semantics:\n  return LD32 (rs1);\n",
+                        "needs a 'test:' block"),
+    "inputs 4": ("name = mac\ninputs = 4\nsemantics:\n  return rs1;\n",
+                 "inputs must be 0..3"),
+    "writes typo": ("name = mac\ninputs = 2\nwrites = result\n"
+                    "semantics:\n  return rs1;\n",
+                    "writes must be 'rd' or 'none'"),
+}
+
+
+@pytest.mark.parametrize("text,want", BAD_SPECS.values(), ids=BAD_SPECS.keys())
+def test_a_bad_spec_is_refused(tmp_path, text, want):
+    """Each malformed spec exits non-zero, names the spec file and says
+    what is wrong — before anything is written to the trees."""
+    spec = tmp_path / "bad.spec"
+    spec.write_text(text)
+    r = xinsn("show", str(spec))
+    assert r.returncode == 1, r.stdout
+    assert want in r.stderr, r.stderr
+    assert str(spec) in r.stderr

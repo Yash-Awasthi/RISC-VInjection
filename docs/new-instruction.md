@@ -113,6 +113,12 @@ tested automatically against the host model on 64 vectors (27 edge
 values and 37 random ones). Memory instructions and instructions that
 write no register need a `test:` block.
 
+The spec is checked before anything is written: an unknown key (a typo
+like `writse = rd`), a missing `name`, `semantics:` or `test:` block
+where one is required, and a value outside the documented range each
+stop the run with exit code 1 and a message naming the spec file and
+the expected text.
+
 `examples/insns/` has one spec for each shape: `bitrev` (1 input),
 `avgu` (2), `mac` (3), `vsum` (memory read, result), `fill` (memory
 write, no result).
