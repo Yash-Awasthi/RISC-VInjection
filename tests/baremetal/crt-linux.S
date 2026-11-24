@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Start-up for the Linux user-mode build (qemu-riscv64).  */
 
 	.text

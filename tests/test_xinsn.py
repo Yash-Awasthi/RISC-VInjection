@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """scripts/xinsn.py: the general method, tested.
 
 The method is the second half of the product ("any instruction into four

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* attn_abi.h -- architectural interface of the RISC-V Xattn extension.
 
    One instruction computes a complete multi-head self-attention block:

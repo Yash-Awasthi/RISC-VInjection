@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "bm.h"
 
 volatile uint64_t bm_trap_cause = ~0ull, bm_trap_tval;

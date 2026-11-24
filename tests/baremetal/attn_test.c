@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Executes attn on Spike or QEMU and checks every byte of Y against the
    host-computed reference, then checks the trap behaviour.  Exit code 0 means
    every check passed.  */

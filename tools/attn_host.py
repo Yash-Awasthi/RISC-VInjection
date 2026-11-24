@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Run include/attn_core.h on the host, over an attn_model.Case image."""
 
 import ctypes

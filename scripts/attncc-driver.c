@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Driver for scripts/attncc.sh --run: calls FN (one attn) and FN_loops
    (recognizer off) on the same inputs, prints the instructions each call
    retired and the largest output difference.  */

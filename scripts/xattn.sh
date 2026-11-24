@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Remove Xattn from the toolchain and simulators, or put it back.
 #
 #   scripts/xattn.sh remove    upstream sources, rebuild: no attn anywhere

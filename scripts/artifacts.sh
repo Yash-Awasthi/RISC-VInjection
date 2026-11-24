@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Regenerate artifacts/: the demo excerpt and everything the toolchain makes
 # of it, with the attention recognizer on and off.
 #

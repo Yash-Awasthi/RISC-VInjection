@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Keep the Xattn changes to the upstream trees as patch files in patches/.
 #
 #   scripts/patches.sh apply  [component...]   check out the pinned upstream
@@ -61,25 +62,37 @@ do_export() {
   echo "$c: $n patch(es) from ${base:0:12}"
 }
 
+# A tree may report stat-only dirt: on Windows with a CRLF-filtered checkout
+# `git diff-files` says "M" for thousands of files whose blob is identical to
+# the index (qemu shows 10873 of them).  Content decides, not the stat data: if
+# `git diff` is silent, the tree is clean and a forced checkout loses nothing.
 clean_or_die() {
-  if [ -n "$(git -C "$REPO/$1" status --porcelain --untracked-files=no)" ]; then
+  if ! git -C "$REPO/$1" diff --quiet -- . ||
+     [ -n "$(git -C "$REPO/$1" ls-files --others --exclude-standard)" ]; then
     echo "error: $1 has uncommitted changes; commit or stash them first" >&2
     exit 1
   fi
+}
+
+do_checkout() {
+  local c=$1
+  shift
+  git -C "$REPO/$c" checkout -q "$@" 2>/dev/null ||
+    git -C "$REPO/$c" checkout -q -f "$@"
 }
 
 do_remove() {
   local c=$1 base
   base=$(base_of "$c")
   clean_or_die "$c"
-  git -C "$REPO/$c" checkout -q --detach "$base"
+  do_checkout "$c" --detach "$base"
   echo "$c: upstream ${base:0:12}, Xattn removed (branch $BRANCH kept)"
 }
 
 do_restore() {
   local c=$1
   clean_or_die "$c"
-  git -C "$REPO/$c" checkout -q "$BRANCH"
+  do_checkout "$c" "$BRANCH"
   echo "$c: back on branch $BRANCH"
 }
 

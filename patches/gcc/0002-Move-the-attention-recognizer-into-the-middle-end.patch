@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 14:36:13 +0530
-Subject: [PATCH 2/4] Move the attention recognizer into the middle end
+Subject: [PATCH 2/5] Move the attention recognizer into the middle end
 
 It runs at -O2 on any target with the new attn optab and emits IFN_ATTN; -mattn-recognize is gone and errno from expf no longer blocks it.
 ---
@@ -37,7 +37,7 @@ It runs at -O2 on any target with the new attn optab and emits IFN_ATTN; -mattn-
  rename gcc/{config/riscv/riscv-attn-recog.cc => tree-ssa-loop-attn.cc} (98%)
 
 diff --git a/gcc/Makefile.in b/gcc/Makefile.in
-index 8ecef4ccdc7..82b0e96a8a6 100644
+index 8ecef4ccd..82b0e96a8 100644
 --- a/gcc/Makefile.in
 +++ b/gcc/Makefile.in
 @@ -1762,6 +1762,7 @@ OBJS = \
@@ -49,7 +49,7 @@ index 8ecef4ccdc7..82b0e96a8a6 100644
  	gimple-crc-optimization.o \
  	sym-exec/sym-exec-expression.o \
 diff --git a/gcc/common.opt b/gcc/common.opt
-index 204c8ae721b..b63df8cfe5d 100644
+index 204c8ae72..b63df8cfe 100644
 --- a/gcc/common.opt
 +++ b/gcc/common.opt
 @@ -3302,6 +3302,11 @@ being used in a way forbidden by a returns_nonnull or nonnull
@@ -65,7 +65,7 @@ index 204c8ae721b..b63df8cfe5d 100644
  Common Var(flag_tree_loop_distribution) Optimization
  Enable loop distribution on trees.
 diff --git a/gcc/config.gcc b/gcc/config.gcc
-index 723703d7dd6..743421768ea 100644
+index 723703d7d..743421768 100644
 --- a/gcc/config.gcc
 +++ b/gcc/config.gcc
 @@ -569,7 +569,7 @@ pru-*-*)
@@ -78,7 +78,7 @@ index 723703d7dd6..743421768ea 100644
  	extra_objs="${extra_objs} riscv-vector-builtins.o riscv-vector-builtins-shapes.o riscv-vector-builtins-bases.o sifive-vector-builtins-bases.o andes-vector-builtins-bases.o"
  	extra_objs="${extra_objs} thead.o riscv-target-attr.o riscv-zicfilp.o riscv-bclr-lowest-set-bit.o riscv-opt-popretz.o"
 diff --git a/gcc/config/riscv/riscv-builtins.cc b/gcc/config/riscv/riscv-builtins.cc
-index 4327cb88c4f..e851ce21306 100644
+index 4327cb88c..e851ce213 100644
 --- a/gcc/config/riscv/riscv-builtins.cc
 +++ b/gcc/config/riscv/riscv-builtins.cc
 @@ -347,20 +347,6 @@ riscv_builtin_decl (unsigned int code, bool initialize_p ATTRIBUTE_UNUSED)
@@ -103,7 +103,7 @@ index 4327cb88c4f..e851ce21306 100644
     an expand operand.  Store the operand in *OP.  */
  
 diff --git a/gcc/config/riscv/riscv-passes.def b/gcc/config/riscv/riscv-passes.def
-index 24488308223..bc6b3c8b98d 100644
+index 244883082..bc6b3c8b9 100644
 --- a/gcc/config/riscv/riscv-passes.def
 +++ b/gcc/config/riscv/riscv-passes.def
 @@ -24,5 +24,4 @@ INSERT_PASS_BEFORE (pass_fast_rtl_dce, 1, pass_vsetvl);
@@ -113,7 +113,7 @@ index 24488308223..bc6b3c8b98d 100644
 -INSERT_PASS_AFTER (pass_tree_loop_init, 1, pass_riscv_attn_recog);
  
 diff --git a/gcc/config/riscv/riscv-protos.h b/gcc/config/riscv/riscv-protos.h
-index 7a2933901f7..dd029c70413 100644
+index 7a2933901..dd029c704 100644
 --- a/gcc/config/riscv/riscv-protos.h
 +++ b/gcc/config/riscv/riscv-protos.h
 @@ -195,7 +195,6 @@ extern bool riscv_gimple_fold_builtin (gimple_stmt_iterator *);
@@ -134,7 +134,7 @@ index 7a2933901f7..dd029c70413 100644
  rtl_opt_pass * make_pass_bclr_lowest_set_bit (gcc::context *ctxt);
  rtl_opt_pass * make_pass_combine_popretz (gcc::context *ctxt);
 diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
-index 1fa489c9ebb..2c26ee99691 100644
+index 1fa489c9e..2c26ee996 100644
 --- a/gcc/config/riscv/riscv.opt
 +++ b/gcc/config/riscv/riscv.opt
 @@ -423,8 +423,3 @@ Specifies whether the fence.tso instruction should be used.
@@ -147,7 +147,7 @@ index 1fa489c9ebb..2c26ee99691 100644
 -Replace multi-head self-attention written as C loops with the Xattn attn
 -instruction when the compiler can prove the two are equivalent.
 diff --git a/gcc/config/riscv/t-riscv b/gcc/config/riscv/t-riscv
-index 04fed4a2e6f..0883a67241a 100644
+index 04fed4a2e..0883a6724 100644
 --- a/gcc/config/riscv/t-riscv
 +++ b/gcc/config/riscv/t-riscv
 @@ -118,12 +118,6 @@ riscv-vector-costs.o: $(srcdir)/config/riscv/riscv-vector-costs.cc \
@@ -164,7 +164,7 @@ index 04fed4a2e6f..0883a67241a 100644
    $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) $(REGS_H) \
    $(TARGET_H) tree-pass.h df.h rtl-ssa.h cfgcleanup.h insn-attr.h \
 diff --git a/gcc/config/riscv/xattn.md b/gcc/config/riscv/xattn.md
-index a4d5a2a2f7c..1eab8ea4460 100644
+index a4d5a2a2f..1eab8ea44 100644
 --- a/gcc/config/riscv/xattn.md
 +++ b/gcc/config/riscv/xattn.md
 @@ -32,6 +32,16 @@
@@ -185,7 +185,7 @@ index a4d5a2a2f7c..1eab8ea4460 100644
  ;; reservation is tune-independent, like "ghost", so every pipeline model
  ;; can schedule it.
 diff --git a/gcc/internal-fn.cc b/gcc/internal-fn.cc
-index 662d1e75d2f..bcbc7b1151a 100644
+index 662d1e75d..bcbc7b115 100644
 --- a/gcc/internal-fn.cc
 +++ b/gcc/internal-fn.cc
 @@ -193,6 +193,7 @@ init_internal_fns ()
@@ -222,7 +222,7 @@ index 662d1e75d2f..bcbc7b1151a 100644
  #define direct_vec_extract_optab_supported_p convert_optab_supported_p
  #define direct_reduc_sbool_optab_supported_p direct_optab_supported_p
 diff --git a/gcc/internal-fn.def b/gcc/internal-fn.def
-index d142416725a..007a26da0cc 100644
+index d14241672..007a26da0 100644
 --- a/gcc/internal-fn.def
 +++ b/gcc/internal-fn.def
 @@ -82,6 +82,8 @@ along with GCC; see the file COPYING3.  If not see
@@ -247,7 +247,7 @@ index d142416725a..007a26da0cc 100644
  		       vec_shl_insert, binary)
  
 diff --git a/gcc/optabs.def b/gcc/optabs.def
-index 193f42a728a..ddec7763697 100644
+index 193f42a72..ddec77636 100644
 --- a/gcc/optabs.def
 +++ b/gcc/optabs.def
 @@ -567,6 +567,7 @@ OPTAB_DC (vec_duplicate_optab, "vec_duplicate$a", VEC_DUPLICATE)
@@ -259,7 +259,7 @@ index 193f42a728a..ddec7763697 100644
  OPTAB_D (mask_len_strided_load_optab, "mask_len_strided_load_$a")
  OPTAB_D (mask_len_strided_store_optab, "mask_len_strided_store_$a")
 diff --git a/gcc/opts.cc b/gcc/opts.cc
-index 6658b6acd37..dd83eef49f6 100644
+index 6658b6acd..dd83eef49 100644
 --- a/gcc/opts.cc
 +++ b/gcc/opts.cc
 @@ -689,6 +689,7 @@ static const struct default_options default_options_table[] =
@@ -271,7 +271,7 @@ index 6658b6acd37..dd83eef49f6 100644
      { OPT_LEVELS_2_PLUS_SPEED_ONLY, OPT_fopenmp_target_simd_clone_, NULL,
        OMP_TARGET_SIMD_CLONE_NOHOST },
 diff --git a/gcc/passes.def b/gcc/passes.def
-index cdddb87302f..735909c2734 100644
+index cdddb8730..735909c27 100644
 --- a/gcc/passes.def
 +++ b/gcc/passes.def
 @@ -293,6 +293,7 @@ along with GCC; see the file COPYING3.  If not see
@@ -283,7 +283,7 @@ index cdddb87302f..735909c2734 100644
  	  NEXT_PASS (pass_loop_split);
  	  NEXT_PASS (pass_scev_cprop);
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
-index 5029212b129..03c9200b562 100644
+index 5029212b1..03c9200b5 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
 @@ -1,6 +1,6 @@
@@ -295,7 +295,7 @@ index 5029212b129..03c9200b562 100644
  
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
-index eff8eafb39f..bebb787672c 100644
+index eff8eafb3..bebb78767 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
 @@ -1,6 +1,6 @@
@@ -309,7 +309,7 @@ index eff8eafb39f..bebb787672c 100644
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-11.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-11.c
 new file mode 100644
-index 00000000000..1b7d91f22c7
+index 000000000..1b7d91f22
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-11.c
 @@ -0,0 +1,87 @@
@@ -401,7 +401,7 @@ index 00000000000..1b7d91f22c7
 +/* { dg-final { scan-tree-dump "replaced with attn" "attn_recog" } } */
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
-index 8709a2a392a..ed6de6bc4d8 100644
+index 8709a2a39..ed6de6bc4 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
 @@ -1,6 +1,6 @@
@@ -413,7 +413,7 @@ index 8709a2a392a..ed6de6bc4d8 100644
  
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
-index 4ca5459f8d1..45034851a31 100644
+index 4ca5459f8..45034851a 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
 @@ -1,6 +1,6 @@
@@ -425,7 +425,7 @@ index 4ca5459f8d1..45034851a31 100644
  
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
-index ca6943c4a21..b02cfbfab5b 100644
+index ca6943c4a..b02cfbfab 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
 @@ -1,6 +1,6 @@
@@ -437,7 +437,7 @@ index ca6943c4a21..b02cfbfab5b 100644
  
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
-index 5b2bf2b8e90..1f4e49e332f 100644
+index 5b2bf2b8e..1f4e49e33 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
 @@ -1,6 +1,6 @@
@@ -449,7 +449,7 @@ index 5b2bf2b8e90..1f4e49e332f 100644
  
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
-index 21f70e6ab76..15795929864 100644
+index 21f70e6ab..157959298 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
 @@ -1,6 +1,6 @@
@@ -461,7 +461,7 @@ index 21f70e6ab76..15795929864 100644
  
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
-index 5b1a5930f1e..6f11fdc8b8a 100644
+index 5b1a5930f..6f11fdc8b 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
 @@ -1,6 +1,6 @@
@@ -473,7 +473,7 @@ index 5b1a5930f1e..6f11fdc8b8a 100644
  
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
-index 22040aee040..4268171050e 100644
+index 22040aee0..426817105 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
 @@ -1,6 +1,6 @@
@@ -485,7 +485,7 @@ index 22040aee040..4268171050e 100644
  
  #include <math.h>
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
-index becb65fcf9a..e900b91d5fa 100644
+index becb65fcf..e900b91d5 100644
 --- a/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
 @@ -1,6 +1,6 @@
@@ -497,7 +497,7 @@ index becb65fcf9a..e900b91d5fa 100644
  
  #include <math.h>
 diff --git a/gcc/tree-pass.h b/gcc/tree-pass.h
-index b3c97658a8f..90df9f8fbec 100644
+index b3c97658a..90df9f8fb 100644
 --- a/gcc/tree-pass.h
 +++ b/gcc/tree-pass.h
 @@ -389,6 +389,7 @@ extern gimple_opt_pass *make_pass_graphite_transforms (gcc::context *ctxt);
@@ -512,7 +512,7 @@ diff --git a/gcc/config/riscv/riscv-attn-recog.cc b/gcc/tree-ssa-loop-attn.cc
 similarity index 98%
 rename from gcc/config/riscv/riscv-attn-recog.cc
 rename to gcc/tree-ssa-loop-attn.cc
-index 4e864a17a26..9cc50600f64 100644
+index 4e864a17a..9cc50600f 100644
 --- a/gcc/config/riscv/riscv-attn-recog.cc
 +++ b/gcc/tree-ssa-loop-attn.cc
 @@ -1,5 +1,6 @@

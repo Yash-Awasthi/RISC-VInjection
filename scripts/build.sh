@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Build the Xattn toolchain and simulators from the submodules.
 #
 #   scripts/build.sh [step...]

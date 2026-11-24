@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Compile a C file or a bare code excerpt with the Xattn toolchain and show
 # what the compiler made of it.
 #

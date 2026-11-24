@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Plug a new custom RISC-V instruction into binutils, GCC, Spike and QEMU.
 
   xinsn.py new   [SPEC]    ask for the instruction (name, operands, C code,

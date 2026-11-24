@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Multi-head self-attention written as ordinary C loops.
 
    Compiled with plain -O2 (the toolchain defaults to Xattn), GCC proves

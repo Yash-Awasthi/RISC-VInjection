@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Run on a hart without Xattn: attn must raise illegal-instruction.  */
 
 #include "bm.h"

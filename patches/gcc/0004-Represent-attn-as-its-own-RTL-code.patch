@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 14:36:13 +0530
-Subject: [PATCH 4/4] Represent attn as its own RTL code
+Subject: [PATCH 4/5] Represent attn as its own RTL code
 
 It uses four registers, sets none and orders only memory; codes with more than three e operands now take the generic subrtx walk.
 ---
@@ -20,7 +20,7 @@ It uses four registers, sets none and orders only memory; codes with more than t
  create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c
 
 diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
-index 876c5df2d46..77b4aa0d8e8 100644
+index 876c5df2d..77b4aa0d8 100644
 --- a/gcc/config/riscv/riscv.md
 +++ b/gcc/config/riscv/riscv.md
 @@ -152,9 +152,6 @@
@@ -34,7 +34,7 @@ index 876c5df2d46..77b4aa0d8e8 100644
  
  (define_constants
 diff --git a/gcc/config/riscv/xattn.md b/gcc/config/riscv/xattn.md
-index 1eab8ea4460..c442697ba7f 100644
+index 1eab8ea44..c442697ba 100644
 --- a/gcc/config/riscv/xattn.md
 +++ b/gcc/config/riscv/xattn.md
 @@ -18,14 +18,14 @@
@@ -76,7 +76,7 @@ index 1eab8ea4460..c442697ba7f 100644
    "TARGET_XATTN")
  
 diff --git a/gcc/dce.cc b/gcc/dce.cc
-index 693baab6386..568f3d7657d 100644
+index 693baab63..568f3d765 100644
 --- a/gcc/dce.cc
 +++ b/gcc/dce.cc
 @@ -72,6 +72,7 @@ deletable_insn_p_1 (rtx body)
@@ -88,7 +88,7 @@ index 693baab6386..568f3d7657d 100644
        /* The UNSPEC case was added here because the ia-64 claims that
  	 USEs do not work after reload and generates UNSPECS rather
 diff --git a/gcc/rtl.def b/gcc/rtl.def
-index ad98fd59172..21b2d802466 100644
+index ad98fd591..21b2d8024 100644
 --- a/gcc/rtl.def
 +++ b/gcc/rtl.def
 @@ -282,6 +282,13 @@ DEF_RTL_EXPR(ADDR_DIFF_VEC, "addr_diff_vec", "eEee0", RTX_EXTRA)
@@ -106,7 +106,7 @@ index ad98fd59172..21b2d802466 100644
     At the top level of an instruction (perhaps under PARALLEL).
     ---------------------------------------------------------------------- */
 diff --git a/gcc/rtlanal.cc b/gcc/rtlanal.cc
-index 88561a54e5a..d794b84fcf8 100644
+index 88561a54e..d794b84fc 100644
 --- a/gcc/rtlanal.cc
 +++ b/gcc/rtlanal.cc
 @@ -1183,6 +1183,12 @@ reg_referenced_p (const_rtx x, const_rtx body)
@@ -156,7 +156,7 @@ index 88561a54e5a..d794b84fcf8 100644
    for (; format[i]; ++i)
      if (format[i] == 'E' || format[i] == 'V' || format[i] == 'e')
 diff --git a/gcc/sched-deps.cc b/gcc/sched-deps.cc
-index 1818a077bda..b0cd74c9d5f 100644
+index 1818a077b..b0cd74c9d 100644
 --- a/gcc/sched-deps.cc
 +++ b/gcc/sched-deps.cc
 @@ -2753,6 +2753,13 @@ sched_analyze_2 (class deps_desc *deps, rtx x, rtx_insn *insn)
@@ -175,7 +175,7 @@ index 1818a077bda..b0cd74c9d5f 100644
        /* FALLTHRU */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-rtl-1.c b/gcc/testsuite/gcc.target/riscv/xattn-rtl-1.c
 new file mode 100644
-index 00000000000..ee24a4606ae
+index 000000000..ee24a4606
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-rtl-1.c
 @@ -0,0 +1,14 @@
@@ -195,7 +195,7 @@ index 00000000000..ee24a4606ae
 +/* { dg-final { scan-rtl-dump-not "unspec_volatile" "expand" } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-rtl-2.c b/gcc/testsuite/gcc.target/riscv/xattn-rtl-2.c
 new file mode 100644
-index 00000000000..64ba061b082
+index 000000000..64ba061b0
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-rtl-2.c
 @@ -0,0 +1,14 @@
@@ -215,7 +215,7 @@ index 00000000000..64ba061b082
 +/* { dg-final { scan-assembler "\\tmul\\t(.|\\n)*\\tattn\\t" } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c b/gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c
 new file mode 100644
-index 00000000000..61c4af35837
+index 000000000..61c4af358
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-rtl-3.c
 @@ -0,0 +1,20 @@

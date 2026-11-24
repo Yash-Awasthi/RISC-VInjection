@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 02:57:57 +0530
-Subject: [PATCH 1/4] RISC-V: add Xattn, its builtin and the attention
+Subject: [PATCH 1/5] RISC-V: add Xattn, its builtin and the attention
  recognizer
 
 __builtin_riscv_attn emits attn; -mattn-recognize proves C multi-head attention loops equivalent and replaces them behind a runtime guard.
@@ -64,7 +64,7 @@ __builtin_riscv_attn emits attn; -mattn-recognize proves C multi-head attention 
  create mode 100644 gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
 
 diff --git a/gcc/config.gcc b/gcc/config.gcc
-index 743421768ea..723703d7dd6 100644
+index 743421768..723703d7d 100644
 --- a/gcc/config.gcc
 +++ b/gcc/config.gcc
 @@ -569,7 +569,7 @@ pru-*-*)
@@ -78,7 +78,7 @@ index 743421768ea..723703d7dd6 100644
  	extra_objs="${extra_objs} thead.o riscv-target-attr.o riscv-zicfilp.o riscv-bclr-lowest-set-bit.o riscv-opt-popretz.o"
 diff --git a/gcc/config/riscv/riscv-attn-recog.cc b/gcc/config/riscv/riscv-attn-recog.cc
 new file mode 100644
-index 00000000000..4e864a17a26
+index 000000000..4e864a17a
 --- /dev/null
 +++ b/gcc/config/riscv/riscv-attn-recog.cc
 @@ -0,0 +1,2059 @@
@@ -2142,7 +2142,7 @@ index 00000000000..4e864a17a26
 +  return new pass_riscv_attn_recog (ctxt);
 +}
 diff --git a/gcc/config/riscv/riscv-builtins.cc b/gcc/config/riscv/riscv-builtins.cc
-index 8c57fbb1aaa..4327cb88c4f 100644
+index 8c57fbb1a..4327cb88c 100644
 --- a/gcc/config/riscv/riscv-builtins.cc
 +++ b/gcc/config/riscv/riscv-builtins.cc
 @@ -95,6 +95,8 @@ struct riscv_builtin_description {
@@ -2193,7 +2193,7 @@ index 8c57fbb1aaa..4327cb88c4f 100644
  
 diff --git a/gcc/config/riscv/riscv-ext-xattn.def b/gcc/config/riscv/riscv-ext-xattn.def
 new file mode 100644
-index 00000000000..da2e29a70bf
+index 000000000..da2e29a70
 --- /dev/null
 +++ b/gcc/config/riscv/riscv-ext-xattn.def
 @@ -0,0 +1,35 @@
@@ -2233,7 +2233,7 @@ index 00000000000..da2e29a70bf
 +  /* BITMASK_BIT_POSITION*/ BITMASK_NOT_YET_ALLOCATED,
 +  /* EXTRA_EXTENSION_FLAGS */ 0)
 diff --git a/gcc/config/riscv/riscv-ext.def b/gcc/config/riscv/riscv-ext.def
-index 1621e81b011..c8c50828932 100644
+index 1621e81b0..c8c508289 100644
 --- a/gcc/config/riscv/riscv-ext.def
 +++ b/gcc/config/riscv/riscv-ext.def
 @@ -2089,3 +2089,4 @@ DEFINE_RISCV_EXT(
@@ -2242,7 +2242,7 @@ index 1621e81b011..c8c50828932 100644
  #include "riscv-ext-spacemit.def"
 +#include "riscv-ext-xattn.def"
 diff --git a/gcc/config/riscv/riscv-ext.opt b/gcc/config/riscv/riscv-ext.opt
-index 18402ea97c7..8272c6b097e 100644
+index 18402ea97..8272c6b09 100644
 --- a/gcc/config/riscv/riscv-ext.opt
 +++ b/gcc/config/riscv/riscv-ext.opt
 @@ -46,6 +46,9 @@ int riscv_sv_subext
@@ -2262,7 +2262,7 @@ index 18402ea97c7..8272c6b097e 100644
 +Mask(XATTN) Var(riscv_xattn_subext)
 +
 diff --git a/gcc/config/riscv/riscv-ftypes.def b/gcc/config/riscv/riscv-ftypes.def
-index 8dcc1e5a71e..427459fb1fe 100644
+index 8dcc1e5a7..427459fb1 100644
 --- a/gcc/config/riscv/riscv-ftypes.def
 +++ b/gcc/config/riscv/riscv-ftypes.def
 @@ -66,3 +66,4 @@ DEF_RISCV_FTYPE (3, (SI, SI, SI, UQI))
@@ -2271,7 +2271,7 @@ index 8dcc1e5a71e..427459fb1fe 100644
  DEF_RISCV_FTYPE (4, (SI, SI, SI, SI, UQI))
 +DEF_RISCV_FTYPE (4, (VOID, VOID_PTR, CVOID_PTR, CVOID_PTR, CVOID_PTR))
 diff --git a/gcc/config/riscv/riscv-passes.def b/gcc/config/riscv/riscv-passes.def
-index bc6b3c8b98d..24488308223 100644
+index bc6b3c8b9..244883082 100644
 --- a/gcc/config/riscv/riscv-passes.def
 +++ b/gcc/config/riscv/riscv-passes.def
 @@ -24,4 +24,5 @@ INSERT_PASS_BEFORE (pass_fast_rtl_dce, 1, pass_vsetvl);
@@ -2281,7 +2281,7 @@ index bc6b3c8b98d..24488308223 100644
 +INSERT_PASS_AFTER (pass_tree_loop_init, 1, pass_riscv_attn_recog);
  
 diff --git a/gcc/config/riscv/riscv-protos.h b/gcc/config/riscv/riscv-protos.h
-index dd029c70413..7a2933901f7 100644
+index dd029c704..7a2933901 100644
 --- a/gcc/config/riscv/riscv-protos.h
 +++ b/gcc/config/riscv/riscv-protos.h
 @@ -195,6 +195,7 @@ extern bool riscv_gimple_fold_builtin (gimple_stmt_iterator *);
@@ -2302,7 +2302,7 @@ index dd029c70413..7a2933901f7 100644
  rtl_opt_pass * make_pass_bclr_lowest_set_bit (gcc::context *ctxt);
  rtl_opt_pass * make_pass_combine_popretz (gcc::context *ctxt);
 diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
-index 3e1580d7241..876c5df2d46 100644
+index 3e1580d72..876c5df2d 100644
 --- a/gcc/config/riscv/riscv.md
 +++ b/gcc/config/riscv/riscv.md
 @@ -152,6 +152,9 @@
@@ -2333,7 +2333,7 @@ index 3e1580d7241..876c5df2d46 100644
  (include "generic.md")
  (include "xiangshan.md")
 diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
-index 2c26ee99691..1fa489c9ebb 100644
+index 2c26ee996..1fa489c9e 100644
 --- a/gcc/config/riscv/riscv.opt
 +++ b/gcc/config/riscv/riscv.opt
 @@ -423,3 +423,8 @@ Specifies whether the fence.tso instruction should be used.
@@ -2346,7 +2346,7 @@ index 2c26ee99691..1fa489c9ebb 100644
 +Replace multi-head self-attention written as C loops with the Xattn attn
 +instruction when the compiler can prove the two are equivalent.
 diff --git a/gcc/config/riscv/t-riscv b/gcc/config/riscv/t-riscv
-index 2761e5e20c0..04fed4a2e6f 100644
+index 2761e5e20..04fed4a2e 100644
 --- a/gcc/config/riscv/t-riscv
 +++ b/gcc/config/riscv/t-riscv
 @@ -118,6 +118,12 @@ riscv-vector-costs.o: $(srcdir)/config/riscv/riscv-vector-costs.cc \
@@ -2374,7 +2374,7 @@ index 2761e5e20c0..04fed4a2e6f 100644
  
 diff --git a/gcc/config/riscv/xattn.def b/gcc/config/riscv/xattn.def
 new file mode 100644
-index 00000000000..300582502e6
+index 000000000..300582502
 --- /dev/null
 +++ b/gcc/config/riscv/xattn.def
 @@ -0,0 +1,3 @@
@@ -2383,7 +2383,7 @@ index 00000000000..300582502e6
 +RISCV_BUILTIN (attn_di, "attn", RISCV_BUILTIN_DIRECT_NO_TARGET, RISCV_VOID_FTYPE_VOID_PTR_CVOID_PTR_CVOID_PTR_CVOID_PTR, attn64),
 diff --git a/gcc/config/riscv/xattn.md b/gcc/config/riscv/xattn.md
 new file mode 100644
-index 00000000000..a4d5a2a2f7c
+index 000000000..a4d5a2a2f
 --- /dev/null
 +++ b/gcc/config/riscv/xattn.md
 @@ -0,0 +1,40 @@
@@ -2428,7 +2428,7 @@ index 00000000000..a4d5a2a2f7c
 +  (eq_attr "type" "attn")
 +  "nothing")
 diff --git a/gcc/doc/riscv-ext.texi b/gcc/doc/riscv-ext.texi
-index 36b4dff31ff..00f969444db 100644
+index 36b4dff31..00f969444 100644
 --- a/gcc/doc/riscv-ext.texi
 +++ b/gcc/doc/riscv-ext.texi
 @@ -750,4 +750,8 @@
@@ -2442,7 +2442,7 @@ index 36b4dff31ff..00f969444db 100644
  @end multitable
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-1.c b/gcc/testsuite/gcc.target/riscv/xattn-1.c
 new file mode 100644
-index 00000000000..3afa9311902
+index 000000000..3afa93119
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-1.c
 @@ -0,0 +1,15 @@
@@ -2463,7 +2463,7 @@ index 00000000000..3afa9311902
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-2.c b/gcc/testsuite/gcc.target/riscv/xattn-2.c
 new file mode 100644
-index 00000000000..407310790cb
+index 000000000..407310790
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-2.c
 @@ -0,0 +1,15 @@
@@ -2484,7 +2484,7 @@ index 00000000000..407310790cb
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-3.c b/gcc/testsuite/gcc.target/riscv/xattn-3.c
 new file mode 100644
-index 00000000000..7229c291c95
+index 000000000..7229c291c
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-3.c
 @@ -0,0 +1,15 @@
@@ -2505,7 +2505,7 @@ index 00000000000..7229c291c95
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-4.c b/gcc/testsuite/gcc.target/riscv/xattn-4.c
 new file mode 100644
-index 00000000000..6ca282f0e64
+index 000000000..6ca282f0e
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-4.c
 @@ -0,0 +1,15 @@
@@ -2526,7 +2526,7 @@ index 00000000000..6ca282f0e64
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-5.c b/gcc/testsuite/gcc.target/riscv/xattn-5.c
 new file mode 100644
-index 00000000000..80f9a6b4db6
+index 000000000..80f9a6b4d
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-5.c
 @@ -0,0 +1,15 @@
@@ -2547,7 +2547,7 @@ index 00000000000..80f9a6b4db6
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-6.c b/gcc/testsuite/gcc.target/riscv/xattn-6.c
 new file mode 100644
-index 00000000000..694dcd4703e
+index 000000000..694dcd470
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-6.c
 @@ -0,0 +1,15 @@
@@ -2568,7 +2568,7 @@ index 00000000000..694dcd4703e
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 2 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-7.c b/gcc/testsuite/gcc.target/riscv/xattn-7.c
 new file mode 100644
-index 00000000000..8acf5ea0ddc
+index 000000000..8acf5ea0d
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-7.c
 @@ -0,0 +1,9 @@
@@ -2583,7 +2583,7 @@ index 00000000000..8acf5ea0ddc
 +}
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-8.c b/gcc/testsuite/gcc.target/riscv/xattn-8.c
 new file mode 100644
-index 00000000000..5424f6abcd2
+index 000000000..5424f6abc
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-8.c
 @@ -0,0 +1,7 @@
@@ -2596,7 +2596,7 @@ index 00000000000..5424f6abcd2
 +#endif
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
 new file mode 100644
-index 00000000000..5029212b129
+index 000000000..5029212b1
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c
 @@ -0,0 +1,87 @@
@@ -2689,7 +2689,7 @@ index 00000000000..5029212b129
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
 new file mode 100644
-index 00000000000..eff8eafb39f
+index 000000000..eff8eafb3
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c
 @@ -0,0 +1,86 @@
@@ -2781,7 +2781,7 @@ index 00000000000..eff8eafb39f
 +/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
 new file mode 100644
-index 00000000000..8709a2a392a
+index 000000000..8709a2a39
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c
 @@ -0,0 +1,88 @@
@@ -2875,7 +2875,7 @@ index 00000000000..8709a2a392a
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
 new file mode 100644
-index 00000000000..4ca5459f8d1
+index 000000000..4ca5459f8
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c
 @@ -0,0 +1,87 @@
@@ -2968,7 +2968,7 @@ index 00000000000..4ca5459f8d1
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
 new file mode 100644
-index 00000000000..ca6943c4a21
+index 000000000..ca6943c4a
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c
 @@ -0,0 +1,87 @@
@@ -3061,7 +3061,7 @@ index 00000000000..ca6943c4a21
 +/* { dg-final { scan-assembler-times "\\tattn\\t" 1 } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
 new file mode 100644
-index 00000000000..5b2bf2b8e90
+index 000000000..5b2bf2b8e
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c
 @@ -0,0 +1,87 @@
@@ -3154,7 +3154,7 @@ index 00000000000..5b2bf2b8e90
 +/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
 new file mode 100644
-index 00000000000..21f70e6ab76
+index 000000000..21f70e6ab
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c
 @@ -0,0 +1,87 @@
@@ -3247,7 +3247,7 @@ index 00000000000..21f70e6ab76
 +/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
 new file mode 100644
-index 00000000000..5b1a5930f1e
+index 000000000..5b1a5930f
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c
 @@ -0,0 +1,87 @@
@@ -3340,7 +3340,7 @@ index 00000000000..5b1a5930f1e
 +/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
 new file mode 100644
-index 00000000000..22040aee040
+index 000000000..22040aee0
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c
 @@ -0,0 +1,87 @@
@@ -3433,7 +3433,7 @@ index 00000000000..22040aee040
 +/* { dg-final { scan-assembler-not "\\tattn\\t" } } */
 diff --git a/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c b/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
 new file mode 100644
-index 00000000000..becb65fcf9a
+index 000000000..becb65fcf
 --- /dev/null
 +++ b/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c
 @@ -0,0 +1,89 @@

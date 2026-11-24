@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # One command from a fresh clone to a working Xattn toolchain:
 #
 #   scripts/setup.sh

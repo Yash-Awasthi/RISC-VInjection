@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* The causal, biased block of demo/mha_plain.c through __builtin_attn.
    Built without Xattn, so GCC calls __attn in libgcc.  */
 

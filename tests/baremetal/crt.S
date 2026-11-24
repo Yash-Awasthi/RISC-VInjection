@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Bare-metal start-up shared by the Spike and QEMU virt test images.  */
 
 	.section .text.init, "ax"
