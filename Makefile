@@ -5,6 +5,7 @@
 #   make check-info  copy out/BUILD-INFO to artifacts/BUILD-INFO alone
 #   make check-core  attn_core.h against the float64 model (host only)
 #   make check-gcc   GCC testsuite files for Xattn (compile only)
+#   make check-sched every pipeline model in this GCC port schedules attn
 #   make check-sim   bare-metal tests on QEMU and Spike
 #   make check-recog recognizer: recognized loops vs plain loops, at run time
 #   make check-xinsn-sim  a generated instruction run on QEMU and Spike (slow)
@@ -21,7 +22,7 @@ $(PY):
 	python3 -m venv .venv
 	$(PY) -m pip install -q numpy pytest
 
-check: check-info check-core check-gcc check-sim check-recog
+check: check-info check-core check-gcc check-sched check-sim check-recog
 
 # The build these results belong to.  No BUILD-INFO (nothing built yet) is not
 # an error: the tests that do not need a build still run.
@@ -41,6 +42,10 @@ check-gcc:
 	@mkdir -p $(TMPDIR)
 	python3 tests/run_dg.py gcc/gcc/testsuite/gcc.target/riscv/xattn-*.c
 
+# Reads the tuning table from riscv-cores.def and compiles with -dp per model.
+check-sched: $(PY)
+	$(PY) -m pytest -q -s tests/test_sched_models.py
+
 check-sim: $(PY)
 	$(MAKE) -C tests/baremetal CC=$(GCC) ARCH=rv64gc_xattn \
 	  OUT=$(CURDIR)/build/baremetal-gcc PYTHON=$(CURDIR)/$(PY) check
@@ -59,4 +64,4 @@ check-xinsn-sim: $(PY)
 check-three-way: $(PY)
 	XATTN_SIM=1 $(PY) -m pytest -q -s tests/test_three_way.py
 
-.PHONY: all check check-info check-core check-gcc check-sim check-recog check-xinsn-sim check-three-way
+.PHONY: all check check-info check-core check-gcc check-sched check-sim check-recog check-xinsn-sim check-three-way

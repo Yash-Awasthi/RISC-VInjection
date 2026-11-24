@@ -93,6 +93,7 @@ make check
 | `check-sim` | on QEMU and on Spike (bare metal), 14 checks each: every byte of `Y` equals the host core for 7 configurations; reserved configuration traps with `mcause 2` (bad `e % h`, `n > 4096`, `e > 2048`); a load fault and a descriptor fault trap with `mtval` = the bad address and `Y` untouched; re-execution completes; a misaligned descriptor either traps or completes with identical bytes; `attn` without Xattn traps. On QEMU Linux user mode (`qemu-riscv64`): the 7 configurations again | 2 x 15 + 7 |
 | `check-recog` | recognized `attn` vs plain loops at run time on both simulators, for three source forms; libgcc `__attn` (`__builtin_attn` without Xattn) vs the loops; guard-failing cases run the loops bit-exactly | 7 + 6 |
 | `check-three-way` | the same bare-metal image on QEMU and on Spike, compared with the host core case by case: prints the largest absolute difference and requires it to be exactly 0 for all 7 configurations | 1 |
+| `check-sched` | `attn` is scheduled under every pipeline model of this GCC port — 13 models, 26 `-mtune` names read from `gcc/gcc/config/riscv/riscv-cores.def`; for each, both `attn` lines carry the `riscv_attn_di` annotation in `-dp` output | 26 |
 
 Expected tail of the output:
 
