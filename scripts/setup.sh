@@ -7,7 +7,8 @@
 #  1. checks the build tools and, if some are missing, prints the package
 #     command for this distribution (apt, dnf, pacman, zypper, brew) and runs
 #     it after asking;
-#  2. fetches the upstream submodules (gcc, binutils, spike, qemu, newlib);
+#  2. fetches the upstream submodules (gcc, binutils, spike, qemu, newlib)
+#     and asserts they are the commits versions.env names;
 #  3. applies patches/ (skipped for a submodule already on branch xattn);
 #  4. builds binutils, GCC, newlib, libgcc, Spike and QEMU (scripts/build.sh);
 #  5. runs every test (make check);
@@ -77,6 +78,7 @@ for c in gcc binutils spike qemu newlib; do
 done
 
 step "3/6 Xattn patches"
+scripts/check-pins.sh
 for c in binutils gcc spike qemu; do
   if [ "$(git -C "$c" rev-parse --abbrev-ref HEAD)" = xattn ]; then
     echo "$c: already on branch xattn"

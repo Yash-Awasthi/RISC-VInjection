@@ -125,7 +125,10 @@ status, nobody may legally reuse this and the author has no clear grant.
 
 ### M1.4 Pin the inputs and record them
 
-- [ ] Write the five submodule SHAs into `versions.env`; `scripts/setup.sh` asserts `git submodule status` matches before building. `[C]`
+- [x] Write the five submodule SHAs into `versions.env`; `scripts/setup.sh` asserts `git submodule status` matches before building. `[C]`
+  - verified-here: `versions.env` pins the five 40-character SHAs; `scripts/check-pins.sh` compares them with `git ls-tree HEAD <submodule>` and `scripts/setup.sh` runs it as part of step 3/6, before patching and building. Fails before: `bash scripts/check-pins.sh` → exit 1 with `error: BINUTILS_SHA in …/versions.env is 781713d… but the superproject pins 7151425c…` (four such lines). Passes after: exit 0, five lines, `binutils 781713d…`, `gcc 041359f…`, `newlib 06add56…`, `qemu 615ece3…`, `spike 89c7471…`.
+  - fix: the gitlinks had drifted. `git add -A` in m1.3.3 recorded the local patched commits as the superproject's pins (`binutils 7151425`, `gcc e4f983b`, `qemu ef966e0`, `spike 777d453`), so the pointer no longer named upstream and `patches.sh` would have used a patched commit as a base. Restored from `f64abf4`: `git ls-files -s binutils gcc newlib qemu spike` now shows the upstream SHAs again. This check is what makes that visible instead of silent.
+  - tests: `tests/test_pins.py` — four cases (the file names the pins, the script agrees, a drifted SHA is refused, a missing key is refused).
 - [ ] Fix `.gitmodules`: Spike/QEMU `branch = master` invites `--remote` drift — pin the branch names to the release lines actually used, and correct the newlib remote (upstream newlib is not `cygwin/cygwin`; verify the intended source and say why). `[C]`
 - [ ] `scripts/build.sh` writes `out/BUILD-INFO` (five submodule SHAs, host gcc/clang, Python, numpy, date) and `make check` copies it into the artefacts. `[C]`
 
@@ -493,3 +496,4 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 - 2026-11-24 m1.3.2 [x] CONTRIBUTING.md (DCO, patch series, spec+vectors rule) | proof: every command named exists in `Makefile`/`scripts/` | next: m1.3.3
 - 2026-11-24 m1.3.3 [x] SPDX on the 31 owned files, LF pinned by .gitattributes, patch series re-exported | proof: `make check` → exit 0 in 115s, 67 PASS; 3/3 header copies byte-identical; `patches.sh remove && apply` clean on all four trees | fix: `patches.sh` now ignores stat-only dirt (qemu's 10873 phantom entries) | next: m1.3.4
 - 2026-11-24 m1.3.4 [x] README provenance section | proof: original vs derived table, licences matched to each tree's COPYING* | next: m1.3.5
+- 2026-11-24 m1.4.1 [x] versions.env + check-pins.sh asserted by setup.sh | proof: drifted tree → exit 1 naming SHA and pin; restored pointers → exit 0, 5 pins | fix: m1.3.3's `git add -A` had committed the patched submodule commits as pins | next: m1.4.2
