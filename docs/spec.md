@@ -9,7 +9,7 @@ float64 model (`tools/attn_model.py`).
 
 | Version | Date | Change | Compatibility |
 |---------|------|--------|---------------|
-| 1.0 | 2026-11-24 | Current encoding, version 1.0. Initial normative definition: encoding, descriptor layouts, semantics, reserved configurations, memory and exception behaviour, software interface. No semantic change accompanies this commit: encoding, MATCH/MASK, descriptors, semantics, traps all unchanged. | First version; no earlier specification exists. Until `tests/vectors/` exists, the frozen check is `tests/test_core.py` against `tools/attn_model.py`. |
+| 1.0 | 2026-11-24 | Current encoding, version 1.0. Initial normative definition: encoding, descriptor layouts, semantics, reserved configurations, memory and exception behaviour, software interface. No semantic change accompanies this commit: encoding, MATCH/MASK, descriptors, semantics, traps all unchanged. | First version; no earlier specification exists. Frozen vector set: `tests/vectors/` (14 vectors and `MANIFEST.json`), regenerated only by `tools/freeze_vectors.py`; a header-hash mismatch fails the check until `--refreeze --reason TEXT` records why the set moved. |
 
 Version 1.0 is the current encoding; this commit adds governance text only and changes no semantics.
 
@@ -188,9 +188,11 @@ Versions are never reused. MATCH (`0x0600107b`), MASK (`0x0600707f`) and the
 `attn_weights` and `attn_cfg` layouts are part of the ABI: changing any of
 them is a semantic change and cannot land without a version bump.
 
-**Re-freeze.** At version 1.0 the frozen check is `make check-core`, which
-runs `tests/test_core.py` against the independent float64 model in
-`tools/attn_model.py` (see CONTRIBUTING.md). A re-freeze is the recorded
-passing run of `make check-core` at the new version. When `tests/vectors/`
-lands, that set becomes the frozen vector set and replaces this interim
-check.
+**Re-freeze.** The frozen vector set is `tests/vectors/` (14 vectors and
+`MANIFEST.json`), produced by `tools/freeze_vectors.py --write` from the
+independent float64 model in `tools/attn_model.py` and checked against the
+host core. The manifest records the hash of `include/attn_core.h`; a change
+to that header fails the check until `tools/freeze_vectors.py --refreeze
+--reason TEXT` records why the set moved. A semantic change requires that
+re-freeze at the new version, and the recorded reason is the changelog's
+evidence.
