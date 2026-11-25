@@ -9,7 +9,7 @@ Without this patch attn is a plain unspec, so the scheduler has no register or m
 
 Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 041359f347cb, the series re-applies to the same tree and the export matches. The testsuite files are run by make check-gcc.
 
-Upstream status: not submitted.
+Upstream review list: gcc-patches@gcc.gnu.org (gcc/.b4-config send-series-to). Submitted: no.
 ---
  gcc/config/riscv/riscv.md                    |  3 ---
  gcc/config/riscv/xattn.md                    | 23 ++++++++++----------

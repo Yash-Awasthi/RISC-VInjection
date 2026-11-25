@@ -10,7 +10,7 @@ Without this patch the instruction cannot be reached from C: there is no builtin
 
 Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 041359f347cb, the series re-applies to the same tree and the export matches. The testsuite files are run by make check-gcc.
 
-Upstream status: not submitted.
+Upstream review list: gcc-patches@gcc.gnu.org (gcc/.b4-config send-series-to). Submitted: no.
 ---
  gcc/config.gcc                                |    2 +-
  gcc/config/riscv/riscv-attn-recog.cc          | 2059 +++++++++++++++++

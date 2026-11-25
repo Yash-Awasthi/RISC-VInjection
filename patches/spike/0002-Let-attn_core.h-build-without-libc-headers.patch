@@ -9,7 +9,7 @@ Without this patch attn_core.h includes math.h and cannot be compiled inside lib
 
 Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 89c7471fd811, the series re-applies to the same tree and the export matches. Both the freestanding and the hosted configuration are compiled by the spike build in scripts/build.sh.
 
-Upstream status: not submitted.
+Upstream review list: no list in tree; riscv-isa-sim takes pull requests on GitHub. Submitted: no.
 ---
  riscv/attn_core.h | 7 +++++++
  1 file changed, 7 insertions(+)

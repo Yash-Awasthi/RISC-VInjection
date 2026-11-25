@@ -9,7 +9,7 @@ Without this patch the simulator rejects --isa=..._xattn, so a bare-metal image 
 
 Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 89c7471fd811, the series re-applies to the same tree and the export matches. The extension itself is exercised by make -C tests/baremetal check on spike.
 
-Upstream status: not submitted.
+Upstream review list: no list in tree; riscv-isa-sim takes pull requests on GitHub. Submitted: no.
 ---
  riscv/attn_abi.h    |  77 ++++++++++++++
  riscv/attn_core.h   | 249 ++++++++++++++++++++++++++++++++++++++++++++

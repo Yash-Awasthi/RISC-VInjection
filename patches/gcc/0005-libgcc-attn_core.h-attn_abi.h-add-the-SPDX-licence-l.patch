@@ -8,9 +8,9 @@ Without this patch the two headers carry no licence identifier, so a downstream 
 
 Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 041359f347cb, the series re-applies to the same tree and the export matches. The line is visible in both files after apply.
 
-Upstream status: not submitted.
-
 Signed-off-by: Yash Vaibhav Awasthi <132498904+Yash-Awasthi@users.noreply.github.com>
+
+Upstream review list: gcc-patches@gcc.gnu.org (gcc/.b4-config send-series-to). Submitted: no.
 ---
  libgcc/attn_abi.h  | 1 +
  libgcc/attn_core.h | 1 +

@@ -9,7 +9,7 @@ Without this patch QEMU cannot run or disassemble code built for the extension, 
 
 Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 615ece3c406b, the series re-applies to the same tree and the export matches. The helper is exercised by make -C tests/baremetal check on qemu.
 
-Upstream status: not submitted.
+Upstream review list: qemu-devel@nongnu.org (qemu/docs/devel/submitting-a-patch.rst). Submitted: no.
 ---
  disas/meson.build                             |   3 +-
  disas/riscv-xattn.c                           |  22 ++

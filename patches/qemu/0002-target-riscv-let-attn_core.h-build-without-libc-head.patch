@@ -9,7 +9,7 @@ Without this patch attn_core.h includes math.h and cannot be compiled in a frees
 
 Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 615ece3c406b, the series re-applies to the same tree and the export matches. Both configurations are compiled by the QEMU build in scripts/build.sh.
 
-Upstream status: not submitted.
+Upstream review list: qemu-devel@nongnu.org (qemu/docs/devel/submitting-a-patch.rst). Submitted: no.
 ---
  target/riscv/attn_core.h | 7 +++++++
  1 file changed, 7 insertions(+)

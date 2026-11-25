@@ -9,7 +9,7 @@ Without this patch gas rejects attn, objdump cannot name it, and an object built
 
 Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 781713dde4c8, the series re-applies to the same tree and the export matches. The gas tests are run by make check-gas in the binutils tree.
 
-Upstream status: not submitted.
+Upstream review list: binutils@sourceware.org (binutils/MAINTAINERS). Submitted: no.
 ---
  bfd/elfxx-riscv.c                     |  5 +++++
  gas/testsuite/gas/riscv/x-attn-32.d   | 13 +++++++++++++
