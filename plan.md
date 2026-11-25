@@ -161,7 +161,8 @@ Each claim gets one command; a claim without one is deleted.
 
 ### M1.6 Patch-series hygiene
 
-- [ ] `scripts/patches.sh check`: every patch applies with `git apply --check` against the pinned SHA and re-applies idempotently. `[C]`
+- [x] `scripts/patches.sh check`: every patch applies with `git apply --check` against the pinned SHA and re-applies idempotently. `[C]`
+  - verified-here: `scripts/patches.sh check` → `binutils: 1 patch(es) apply to 781713dde4c8, re-apply the same tree, export matches`, and the same line for gcc (5, `041359f347cb`), spike (3, `89c7471fd811`), qemu (3, `615ece3c406b`), exit 0. Each component is replayed in a scratch worktree at the pinned commit: every patch `git apply --check`ed and applied in order, the series replayed twice with `git am` with the two trees compared, and the branch re-export diffed against `patches/<c>/`.
 - [ ] Patches carry `git format-patch` headers (author, date, subject, body with rationale and upstream status). `[C]`
 - [ ] Record in each patch header which upstream review list it targets and whether it was submitted. `[C]`
 - [ ] `scripts/xattn.sh remove` asserts a clean tree afterwards; add the negative test (remove twice fails cleanly). `[C]`
