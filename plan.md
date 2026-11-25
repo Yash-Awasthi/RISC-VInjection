@@ -312,7 +312,8 @@ file, and `artifacts/` is hand-collected.
   - verified-here: `.venv/bin/python -m pytest -q tests/test_tolerances.py tests/test_core.py tests/test_vectors.py` -> `62 passed`; frozen-vector max abs error 1.43e-06 with ATOL_F32=1e-4 and ATOL_BF16=2^-7 now defined once in tools/tolerances.py
 - [x] Accumulation-order analysis: prove the spike, QEMU and host paths sum in the same order, or make the order explicit in `attn_core.h` and assert it. `[D]`
   - verified-here: `.venv/bin/python -m pytest -q tests/test_accumulation_order.py` -> `14 passed`; the host path is bit-exact against the ascending-k order the header states, a reordered sum is detected, and include/attn_core.h is unchanged
-- [ ] Boundary shapes: n=1, e=1, heads=1, head_dim=1, n>cache, empty mask, maximum dims from the descriptor fields. `[D]`
+- [x] Boundary shapes: n=1, e=1, heads=1, head_dim=1, n>cache, empty mask, maximum dims from the descriptor fields. `[D]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_boundaries.py` -> `12 passed`; the maxima are read from include/attn_abi.h and one-past shapes are refused; the ABI has no cache field, so n>cache is vacuous
 - [ ] Cross-compiler stability: the same vectors under GCC and Clang at `-O0/-O2/-O3 -ffp-contract=off` must match. `[D]`
 
 ### M5.2 Performance depth
