@@ -358,7 +358,8 @@ that a machine can read, failures that name the fix.
 **Done when:** the runbook exists and the cost is written down.
 
 - **m6.3.1 Runbook and security**
-  - [ ] `docs/RUNBOOK.md`: build fails at each step, patch conflict, submodule drift, simulator aborts, vector mismatch — each with the first diagnostic command. `[E]`
+  - [x] `docs/RUNBOOK.md`: build fails at each step, patch conflict, submodule drift, simulator aborts, vector mismatch — each with the first diagnostic command. `[E]`
+  - verified-here: scripts/check-pins.sh -> five pins match versions.env, rc 0; scripts/patches.sh status -> binutils gcc spike qemu on xattn; make check-core -> 32 passed in 1.67s; git -C gcc status --porcelain -> empty; every command located in scripts/build.sh, scripts/patches.sh, scripts/check-pins.sh, Makefile, spike/spike_main/spike.cc, qemu/qemu-options.hx, qemu/util/log.c
   - [ ] `SECURITY.md`: how to report a simulator bug (a mis-executed instruction is a security issue in an emulator) and the response window. `[E]`
 - **m6.3.2 Support matrix**
   - [ ] Host OS, GCC/Clang, Python, disk and time budget for a full build; CI enforces what it can. `[E]`
