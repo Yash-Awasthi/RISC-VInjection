@@ -363,7 +363,8 @@ that a machine can read, failures that name the fix.
 - **m6.3.1 Runbook and security**
   - [x] `docs/RUNBOOK.md`: build fails at each step, patch conflict, submodule drift, simulator aborts, vector mismatch — each with the first diagnostic command. `[E]`
   - verified-here: scripts/check-pins.sh -> five pins match versions.env, rc 0; scripts/patches.sh status -> binutils gcc spike qemu on xattn; make check-core -> 32 passed in 1.67s; git -C gcc status --porcelain -> empty; every command located in scripts/build.sh, scripts/patches.sh, scripts/check-pins.sh, Makefile, spike/spike_main/spike.cc, qemu/qemu-options.hx, qemu/util/log.c
-  - [ ] `SECURITY.md`: how to report a simulator bug (a mis-executed instruction is a security issue in an emulator) and the response window. `[E]`
+  - [x] `SECURITY.md`: how to report a simulator bug (a mis-executed instruction is a security issue in an emulator) and the response window. `[E]`
+  - verified-here: SECURITY.md 60 lines, sections Reporting, What to send, Response window, Scope and upstream, Supported versions; GitHub private vulnerability reporting only, no email; 5/10/30 business-day windows, 90-day disclosure; git ls-tree HEAD spike gcc qemu binutils newlib -> 89c7471, 041359f, 615ece3, 781713d, 06add56; git -C spike rev-parse HEAD -> 79f1804
 - **m6.3.2 Support matrix**
   - [ ] Host OS, GCC/Clang, Python, disk and time budget for a full build; CI enforces what it can. `[E]`
 - **m6.3.3 Honest cost**
