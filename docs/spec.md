@@ -5,6 +5,14 @@ form of the same definition is `include/attn_core.h`. Spike, QEMU and the
 host tests all run that file, and the tests compare it with an independent
 float64 model (`tools/attn_model.py`).
 
+## Changelog
+
+| Version | Date | Change | Compatibility |
+|---------|------|--------|---------------|
+| 1.0 | 2026-11-24 | Current encoding, version 1.0. Initial normative definition: encoding, descriptor layouts, semantics, reserved configurations, memory and exception behaviour, software interface. No semantic change accompanies this commit: encoding, MATCH/MASK, descriptors, semantics, traps all unchanged. | First version; no earlier specification exists. Until `tests/vectors/` exists, the frozen check is `tests/test_core.py` against `tools/attn_model.py`. |
+
+Version 1.0 is the current encoding; this commit adds governance text only and changes no semantics.
+
 ## 1. Encoding
 
 ```
@@ -156,3 +164,33 @@ checks whichever of the two outcomes the platform takes.
 - At `-O2`, GCC replaces C code that computes this definition with the
   instruction, with no flags or headers (see `docs/recognizer.md`).
 - Spike: `--isa=rv64gc_xattn`. QEMU: `-cpu rv64,xattn=on`.
+
+## 7. Versioning
+
+This document is normative. Its version is the one in the title and the one
+reported by `__riscv_xattn` (value 1000000 for version 1.0); they change
+together.
+
+A **semantic change** is any change to observable behaviour, including a
+trap: the encoding, MATCH/MASK, the descriptor layouts, section 3 semantics,
+section 4 reserved configurations, section 5 memory and exception behaviour,
+or any other normative statement. It requires all of the following:
+
+- a new spec version in the title and a new row in the changelog;
+- a re-frozen vector set at the new version;
+- a compatibility note in the commit message, stating what existing software
+  observes differently.
+
+A **cosmetic change** (comments, formatting, a bit-identical rewrite)
+requires no version bump, but the frozen check must still pass.
+
+Versions are never reused. MATCH (`0x0600107b`), MASK (`0x0600707f`) and the
+`attn_weights` and `attn_cfg` layouts are part of the ABI: changing any of
+them is a semantic change and cannot land without a version bump.
+
+**Re-freeze.** At version 1.0 the frozen check is `make check-core`, which
+runs `tests/test_core.py` against the independent float64 model in
+`tools/attn_model.py` (see CONTRIBUTING.md). A re-freeze is the recorded
+passing run of `make check-core` at the new version. When `tests/vectors/`
+lands, that set becomes the frozen vector set and replaces this interim
+check.

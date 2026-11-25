@@ -337,7 +337,8 @@ that a machine can read, failures that name the fix.
 **Done when:** a semantic change cannot land without a version bump and a re-frozen vector set.
 
 - **m6.1.1 Versioning**
-  - [ ] `docs/spec.md` versioned with a changelog; a semantic change requires a new version, a vector re-freeze and a compatibility note. `[E]`
+  - [x] `docs/spec.md` versioned with a changelog; a semantic change requires a new version, a vector re-freeze and a compatibility note. `[E]`
+  - verified-here: docs/spec.md version 1.0, changelog added, no semantic change; make check-core -> 32 passed in 3.49s.
 - **m6.1.2 Releases**
   - [ ] Tags per spec version, a source archive, the matching `BUILD-INFO`, and the vector set as the release's evidence. `[E]`
 
