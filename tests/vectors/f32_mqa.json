@@ -87,6 +87,9 @@
       32
     ]
   },
-  "format": 1,
+  "features": [
+    "gqa"
+  ],
+  "format": 2,
   "name": "f32_mqa"
 }

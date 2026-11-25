@@ -59,6 +59,7 @@
       12
     ]
   },
-  "format": 1,
+  "features": [],
+  "format": 2,
   "name": "f32_nobias"
 }

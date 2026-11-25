@@ -87,6 +87,9 @@
       64
     ]
   },
-  "format": 1,
+  "features": [
+    "causal"
+  ],
+  "format": 2,
   "name": "f32_gpt2_head"
 }

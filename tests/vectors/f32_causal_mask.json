@@ -95,6 +95,10 @@
       16
     ]
   },
-  "format": 1,
+  "features": [
+    "causal",
+    "mask"
+  ],
+  "format": 2,
   "name": "f32_causal_mask"
 }

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Frozen vectors in tests/vectors/ against the host core in include/."""
 
+import json
 import struct
 import subprocess
 import sys
@@ -33,8 +34,10 @@ def all_vectors():
 def test_vector_matches_frozen_hash(lib, fname):
     v = vectors.load_vector(vectors.VECTORS / fname)
     assert v.name + ".json" == fname
-    assert set(v.document) == {"format", "name", "cfg", "arrays", "expected"}
-    assert v.document["format"] == vectors.FORMAT
+    assert set(v.document) == {"format", "name", "cfg", "arrays", "expected",
+                               "features"}
+    assert v.format == vectors.FORMAT == 2
+    assert v.features == vectors.derive_features(v)
 
     # Arrays come from the file bytes, not from re-running a seed generator.
     for key, entry in v.arrays.items():
@@ -69,8 +72,40 @@ def test_vector_matches_frozen_hash(lib, fname):
 def test_feature_coverage(all_vectors):
     seen = set()
     for v in all_vectors:
-        seen.update(vectors.derive_features(v))
+        seen.update(v.features)
     assert {"causal", "mask", "gqa", "scale"} <= seen
+
+
+def test_v2_features_are_derived(all_vectors):
+    for v in all_vectors:
+        assert v.features == vectors.derive_features(v), v.name
+        for tag in v.features:
+            assert tag in vectors.FEATURE_TAGS, (v.name, tag)
+        assert set(v.features) <= set(vectors.FEATURE_TAGS), v.name
+
+
+def test_v1_fixture_loads(lib):
+    path = vectors.VECTORS / "v1" / "f32_causal.json"
+    a = vectors.load_vector(path)
+    assert a.document["format"] == 1
+    assert a.features == ["causal"] == vectors.derive_features(a)
+    rc, mem = attn_host.run(lib, a.build_image())
+    assert rc == 0
+    out_dt = a.cfg["out_dtype"]
+    assert vectors.canonical_sha256(a.read_y(mem), out_dt) == \
+        a.expected["sha256"]
+    b = vectors.load_vector(vectors.VECTORS / "f32_causal.json")
+    assert a.expected["sha256"] == b.expected["sha256"]
+
+
+def test_unknown_format_rejected(tmp_path):
+    doc = json.loads((vectors.VECTORS / "f32_causal.json")
+                     .read_text(encoding="utf-8"))
+    doc["format"] = 99
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    with pytest.raises(ValueError, match="99"):
+        vectors.load_vector(path)
 
 
 def test_dtype_combos(all_vectors):
@@ -79,7 +114,8 @@ def test_dtype_combos(all_vectors):
 
 
 def test_manifest():
-    assert MANIFEST["format"] == 1
+    assert MANIFEST["format"] == vectors.FORMAT
+    assert MANIFEST["format"] == 2
     assert MANIFEST["header_sha256"] == vectors.header_sha256()
     assert VECTOR_FILES == sorted(VECTOR_FILES)
     assert len(set(VECTOR_FILES)) == len(VECTOR_FILES)

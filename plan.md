@@ -206,7 +206,8 @@ read or write out of bounds.
   - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `17 passed in 1.30s`
 - [x] Any change to `attn_core.h` that moves a hash fails the test and requires an explicit re-freeze commit with the reason. `[P]`
   - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `20 passed in 4.23s`
-- [ ] Version the vector file format so an old vector stays readable. `[P]`
+- [x] Version the vector file format so an old vector stays readable. `[P]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `23 passed in 3.23s`
 
 ### M2.4 Python and script hygiene
 

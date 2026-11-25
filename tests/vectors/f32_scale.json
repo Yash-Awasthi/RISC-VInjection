@@ -87,6 +87,9 @@
       8
     ]
   },
-  "format": 1,
+  "features": [
+    "scale"
+  ],
+  "format": 2,
   "name": "f32_scale"
 }

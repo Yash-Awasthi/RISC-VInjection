@@ -67,7 +67,9 @@ def document_for(name, case):
     expected = {"dtype": "<u2" if case.out_dt == am.DT_BF16 else "<f4",
                 "shape": [case.n, case.e], "sha256": PLACEHOLDER}
     return {"format": vectors.FORMAT, "name": name, "cfg": cfg,
-            "arrays": arrays, "expected": expected}
+            "arrays": arrays,
+            "features": vectors.derive_features((cfg, arrays)),
+            "expected": expected}
 
 
 def freeze():

@@ -87,6 +87,9 @@
       16
     ]
   },
-  "format": 1,
+  "features": [
+    "causal"
+  ],
+  "format": 2,
   "name": "f32_causal"
 }

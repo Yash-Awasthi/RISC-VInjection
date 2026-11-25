@@ -87,6 +87,10 @@
       32
     ]
   },
-  "format": 1,
+  "features": [
+    "gqa",
+    "scale"
+  ],
+  "format": 2,
   "name": "f32_gqa_scale"
 }

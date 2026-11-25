@@ -87,6 +87,7 @@
       32
     ]
   },
-  "format": 1,
+  "features": [],
+  "format": 2,
   "name": "bf16_f32"
 }

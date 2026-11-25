@@ -95,6 +95,9 @@
       16
     ]
   },
-  "format": 1,
+  "features": [
+    "mask"
+  ],
+  "format": 2,
   "name": "f32_mask"
 }

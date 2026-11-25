@@ -5,6 +5,10 @@
 A vector file holds the exact input bytes as base64 plus the SHA-256 of the
 output the host core produced when the vector was frozen, so a test can detect
 any drift in attn_core.h without recomputing an oracle from a seed.
+
+Format 2 stores the active feature tags in "features". Format 1 is legacy: it
+has no "features" key and the tags are derived from cfg and the array keys at
+load time, so an old vector stays readable.
 """
 
 import base64
@@ -21,7 +25,8 @@ if str(REPO / "tools") not in sys.path:
     sys.path.insert(0, str(REPO / "tools"))
 import attn_model as am  # noqa: E402
 
-FORMAT = 1
+FORMAT = 2
+FEATURE_TAGS = ("causal", "gqa", "mask", "scale")
 VECTORS = REPO / "tests" / "vectors"
 MAIN_ARRAYS = ("x", "wq", "wk", "wv", "wo")
 BIAS_ARRAYS = ("bq", "bk", "bv", "bo")
@@ -128,11 +133,36 @@ class Vector:
         self.path = Path(path)
         self.document = json.loads(self.path.read_text(encoding="utf-8"))
         doc = self.document
+        fmt = doc.get("format")
+        if fmt not in (1, 2):
+            raise ValueError("unsupported vector format %s in %s"
+                             % (fmt, self.path.name))
+        self.format = fmt
         self.name, self.cfg = doc["name"], doc["cfg"]
         self.arrays, self.expected = doc["arrays"], doc["expected"]
         self.data = {k: decode_array(e) for k, e in self.arrays.items()}
         self.raw = {k: base64.b64decode(e["data"]) for k, e in self.arrays.items()}
+        if fmt == 1:
+            self.features = derive_features((self.cfg, self.arrays))
+        else:
+            self.features = self._read_features(doc)
         self._image = None
+
+    def _read_features(self, doc):
+        feats = doc.get("features")
+        if not isinstance(feats, list) or \
+                not all(isinstance(f, str) for f in feats):
+            raise ValueError("%s: features must be a list of strings"
+                             % self.path.name)
+        bad = [f for f in feats if f not in FEATURE_TAGS]
+        if bad:
+            raise ValueError("%s: unknown feature tag(s) %s; allowed %s"
+                             % (self.path.name, bad, list(FEATURE_TAGS)))
+        want = derive_features((self.cfg, self.arrays))
+        if sorted(feats) != want:
+            raise ValueError("%s: features %s do not match derived %s"
+                             % (self.path.name, sorted(feats), want))
+        return list(feats)
 
     def build_image(self, base=0x1000):
         cfg = self.cfg

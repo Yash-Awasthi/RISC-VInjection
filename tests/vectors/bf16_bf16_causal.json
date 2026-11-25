@@ -87,6 +87,9 @@
       32
     ]
   },
-  "format": 1,
+  "features": [
+    "causal"
+  ],
+  "format": 2,
   "name": "bf16_bf16_causal"
 }
