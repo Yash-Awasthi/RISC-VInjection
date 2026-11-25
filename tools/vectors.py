@@ -32,6 +32,24 @@ def header_sha256(path=None):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+class HeaderMismatch(Exception):
+    """include/attn_core.h no longer matches the hash recorded in the manifest."""
+
+
+def verify_header(manifest=None, header_path=None):
+    """Return the current header hash; raise if the manifest records another."""
+    if manifest is None:
+        manifest = read_manifest()
+    recorded = manifest.get("header_sha256")
+    current = header_sha256(header_path)
+    if recorded != current:
+        raise HeaderMismatch(
+            "header_sha256 mismatch: manifest %s, current %s; re-record with "
+            'tools/freeze_vectors.py --refreeze --reason "<text>"'
+            % (recorded, current))
+    return current
+
+
 def read_manifest(repo_root=REPO):
     p = Path(repo_root) / "tests" / "vectors" / "MANIFEST.json"
     return json.loads(p.read_text(encoding="utf-8"))

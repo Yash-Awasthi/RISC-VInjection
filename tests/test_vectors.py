@@ -2,6 +2,7 @@
 """Frozen vectors in tests/vectors/ against the host core in include/."""
 
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -84,3 +85,26 @@ def test_manifest():
     assert len(set(VECTOR_FILES)) == len(VECTOR_FILES)
     for fname in VECTOR_FILES:
         assert (vectors.VECTORS / fname).is_file()
+
+
+def test_verify_header_matches():
+    assert vectors.verify_header() == MANIFEST["header_sha256"]
+    assert MANIFEST["header_sha256"] == vectors.header_sha256()
+
+
+def test_header_mismatch_names_refreeze(tmp_path):
+    copy = tmp_path / "attn_core.h"
+    copy.write_bytes((REPO / "include" / "attn_core.h").read_bytes()
+                     + b"\n/* drift */\n")
+    with pytest.raises(vectors.HeaderMismatch,
+                       match="freeze_vectors.py --refreeze"):
+        vectors.verify_header(header_path=copy)
+
+
+def test_refreeze_requires_reason():
+    for tail in (["--refreeze"], ["--refreeze", "--reason", "   "]):
+        result = subprocess.run(
+            [sys.executable, str(REPO / "tools" / "freeze_vectors.py"),
+             *tail], capture_output=True, text=True)
+        assert result.returncode != 0, tail
+        assert result.stderr.strip() != "", tail

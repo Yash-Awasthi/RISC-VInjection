@@ -8,6 +8,7 @@ Without --write it checks the manifest, the header hash and every vector.
 """
 
 import argparse
+import datetime
 import hashlib
 import json
 import sys
@@ -91,8 +92,50 @@ def freeze():
     write_json(vectors.VECTORS / "MANIFEST.json",
                {"format": vectors.FORMAT,
                 "header_sha256": vectors.header_sha256(),
+                "refreeze": prior_refreeze(),
                 "vectors": sorted(names)})
     print("wrote MANIFEST.json (%d vectors)" % len(names))
+    return 0
+
+
+def prior_refreeze():
+    """Existing refreeze records, so a regeneration never drops history."""
+    try:
+        records = vectors.read_manifest().get("refreeze", [])
+    except (OSError, ValueError):
+        return []
+    return records if isinstance(records, list) else []
+
+
+def refreeze(reason):
+    if reason is None or not reason.strip():
+        print("error: --refreeze needs a non-empty --reason TEXT",
+              file=sys.stderr)
+        return 2
+    reason = reason.strip()
+    manifest = vectors.read_manifest()
+    old = manifest.get("header_sha256")
+    new = vectors.header_sha256()
+    lib = attn_host.build(tempfile.mkdtemp())
+    for fname in sorted(manifest.get("vectors") or []):
+        path = vectors.VECTORS / fname
+        v = vectors.load_vector(path)
+        rc, mem = attn_host.run(lib, v.build_image())
+        if rc != 0:
+            print("FAIL %s: host rc=%d" % (fname, rc), file=sys.stderr)
+            return 1
+        doc = v.document
+        doc["expected"]["sha256"] = vectors.canonical_sha256(
+            v.read_y(mem), v.cfg["out_dtype"])
+        write_json(path, doc)
+        print("refroze %s" % fname)
+    manifest["header_sha256"] = new
+    manifest.setdefault("refreeze", []).append(
+        {"date": datetime.date.today().isoformat(), "old_sha256": old,
+         "new_sha256": new, "reason": reason})
+    write_json(vectors.VECTORS / "MANIFEST.json", manifest)
+    n = len(manifest.get("vectors") or [])
+    print("wrote MANIFEST.json (%d vectors)" % n)
     return 0
 
 
@@ -106,9 +149,11 @@ def verify():
     if manifest.get("format") != vectors.FORMAT:
         print("FAIL manifest format %r" % manifest.get("format"))
         problems.append("manifest")
-    if manifest.get("header_sha256") != vectors.header_sha256():
-        print("FAIL manifest header_sha256 differs from include/attn_core.h")
-        problems.append("manifest")
+    try:
+        vectors.verify_header(manifest)
+    except vectors.HeaderMismatch as exc:
+        print("FAIL %s" % exc)
+        problems.append("header")
     lib = attn_host.build(tempfile.mkdtemp())
     listed = set(manifest.get("vectors") or [])
     present = {p.name for p in vectors.VECTORS.glob("*.json")} - {"MANIFEST.json"}
@@ -132,7 +177,13 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--write", action="store_true",
                     help="regenerate the vectors and the manifest")
+    ap.add_argument("--refreeze", action="store_true",
+                    help="re-record the header hash and vector outputs")
+    ap.add_argument("--reason", default=None, metavar="TEXT",
+                    help="why the vectors are being refrozen")
     args = ap.parse_args(argv)
+    if args.refreeze:
+        return refreeze(args.reason)
     return freeze() if args.write else verify()
 
 

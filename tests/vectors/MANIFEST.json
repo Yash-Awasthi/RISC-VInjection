@@ -1,6 +1,7 @@
 {
   "format": 1,
   "header_sha256": "1ade1605d7b303f3648caf897f040190b6a0f1f00015ce0eba9918898686fe2a",
+  "refreeze": [],
   "vectors": [
     "bf16_bf16.json",
     "bf16_bf16_causal.json",
