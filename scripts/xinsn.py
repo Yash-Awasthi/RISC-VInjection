@@ -4,7 +4,11 @@
 
   xinsn.py new   [SPEC]    ask for the instruction (name, operands, C code,
                            test), write SPEC, then do "all"
-  xinsn.py show  SPEC      encoding and the files that would change
+  xinsn.py show  SPEC      encoding and, for each file it would change, a
+                           unified diff; nothing is written.  --json prints
+                           the encoding and the diffs as one document;
+                           --color=auto|always|never colours the diff
+                           (auto, the default, only on a terminal)
   xinsn.py verify SPEC     check a spec: its encoding, a free slot, a new
                            extension, the files it would change; no writes
   xinsn.py apply SPEC      edit the four source trees (idempotent)
@@ -48,9 +52,14 @@ host model on 64 input vectors.
 
 In C the instruction is __builtin_riscv_<name>(...) with -march=..._x<name>,
 taking the registers in operand order and returning rd's value.
+
+Exit codes: 0 on success, 2 when the spec cannot be used, 3 when a build
+step failed, 1 for anything else (a failing test, verify finding a taken
+slot, an unknown instruction to remove).
 """
 
 import argparse
+import difflib
 import json
 import random
 import re
@@ -62,6 +71,20 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 import find_opcodes  # noqa: E402
+
+# main() turns these into the exit status, so a caller can tell a bad spec
+# from a failed build without reading the message.
+EXIT_SPEC = 2
+EXIT_BUILD = 3
+
+
+class SpecError(Exception):
+    """The spec cannot be used: exit 2."""
+
+
+class BuildError(Exception):
+    """A build step failed: exit 3."""
+
 
 FORMAT_FIELDS = {"R0": ("funct3", "funct7"), "R1": ("funct3", "funct7"),
                  "R": ("funct3", "funct7"), "R4": ("funct3", "funct2")}
@@ -137,7 +160,7 @@ class Spec:
         text = Path(path).read_text()
         head, sep, body = text.partition("\nsemantics:")
         if not sep:
-            sys.exit("%s: missing 'semantics:' block" % path)
+            raise SpecError("%s: missing 'semantics:' block" % path)
         kv = {}
         for line in head.splitlines():
             line = line.split("#", 1)[0].strip()
@@ -146,23 +169,23 @@ class Spec:
                 kv[k.strip()] = v.strip()
         for k in kv:
             if k not in self.KEYS:
-                sys.exit("%s: unknown key '%s' (the keys are %s)"
+                raise SpecError("%s: unknown key '%s' (the keys are %s)"
                          % (path, k, ", ".join(self.KEYS)))
         self.name = kv.get("name", "")
         if not self.name:
-            sys.exit("%s: missing 'name = ...'" % path)
+            raise SpecError("%s: missing 'name = ...'" % path)
         if not re.fullmatch(r"[a-z][a-z0-9]{1,15}", self.name):
-            sys.exit("%s: name '%s' must match [a-z][a-z0-9]{1,15}"
+            raise SpecError("%s: name '%s' must match [a-z][a-z0-9]{1,15}"
                      % (path, self.name))
         if kv.get("inputs", "2") not in ("0", "1", "2", "3"):
-            sys.exit("%s: inputs must be 0..3, not '%s'"
+            raise SpecError("%s: inputs must be 0..3, not '%s'"
                      % (path, kv.get("inputs")))
         self.inputs = int(kv.get("inputs", "2"))
         if kv.get("writes", "rd") not in ("rd", "none"):
-            sys.exit("%s: writes must be 'rd' or 'none', not '%s'"
+            raise SpecError("%s: writes must be 'rd' or 'none', not '%s'"
                      % (path, kv.get("writes")))
         if kv.get("memory", "no") not in ("yes", "no"):
-            sys.exit("%s: memory must be 'yes' or 'no', not '%s'"
+            raise SpecError("%s: memory must be 'yes' or 'no', not '%s'"
                      % (path, kv.get("memory")))
         self.writes_rd = kv.get("writes", "rd") == "rd"
         self.memory = kv.get("memory", "no") == "yes"
@@ -172,13 +195,14 @@ class Spec:
         self.test = test.strip("\n")
         if need_test and not self.test:
             if self.memory:
-                sys.exit("%s: 'memory = yes' needs a 'test:' block: a "
-                         "model alone cannot check what the instruction "
-                         "loads or stores" % path)
+                raise SpecError("%s: 'memory = yes' needs a 'test:' block: a "
+                                "model alone cannot check what the "
+                                "instruction loads or stores" % path)
             if not self.writes_rd:
-                sys.exit("%s: 'writes = none' needs a 'test:' block: the "
-                         "result is in memory, so there is nothing to "
-                         "compare against the model" % path)
+                raise SpecError(
+                    "%s: 'writes = none' needs a 'test:' block: the result "
+                    "is in memory, so there is nothing to compare against "
+                    "the model" % path)
         self.ext = "x" + self.name
         self.EXT = self.ext.upper()
         self.N = self.name.upper()
@@ -206,7 +230,8 @@ class Spec:
                 return s["match"], s["mask"], "%s funct3=%d %s=%d" % (
                     s["major"], s["funct3"], FORMAT_FIELDS[self.format][1],
                     s.get("funct2", s.get("funct7")))
-        sys.exit("no %s slot is free of every known encoding" % self.format)
+        raise SpecError(
+            "no %s slot is free of every known encoding" % self.format)
 
     def word(self, match, regs):
         shifts = {"rd": 7, "rs1": 15, "rs2": 20, "rs3": 27}
@@ -220,24 +245,48 @@ class Spec:
 
 class Editor:
     """Applies edits, or with remove=True takes the same edits out again:
-    inserted text is cut, written files are deleted."""
+    inserted text is cut, written files are deleted.  A dry edit keeps the
+    result in memory instead of writing it, so the preview diff is the whole
+    change to a file, not each insert on its own."""
 
     def __init__(self, dry, remove=False):
         self.dry = dry
         self.remove = remove
         self.touched = []
+        self.original = {}      # path -> text before any edit
+        self.current = {}       # path -> text after the edits so far
+
+    def read(self, path):
+        if path not in self.current:
+            p = REPO / path
+            self.original[path] = p.read_text() if p.exists() else ""
+            self.current[path] = self.original[path]
+        return self.current[path] or ""
+
+    def commit(self, path, text):
+        """Record TEXT as the file's new content and write it unless dry;
+        TEXT None deletes the file."""
+        self.read(path)
+        self.touched.append(path)
+        self.current[path] = text
+        if self.dry:
+            return
+        p = REPO / path
+        if text is None:
+            if p.exists():
+                p.unlink()
+        else:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text)
 
     def insert(self, path, anchor, text, after=True, present=None):
         """Insert TEXT after (or before) the first line containing ANCHOR,
         unless PRESENT (default: TEXT) is already in the file."""
-        p = REPO / path
-        s = p.read_text()
+        s = self.read(path)
         if self.remove:
             # A PRESENT check marks text other instructions may share.
             if present is None and text in s:
-                self.touched.append(path)
-                if not self.dry:
-                    p.write_text(s.replace(text, "", 1))
+                self.commit(path, s.replace(text, "", 1))
             return
         if (present or text.strip()) in s:
             return
@@ -248,24 +297,56 @@ class Editor:
             i = s.index("\n", i) + 1
         else:
             i = s.rfind("\n", 0, i) + 1
-        self.touched.append(path)
-        if not self.dry:
-            p.write_text(s[:i] + text + s[i:])
+        self.commit(path, s[:i] + text + s[i:])
 
     def write(self, path, text):
-        p = REPO / path
         if self.remove:
-            if p.exists():
-                self.touched.append(path)
-                if not self.dry:
-                    p.unlink()
+            if path in self.current or (REPO / path).exists():
+                self.commit(path, None)
             return
-        if p.exists() and p.read_text() == text:
+        if self.read(path) == text:
             return
-        self.touched.append(path)
-        if not self.dry:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(text)
+        self.commit(path, text)
+
+
+def diff_text(path, old, new):
+    """Unified diff of PATH from OLD to NEW: a/ and b/ headers, @@ hunks,
+    -/+ lines; "" when nothing changes."""
+    return "\n".join(difflib.unified_diff(
+        old.splitlines(), (new or "").splitlines(),
+        "a/" + path, "b/" + path, lineterm=""))
+
+
+def colour_wanted(mode):
+    """--color=auto colours only a terminal; always and never decide
+    themselves."""
+    if mode == "always":
+        return True
+    return mode == "auto" and sys.stdout.isatty()
+
+
+def _colour_of(line):
+    if line.startswith(("---", "+++")):
+        return "1"                      # bold headers
+    if line.startswith("@@"):
+        return "36"                     # cyan hunk headers
+    if line.startswith("+"):
+        return "32"                     # green added lines
+    if line.startswith("-"):
+        return "31"                     # red removed lines
+    return None
+
+
+def colourise(diff, on):
+    """Paint the diff for a terminal; unchanged when ON is false."""
+    if not on:
+        return diff
+    out = []
+    for line in diff.splitlines():
+        code = _colour_of(line)
+        out.append("\x1b[%sm%s\x1b[0m" % (code, line) if code else line)
+    return "\n".join(out)
+
 
 
 # ---------------------------------------------------------------- shared core
@@ -381,10 +462,14 @@ def regen_gcc_ext(ed):
     for gen, out in (("gen-riscv-ext-opt", riscv / "riscv-ext.opt"),
                      ("gen-riscv-ext-texi", REPO / "gcc/gcc/doc/riscv-ext.texi")):
         exe = tmp / gen
-        subprocess.run(["g++", "-O1", "-I", riscv, riscv / (gen + ".cc"),
-                        "-o", exe], check=True)
-        text = subprocess.run([exe], check=True, capture_output=True,
-                              text=True).stdout
+        try:
+            subprocess.run(["g++", "-O1", "-I", riscv, riscv / (gen + ".cc"),
+                            "-o", exe], check=True)
+            text = subprocess.run([exe], check=True, capture_output=True,
+                                  text=True).stdout
+        except (subprocess.CalledProcessError, OSError) as e:
+            raise BuildError("build failed: cannot build the GCC extension "
+                             "generator %s (%s)" % (gen, e)) from e
         if out.read_text() != text:
             out.write_text(text)
 
@@ -878,8 +963,16 @@ def edit_all(sp, ed, match, mask):
 
 
 def rebuild():
-    subprocess.run([REPO / "scripts/build.sh", "binutils", "gcc", "spike",
-                    "qemu"], check=True)
+    """Run scripts/build.sh; a failure of any kind is a BuildError."""
+    try:
+        subprocess.run([REPO / "scripts/build.sh", "binutils", "gcc", "spike",
+                        "qemu"], check=True)
+    except subprocess.CalledProcessError as e:
+        raise BuildError("build failed: scripts/build.sh exited %d"
+                         % e.returncode) from e
+    except OSError as e:
+        raise BuildError("build failed: cannot run scripts/build.sh (%s)"
+                         % e) from e
 
 
 def encoding_line(sp, match, mask, where):
@@ -888,15 +981,30 @@ def encoding_line(sp, match, mask, where):
             % (sp.name, sp.format, where, match, mask, sp.ext))
 
 
-def cmd_apply(spec, dry):
+def cmd_apply(spec, dry, as_json=False, colour=False):
     sp = Spec(spec)
     match, mask, where = sp.encoding()
-    print(encoding_line(sp, match, mask, where))
+    if not as_json:
+        print(encoding_line(sp, match, mask, where))
     ed = Editor(dry=dry)
     edit_all(sp, ed, match, mask)
-    for p in dict.fromkeys(ed.touched):
-        print(("would change " if ed.dry else "changed ") + p)
-    if not ed.touched:
+    paths = list(dict.fromkeys(ed.touched))
+    if as_json:
+        print(json.dumps({
+            "encoding": encoding_line(sp, match, mask, where),
+            "name": sp.name, "ext": sp.ext, "format": sp.format,
+            "match": match, "mask": mask,
+            "files": [{"path": p,
+                       "diff": diff_text(p, ed.original.get(p, ""),
+                                         ed.current.get(p, ""))}
+                      for p in paths]}, indent=2))
+        return sp
+    for p in paths:
+        print(("would change " if dry else "changed ") + p)
+        if dry:
+            print(colourise(diff_text(p, ed.original.get(p, ""),
+                                      ed.current.get(p, "")), colour))
+    if not paths:
         print("already applied")
     if not dry:
         # remove NAME finds the spec here later.
@@ -1111,38 +1219,54 @@ def main():
                                     "all", "list", "remove"])
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--json", action="store_true",
-                    help="list: print one JSON array instead of text")
+                    help="list: print one JSON array instead of text;\n"
+                         "show: print the encoding and every diff as one\n"
+                         "JSON document")
+    ap.add_argument("--color", choices=("auto", "always", "never"),
+                    default="auto",
+                    help="show: colour the diff; auto (the default) colours\n"
+                         "only when stdout is a terminal")
     ap.add_argument("--no-rebuild", action="store_true",
                     help="remove: edit the trees but do not run\n"
                          "scripts/build.sh, and skip the toolchain check")
     ap.add_argument("--template", choices=sorted(TEMPLATES),
                     help="new: write a prefilled spec from TEMPLATE")
     a = ap.parse_args()
-    if a.json and (a.cmd != "list" or a.no_rebuild):
-        ap.error("--json needs 'list'")
+    if a.json and (a.cmd not in ("list", "show") or a.no_rebuild):
+        ap.error("--json needs 'list' or 'show'")
     if a.template and a.cmd != "new":
         ap.error("--template needs 'new'")
     if a.cmd in ("show", "verify", "apply", "test", "all", "remove") \
             and not a.arg:
         ap.error("%s needs an argument" % a.cmd)
-    if a.cmd == "new":
-        cmd_new(a.arg, a.template)
-    elif a.cmd == "list":
-        cmd_list(a.json)
-    elif a.cmd == "remove":
-        cmd_remove(a.arg, build=not a.no_rebuild)
-    elif a.cmd == "verify":
-        cmd_verify(a.arg)
-    elif a.cmd == "all":
-        cmd_all(a.arg)
-    elif a.cmd == "test":
-        run_test(Spec(a.arg))
-    else:
-        cmd_apply(a.arg, dry=a.cmd == "show")
-        if a.cmd == "apply":
-            print("next: scripts/build.sh binutils gcc spike qemu && "
-                  "scripts/xinsn.py test " + a.arg)
+    try:
+        if a.cmd == "new":
+            cmd_new(a.arg, a.template)
+        elif a.cmd == "list":
+            cmd_list(a.json)
+        elif a.cmd == "remove":
+            cmd_remove(a.arg, build=not a.no_rebuild)
+        elif a.cmd == "verify":
+            cmd_verify(a.arg)
+        elif a.cmd == "all":
+            cmd_all(a.arg)
+        elif a.cmd == "test":
+            run_test(Spec(a.arg))
+        else:
+            cmd_apply(a.arg, dry=a.cmd == "show", as_json=a.json,
+                      colour=colour_wanted(a.color))
+            if a.cmd == "apply":
+                print("next: scripts/build.sh binutils gcc spike qemu && "
+                      "scripts/xinsn.py test " + a.arg)
+    except SpecError as e:
+        print(e, file=sys.stderr)
+        return EXIT_SPEC
+    except BuildError as e:
+        print(e, file=sys.stderr)
+        return EXIT_BUILD
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
+

@@ -334,7 +334,8 @@ Method: `design-ux` §1 principles applied to a CLI — one job per command, out
 that a machine can read, failures that name the fix.
 
 - [ ] `scripts/attncc.sh --run` prints one line per stage (extract, compile, assemble, run, compare) with a pass/fail marker. `[D]`
-- [ ] `xinsn.py` output: dry-run diff preview, colour only on a TTY, `--json`, and an exit code that distinguishes "spec invalid" from "build failed". `[D]`
+- [x] `xinsn.py` output: dry-run diff preview, colour only on a TTY, `--json`, and an exit code that distinguishes "spec invalid" from "build failed". `[D]`
+  - verified-here: cd /c/GITHUB/yash-awasthi/RISC-VInjection; .venv/bin/python -m pytest -q tests/test_xinsn.py -k "show or json or color or colour or invalid or build" -> 10 passed in 52.44s
 - [ ] `make check` summary table at the end: target, pass, fail, time; non-zero exit on any failure. `[D]`
 - [ ] Error messages name the file, line and fix for the five most common build failures (missing package, patch conflict, submodule not initialised, stale toolchain, wrong `-march`). `[D]`
 
