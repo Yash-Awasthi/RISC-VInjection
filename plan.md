@@ -218,7 +218,8 @@ read or write out of bounds.
 
 - [ ] Two builds from one commit in the same container produce identical toolchain and simulator binaries, or the differences are listed and explained. `[P]`
 - [ ] Container image (Dockerfile or devcontainer) with the toolchain prerequisites and a digest recorded in `docs/build-and-test.md`. `[P]`
-- [ ] `make check` fails if `out/BUILD-INFO` is missing or older than the patches. `[P]`
+- [x] `make check` fails if `out/BUILD-INFO` is missing or older than the patches. `[P]`
+  - verified-here: .venv/bin/python -m pytest -q tests/test_build_info.py -> 8 passed
 
 ---
 
