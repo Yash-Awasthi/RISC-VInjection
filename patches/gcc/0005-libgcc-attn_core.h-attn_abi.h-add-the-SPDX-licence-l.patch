@@ -4,6 +4,12 @@ Date: Tue, 24 Nov 2026 12:29:25 +0530
 Subject: [PATCH 5/5] libgcc: attn_core.h, attn_abi.h: add the SPDX licence
  line
 
+Without this patch the two headers carry no licence identifier, so a downstream copy cannot tell what terms they are under. The patch adds the SPDX-License-Identifier line to libgcc/attn_core.h and libgcc/attn_abi.h and changes nothing else.
+
+Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 041359f347cb, the series re-applies to the same tree and the export matches. The line is visible in both files after apply.
+
+Upstream status: not submitted.
+
 Signed-off-by: Yash Vaibhav Awasthi <132498904+Yash-Awasthi@users.noreply.github.com>
 ---
  libgcc/attn_abi.h  | 1 +

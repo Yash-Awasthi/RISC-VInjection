@@ -4,6 +4,12 @@ Date: Tue, 13 Oct 2026 02:57:51 +0530
 Subject: [PATCH] RISC-V: add the Xattn vendor extension
 
 attn rd, rs1, rs2, rs3 computes a multi-head self-attention block; it uses custom-3 funct3 1 funct2 3, the R4 slot no standard or vendor encoding overlaps.
+
+Without this patch gas rejects attn, objdump cannot name it, and an object built for the extension cannot be assembled or inspected, so the compiler and both simulators would have no instruction to target. The patch adds the opcode table entry, the include/opcode headers and the gas tests x-attn.d, x-attn-32.d and x-attn-fail.l, so both XLENs assemble and a reserved or out-of-range field is still rejected.
+
+Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 781713dde4c8, the series re-applies to the same tree and the export matches. The gas tests are run by make check-gas in the binutils tree.
+
+Upstream status: not submitted.
 ---
  bfd/elfxx-riscv.c                     |  5 +++++
  gas/testsuite/gas/riscv/x-attn-32.d   | 13 +++++++++++++
@@ -22,7 +28,7 @@ attn rd, rs1, rs2, rs3 computes a multi-head self-attention block; it uses custo
  create mode 100644 gas/testsuite/gas/riscv/x-attn.s
 
 diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
-index 750754c9255..5f8c5b788fe 100644
+index 750754c9..5f8c5b78 100644
 --- a/bfd/elfxx-riscv.c
 +++ b/bfd/elfxx-riscv.c
 @@ -1660,6 +1660,7 @@ static const struct riscv_supported_ext riscv_supported_vendor_x_ext[] =
@@ -53,7 +59,7 @@ index 750754c9255..5f8c5b788fe 100644
      case INSN_CLASS_XSFCEASE:
 diff --git a/gas/testsuite/gas/riscv/x-attn-32.d b/gas/testsuite/gas/riscv/x-attn-32.d
 new file mode 100644
-index 00000000000..1be4492becd
+index 00000000..1be4492b
 --- /dev/null
 +++ b/gas/testsuite/gas/riscv/x-attn-32.d
 @@ -0,0 +1,13 @@
@@ -72,7 +78,7 @@ index 00000000000..1be4492becd
 +[ 	]+8:[ 	]+fe001ffb[ 	]+attn[ 	]+t6,zero,zero,t6
 diff --git a/gas/testsuite/gas/riscv/x-attn-fail.d b/gas/testsuite/gas/riscv/x-attn-fail.d
 new file mode 100644
-index 00000000000..109eca7fa05
+index 00000000..109eca7f
 --- /dev/null
 +++ b/gas/testsuite/gas/riscv/x-attn-fail.d
 @@ -0,0 +1,3 @@
@@ -81,7 +87,7 @@ index 00000000000..109eca7fa05
 +#error_output: x-attn-fail.l
 diff --git a/gas/testsuite/gas/riscv/x-attn-fail.l b/gas/testsuite/gas/riscv/x-attn-fail.l
 new file mode 100644
-index 00000000000..92c5e368de4
+index 00000000..92c5e368
 --- /dev/null
 +++ b/gas/testsuite/gas/riscv/x-attn-fail.l
 @@ -0,0 +1,4 @@
@@ -91,7 +97,7 @@ index 00000000000..92c5e368de4
 +.*Error: unrecognized opcode `attn t6,zero,zero,t6', extension `xattn' required
 diff --git a/gas/testsuite/gas/riscv/x-attn.d b/gas/testsuite/gas/riscv/x-attn.d
 new file mode 100644
-index 00000000000..61f46b8190b
+index 00000000..61f46b81
 --- /dev/null
 +++ b/gas/testsuite/gas/riscv/x-attn.d
 @@ -0,0 +1,13 @@
@@ -110,7 +116,7 @@ index 00000000000..61f46b8190b
 +[ 	]+8:[ 	]+fe001ffb[ 	]+attn[ 	]+t6,zero,zero,t6
 diff --git a/gas/testsuite/gas/riscv/x-attn.s b/gas/testsuite/gas/riscv/x-attn.s
 new file mode 100644
-index 00000000000..124cb94b5f7
+index 00000000..124cb94b
 --- /dev/null
 +++ b/gas/testsuite/gas/riscv/x-attn.s
 @@ -0,0 +1,4 @@
@@ -119,7 +125,7 @@ index 00000000000..124cb94b5f7
 +	attn	zero, t6, ra, sp
 +	attn	t6, zero, zero, t6
 diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
-index 8f26c714369..ec537a9b195 100644
+index 8f26c714..ec537a9b 100644
 --- a/include/opcode/riscv-opc.h
 +++ b/include/opcode/riscv-opc.h
 @@ -3788,6 +3788,9 @@
@@ -141,7 +147,7 @@ index 8f26c714369..ec537a9b195 100644
  DECLARE_INSN(vt_maskcn, MATCH_VT_MASKCN, MASK_VT_MASKCN)
  /* Vendor-specific (MIPS) instructions.  */
 diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
-index a5b02aff3be..2401f82191f 100644
+index a5b02aff..2401f821 100644
 --- a/include/opcode/riscv.h
 +++ b/include/opcode/riscv.h
 @@ -624,6 +624,7 @@ enum riscv_insn_class
@@ -153,7 +159,7 @@ index a5b02aff3be..2401f82191f 100644
    INSN_CLASS_XSFCEASE,
    INSN_CLASS_XSFVQMACCQOQ,
 diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
-index 49bf79cbe74..292cf44b59c 100644
+index 49bf79cb..292cf44b 100644
 --- a/opcodes/riscv-opc.c
 +++ b/opcodes/riscv-opc.c
 @@ -3567,6 +3567,9 @@ const struct riscv_opcode riscv_opcodes[] =

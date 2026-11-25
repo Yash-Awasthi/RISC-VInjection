@@ -4,6 +4,12 @@ Date: Tue, 13 Oct 2026 14:36:19 +0530
 Subject: [PATCH 2/3] target/riscv: let attn_core.h build without libc headers
 
 With ATTN_FREESTANDING it maps expf, sqrtf and INFINITY to GCC builtins, so libgcc can share the definition.
+
+Without this patch attn_core.h includes math.h and cannot be compiled in a freestanding context, so the definition shared with libgcc and Spike could not be reused. The patch adds the ATTN_FREESTANDING switch and the builtin mappings, with no change to the default path.
+
+Tested with scripts/patches.sh check: the patch applies with git apply --check at the pinned 615ece3c406b, the series re-applies to the same tree and the export matches. Both configurations are compiled by the QEMU build in scripts/build.sh.
+
+Upstream status: not submitted.
 ---
  target/riscv/attn_core.h | 7 +++++++
  1 file changed, 7 insertions(+)
