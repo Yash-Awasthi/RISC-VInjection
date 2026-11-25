@@ -289,7 +289,8 @@ file, and `artifacts/` is hand-collected.
 ### M4.3 Portability of the instruction
 
 - [ ] RV32: full test coverage (the spec says valid on RV32 and RV64; prove it on both simulators for every vector). `[W]`
-- [ ] Vector (V) variant or a documented reason not to; if done, a separate extension name and spec version. `[W]`
+- [x] Vector (V) variant or a documented reason not to; if done, a separate extension name and spec version. `[W]`
+  - verified-here: `grep -n '^## ' docs/spec.md` -> sections 1 to 8; `git diff --numstat HEAD -- docs/spec.md` -> 25 0; `.venv/bin/python -m pytest -q tests/test_vectors.py` -> 23 passed
 - [ ] Cross-check against a third implementation (QEMU TCG vs Spike interpreter already differ; add a scalar reference build of `attn_core.h` compiled for the host as the third). `[W]`
 
 ### M4.4 Teaching surface

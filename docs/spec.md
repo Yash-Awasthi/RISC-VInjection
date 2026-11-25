@@ -196,3 +196,28 @@ to that header fails the check until `tools/freeze_vectors.py --refreeze
 --reason TEXT` records why the set moved. A semantic change requires that
 re-freeze at the new version, and the recorded reason is the changelog's
 evidence.
+
+## 8. No vector (V) variant in version 1.0
+
+Version 1.0 defines one scalar fused instruction. It takes four address
+operands, computes in scalar binary32 arithmetic, and accumulates in the
+index order given in section 3.
+
+A V variant would be a different instruction, not an option on this one. It
+needs vector register operands instead of addresses, shapes expressed in
+units of VLEN and LMUL, a defined tail and mask policy (V0.t rather than the
+additive `mask` descriptor field), a per-lane accumulation order, and its own
+MATCH/MASK. Under section 7 that is a semantic change: it needs a separate
+extension name, a new spec version and a re-frozen vector set.
+
+Before such an instruction could exist, the following would have to be
+specified: how elements group across lanes, the reduction order within a
+lane group, the descriptor layout, trap and restart behaviour, the software
+interface, and a recognizer for the vector form.
+
+Version 1.0 does not define one because the bit-identical three-way evidence
+this specification relies on needs a vector implementation in both
+simulators. Neither Spike nor QEMU in this tree implements one. A
+VLEN-dependent definition would also make the same C code produce different
+results on different vector lengths, so there would be no stable result to
+freeze.
