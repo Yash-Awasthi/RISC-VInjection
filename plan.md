@@ -202,7 +202,8 @@ read or write out of bounds.
 
 ### M2.3 Golden vectors
 
-- [ ] Freeze a vector set (input, weights, config, expected output hash) per dtype and per feature (causal, additive mask, GQA, explicit scale) under `tests/vectors/`. `[P]`
+- [x] Freeze a vector set (input, weights, config, expected output hash) per dtype and per feature (causal, additive mask, GQA, explicit scale) under `tests/vectors/`. `[P]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `17 passed in 1.30s`
 - [ ] Any change to `attn_core.h` that moves a hash fails the test and requires an explicit re-freeze commit with the reason. `[P]`
 - [ ] Version the vector file format so an old vector stays readable. `[P]`
 
