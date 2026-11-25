@@ -10,6 +10,7 @@ qemu/, so they need `git submodule update --init` and
 `scripts/patches.sh apply` (no toolchain build).
 """
 
+import json
 import os
 import re
 import shutil
@@ -186,8 +187,10 @@ def test_remove_restores_a_clean_tree(scratch, tmp_path):
     removed = scratch_xinsn(scratch, "remove", "mac", "--no-rebuild")
     assert removed.returncode == 0, removed.stderr
     assert "mac removed from the trees" in removed.stdout
-    status = git(scratch, "status", "--porcelain").stdout
-    assert status == "", "remove left the trees dirty:\n" + status
+    # git status --porcelain flags stat/eol-only dirt on a Windows checkout,
+    # so compare the content of the tracked files instead.
+    diff = git(scratch, "diff", "--stat").stdout
+    assert diff == "", "remove left the trees dirty:\n" + diff
 
 
 # ------------------------------------------------------------ encoding safety
@@ -241,6 +244,104 @@ def test_two_instructions_never_share_a_slot(scratch):
     assert listed.returncode == 0
     for name in EXAMPLE_ORDER:
         assert re.search(r"^%s +MATCH=0x" % name, listed.stdout, re.M), name
+
+
+# ------------------------------------------------------- list --json, verify
+
+
+def test_list_json_is_one_array_for_tooling():
+    """list --json prints one JSON array and nothing else: every row has
+    exactly the tooling keys, Xattn is there, and its match/mask are the
+    numbers the plain-text list prints."""
+    plain = xinsn("list")
+    assert plain.returncode == 0, plain.stderr
+    r = xinsn("list", "--json")
+    assert r.returncode == 0, r.stderr
+    rows = json.loads(r.stdout)
+    assert isinstance(rows, list) and rows
+    for row in rows:
+        assert set(row) == {"name", "ext", "match", "mask", "source"}, row
+        assert isinstance(row["match"], int) and isinstance(row["mask"], int)
+    attn = [row for row in rows if row["name"] == "attn"]
+    assert attn, rows
+    assert attn[0]["ext"] == "xattn"
+    assert attn[0]["source"] == "scripts/xattn.sh"
+    m = re.search(r"^attn +MATCH=0x([0-9a-f]{8}) MASK=0x([0-9a-f]{8})",
+                  plain.stdout, re.M)
+    assert m, plain.stdout
+    assert "%08x" % attn[0]["match"] == m.group(1)
+    assert "%08x" % attn[0]["mask"] == m.group(2)
+
+
+def test_json_needs_list():
+    """--json is only meaningful for a bare list: any other use is an
+    argparse error, so no other subcommand starts printing JSON by accident."""
+    for args in (("list", "--json", "--no-rebuild"),
+                 ("show", "examples/insns/mac.spec", "--json")):
+        r = xinsn(*args)
+        assert r.returncode != 0, r.stdout
+        assert "--json needs 'list'" in r.stderr, r.stderr
+
+
+def test_verify_mac_needs_no_write():
+    """verify prints the encoding show prints, then the three checks, and
+    leaves the trees byte-identical (scoped git status before and after)."""
+    trees = ("binutils", "gcc", "spike", "qemu")
+    before = git(REPO, "status", "--porcelain", "--", *trees).stdout
+    r = xinsn("verify", "examples/insns/mac.spec")
+    assert r.returncode == 0, r.stderr
+    lines = r.stdout.splitlines()
+    assert lines[0] == ("mac: format R4, custom-3 funct3=3 funct2=2, "
+                        "MATCH=0x0400307b MASK=0x0600707f, -march=..._xmac")
+    assert re.search(r"^ok: \d+ known encodings checked; the slot collides "
+                     r"with none$", r.stdout, re.M), r.stdout
+    assert "ok: extension xmac is new" in r.stdout
+    assert re.search(r"^ok: \d+ files would change; the trees are not "
+                     r"touched$", r.stdout, re.M), r.stdout
+    assert git(REPO, "status", "--porcelain", "--", *trees).stdout == before
+
+
+def test_verify_refuses_a_taken_slot(tmp_path):
+    """custom-3:1:3 is attn's slot: verify exits 1 and names attn."""
+    spec = write_spec(tmp_path, "mac",
+                      MAC_SPEC.replace("slot   = auto",
+                                       "slot   = custom-3:1:3"))
+    r = xinsn("verify", str(spec))
+    assert r.returncode == 1, r.stdout
+    assert "attn" in r.stderr, r.stderr
+
+
+VENTANACONDOPS_SPEC = """\
+name   = ventanacondops
+inputs = 2
+writes = rd
+memory = no
+slot   = auto
+semantics:
+  return rs1 + rs2;
+"""
+
+
+def test_verify_refuses_an_existing_extension(tmp_path):
+    """xventanacondops already owns the ELF attribute xventanacondops1p0."""
+    r = xinsn("verify", str(write_spec(tmp_path, "ventanacondops",
+                                       VENTANACONDOPS_SPEC)))
+    assert r.returncode == 1, r.stdout
+    assert "xventanacondops" in r.stderr, r.stderr
+    assert "xventanacondops1p0" in r.stderr, r.stderr
+
+
+def test_verify_a_bad_spec_writes_nothing(tmp_path):
+    """A malformed spec exits 1 with the Spec() message and leaves the
+    trees byte-identical (scoped git status before and after)."""
+    trees = ("binutils", "gcc", "spike", "qemu")
+    before = git(REPO, "status", "--porcelain", "--", *trees).stdout
+    for text in ("name = MAC\ninputs = 2\nsemantics:\n  return rs1;\n",
+                 "name   = mac\ninputs = 2\n"):
+        r = xinsn("verify", str(write_spec(tmp_path, "bad", text)))
+        assert r.returncode == 1, r.stdout
+        assert str(tmp_path) in r.stderr, r.stderr
+    assert git(REPO, "status", "--porcelain", "--", *trees).stdout == before
 
 
 # ------------------------------------------------------------- failure paths

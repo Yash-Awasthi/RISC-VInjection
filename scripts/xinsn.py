@@ -5,12 +5,14 @@
   xinsn.py new   [SPEC]    ask for the instruction (name, operands, C code,
                            test), write SPEC, then do "all"
   xinsn.py show  SPEC      encoding and the files that would change
+  xinsn.py verify SPEC     check a spec: its encoding, a free slot, a new
+                           extension, the files it would change; no writes
   xinsn.py apply SPEC      edit the four source trees (idempotent)
   xinsn.py test  SPEC      build a test for it and run it on Spike and QEMU
                            (after scripts/build.sh has rebuilt the trees)
   xinsn.py all   SPEC      apply, rebuild, test: every step in one go
   xinsn.py list            every custom instruction in the trees, with its
-                           encoding
+                           encoding; --json prints one JSON array
   xinsn.py remove WHAT     take one out again and rebuild; WHAT is a name,
                            an opcode (MATCH or any instruction word, 0x...)
                            or a SPEC.  "attn" removes Xattn
@@ -49,6 +51,7 @@ taking the registers in operand order and returning rd's value.
 """
 
 import argparse
+import json
 import random
 import re
 import shutil
@@ -818,11 +821,16 @@ def rebuild():
                     "qemu"], check=True)
 
 
+def encoding_line(sp, match, mask, where):
+    """The one encoding line show, apply and verify print for a spec."""
+    return ("%s: format %s, %s, MATCH=0x%08x MASK=0x%08x, -march=..._%s"
+            % (sp.name, sp.format, where, match, mask, sp.ext))
+
+
 def cmd_apply(spec, dry):
     sp = Spec(spec)
     match, mask, where = sp.encoding()
-    print("%s: format %s, %s, MATCH=0x%08x MASK=0x%08x, -march=..._%s"
-          % (sp.name, sp.format, where, match, mask, sp.ext))
+    print(encoding_line(sp, match, mask, where))
     ed = Editor(dry=dry)
     edit_all(sp, ed, match, mask)
     for p in dict.fromkeys(ed.touched):
@@ -898,8 +906,8 @@ def cmd_all(spec):
 
 
 def custom_insns():
-    """[(name, match, mask, generated_by_xinsn)] for every custom instruction
-    in the trees: Xattn and everything xinsn.py added."""
+    """[(name, match, mask, generated_by_xinsn, ext)] for every custom
+    instruction in the trees: Xattn and everything xinsn.py added."""
     h = (REPO / "binutils/include/opcode/riscv-opc.h").read_text()
     out = []
     riscv = REPO / "gcc/gcc/config/riscv"
@@ -911,18 +919,59 @@ def custom_insns():
         if not all(mm):
             continue
         out.append((name, int(mm[0].group(1), 16), int(mm[1].group(1), 16),
-                    "xinsn.py" in d.read_text()))
+                    "xinsn.py" in d.read_text(), ext))
     return out
 
 
-def cmd_list():
+def custom_rows():
+    """[{name, ext, match, mask, source}] for tooling (list --json)."""
+    return [dict(name=name, ext=ext, match=match, mask=mask,
+                 source="xinsn.py" if gen else "scripts/xattn.sh")
+            for name, match, mask, gen, ext in custom_insns()]
+
+
+def cmd_list(as_json=False):
+    if as_json:
+        print(json.dumps(custom_rows(), indent=2))
+        return
     rows = custom_insns()
     if not rows:
         print("no custom instructions in the trees")
-    for name, match, mask, gen in rows:
+    for name, match, mask, gen, ext in rows:
         print("%-12s MATCH=0x%08x MASK=0x%08x  %s" % (
             name, match, mask,
             "added by xinsn.py" if gen else "Xattn (scripts/xattn.sh)"))
+
+
+def cmd_verify(spec):
+    """Check a spec without touching the trees: its encoding, the slot
+    against every known encoding, the extension name, and the files the
+    edits would change."""
+    sp = Spec(spec)
+    match, mask, where = sp.encoding()
+    print(encoding_line(sp, match, mask, where))
+    defs = find_opcodes.load_defs(find_opcodes.default_sources(REPO))
+    # Our own earlier apply must not look like a collision, as in encoding().
+    hits = sorted(n for n, e in defs.items()
+                  if n != sp.name and find_opcodes.collides((match, mask), e))
+    if hits:
+        sys.exit("%s: %s collides with %s already in the trees; "
+                 "pick a free slot" % (spec, where, ", ".join(hits)))
+    print("ok: %d known encodings checked; the slot collides with none"
+          % len(defs))
+    elf = (REPO / "binutils/bfd/elfxx-riscv.c").read_text()
+    if re.search(r'\{\s*"%s"\s*,\s*ISA_SPEC_CLASS_' % re.escape(sp.ext), elf):
+        sys.exit("%s: the ELF attribute %s1p0 is taken; %s is an existing "
+                 "vendor extension" % (spec, sp.ext, sp.ext))
+    print("ok: extension %s is new (not already a vendor extension)" % sp.ext)
+    ed = Editor(dry=True)
+    try:
+        edit_all(sp, ed, match, mask)
+    except SystemExit as e:
+        sys.exit("%s (%d files would change before that)"
+                 % (e.code, len(dict.fromkeys(ed.touched))))
+    print("ok: %d files would change; the trees are not touched"
+          % len(dict.fromkeys(ed.touched)))
 
 
 def find_spec(name):
@@ -979,21 +1028,28 @@ def cmd_remove(what, build=True):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawTextHelpFormatter)
-    ap.add_argument("cmd", choices=["new", "show", "apply", "test", "all",
-                                    "list", "remove"])
+    ap.add_argument("cmd", choices=["new", "show", "verify", "apply", "test",
+                                    "all", "list", "remove"])
     ap.add_argument("arg", nargs="?")
+    ap.add_argument("--json", action="store_true",
+                    help="list: print one JSON array instead of text")
     ap.add_argument("--no-rebuild", action="store_true",
                     help="remove: edit the trees but do not run\n"
                          "scripts/build.sh, and skip the toolchain check")
     a = ap.parse_args()
-    if a.cmd in ("show", "apply", "test", "all", "remove") and not a.arg:
+    if a.json and (a.cmd != "list" or a.no_rebuild):
+        ap.error("--json needs 'list'")
+    if a.cmd in ("show", "verify", "apply", "test", "all", "remove") \
+            and not a.arg:
         ap.error("%s needs an argument" % a.cmd)
     if a.cmd == "new":
         cmd_new(a.arg)
     elif a.cmd == "list":
-        cmd_list()
+        cmd_list(a.json)
     elif a.cmd == "remove":
         cmd_remove(a.arg, build=not a.no_rebuild)
+    elif a.cmd == "verify":
+        cmd_verify(a.arg)
     elif a.cmd == "all":
         cmd_all(a.arg)
     elif a.cmd == "test":

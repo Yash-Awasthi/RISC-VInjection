@@ -271,7 +271,8 @@ file, and `artifacts/` is hand-collected.
 ### M4.1 Prove the general method with a second instruction
 
 - [ ] Ship a second worked example end to end (a small, non-attention instruction such as `mac` or a RoPE step) as `examples/<name>.spec` plus a demo, with its own tests in `make check`. `[W]`
-- [ ] `xinsn.py list --json` for tooling, and `xinsn.py verify SPEC` that checks a spec without touching the trees. `[W]`
+- [x] `xinsn.py list --json` for tooling, and `xinsn.py verify SPEC` that checks a spec without touching the trees. `[W]`
+  - verified-here: `python -m pytest -q tests/test_xinsn.py` -> `21 passed, 1 skipped`; `python scripts/xinsn.py verify examples/insns/mac.spec` -> `ok: 29 files would change; the trees are not touched`
 - [ ] Templates: `xinsn.py new --template elementwise|reduction|memory` prefilled specs. `[W]`
 - [ ] Document the failure modes of the method (encoding exhaustion per major opcode, conflicts with other vendor extensions, attribute naming). `[W]`
 
