@@ -93,6 +93,20 @@ do_remove() {
   echo "$c: upstream ${base:0:12}, Xattn removed (branch $BRANCH kept)"
 }
 
+# A second remove is a no-op that would hide a leaked change, so it is an
+# error.  Checked for every component before any tree moves: a failure
+# leaves all of them as they were.
+check_removable() {
+  local c=$1 base
+  base=$(base_of "$c")
+  if [ "$(git -C "$REPO/$c" rev-parse HEAD)" = "$base" ] &&
+     [ "$(git -C "$REPO/$c" rev-parse --abbrev-ref HEAD)" = HEAD ]; then
+    echo "error: $c: already at the pinned upstream commit ${base:0:12};" \
+      "nothing to remove" >&2
+    exit 1
+  fi
+}
+
 do_restore() {
   local c=$1
   clean_or_die "$c"
@@ -220,7 +234,9 @@ comps=("$@")
 case $cmd in
   apply) for c in "${comps[@]}"; do do_apply "$c"; done ;;
   export) for c in "${comps[@]}"; do do_export "$c"; done ;;
-  remove) for c in "${comps[@]}"; do do_remove "$c"; done ;;
+  remove)
+    for c in "${comps[@]}"; do check_removable "$c"; done
+    for c in "${comps[@]}"; do do_remove "$c"; done ;;
   restore) for c in "${comps[@]}"; do do_restore "$c"; done ;;
   check)
     rc=0
