@@ -366,7 +366,8 @@ that a machine can read, failures that name the fix.
   - [x] `SECURITY.md`: how to report a simulator bug (a mis-executed instruction is a security issue in an emulator) and the response window. `[E]`
   - verified-here: SECURITY.md 60 lines, sections Reporting, What to send, Response window, Scope and upstream, Supported versions; GitHub private vulnerability reporting only, no email; 5/10/30 business-day windows, 90-day disclosure; git ls-tree HEAD spike gcc qemu binutils newlib -> 89c7471, 041359f, 615ece3, 781713d, 06add56; git -C spike rev-parse HEAD -> 79f1804
 - **m6.3.2 Support matrix**
-  - [ ] Host OS, GCC/Clang, Python, disk and time budget for a full build; CI enforces what it can. `[E]`
+  - [x] Host OS, GCC/Clang, Python, disk and time budget for a full build; CI enforces what it can. `[E]`
+  - verified-here: docs/build-and-test.md section 7 added (lines 152-231), sections 1-6 unchanged (git diff --numstat 81 0); measured gcc 16.2.0, clang NOT FOUND, python3 3.15.0, numpy 2.5.5 pytest 9.2.0, make 4.4.1, cmake 4.4.5, ninja 1.13.2, git 2.55.0, nproc 20, df -h . 159G available; grep -n '^## ' shows sections 1 to 7
 - **m6.3.3 Honest cost**
   - [ ] Cost of maintaining five forks stated (hours per upstream release), with the option to upstream the extension and drop the forks. `[E]`
 

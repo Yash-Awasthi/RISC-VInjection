@@ -148,3 +148,84 @@ build/qemu/qemu-system-riscv64 -M virt -bios none -nographic \
 | attn traps with `mcause 2` | Xattn disabled in the simulator, or a reserved configuration | `--isa=..._xattn` / `-cpu ...,xattn=on`; check `docs/spec.md` section 4 |
 | recognizer says `exponential is not a const call` | explicit `-fmath-errno` | drop it |
 | recognizer says `output may alias an input` | aliasing not provable | `restrict` on the pointers |
+
+## 7. Support matrix
+
+What works where. "Tested" means the command runs in CI or was run on the
+machine named; everything else is untested or not supported.
+
+| Host OS | Status | Evidence |
+|---------|--------|----------|
+| Linux x86_64 | supported and tested | CI runner `ubuntu-24.04` in `.github/workflows/ci.yml` (job `fast`) and `.github/workflows/full.yml` (job `build`) |
+| Windows / MSYS2 | documented only, not CI-tested | measured on this machine (section 7.2); no CI job runs on Windows |
+| macOS | untested, unprovable here | no machine available; no CI job runs on macOS |
+| RISC-V silicon | not supported | simulator-only: Spike and QEMU as built from the submodules; the project ships no hardware path |
+
+### 7.1 Toolchain
+
+| Compiler | Use |
+|----------|-----|
+| GCC from the pinned submodule | builds all target code; `versions.env` pins `GCC_SHA=041359f347cb1d48622a2c96934d06d514de7a36`; installed at `out/toolchain/bin/riscv64-unknown-elf-gcc` |
+| host `gcc` | not used to build target code |
+| host `clang` | only for the bare-metal `.insn` path: `tests/baremetal/Makefile` defaults to `CC ?= clang` with `--target=riscv64-unknown-elf -fuse-ld=lld` |
+
+`make check-sim` does not use the host compiler: it passes
+`CC=$(CURDIR)/out/toolchain/bin/riscv64-unknown-elf-gcc`.
+
+### 7.2 Measured on this host
+
+Windows / MSYS2, 20 cores. Re-run for this section:
+
+| Command | Output |
+|---------|--------|
+| `gcc --version` | `gcc.exe (Rev7, Built by MSYS2 project) 16.2.0` |
+| `clang --version` | NOT FOUND: no `clang` binary on PATH or in `/c/msys64/ucrt64/bin`, `/c/msys64/mingw64/bin`, `/c/Program Files/LLVM/bin` |
+| `python3 --version` | `Python 3.15.0` |
+| `.venv/bin/python -c 'import numpy, pytest; print(numpy.__version__, pytest.__version__)'` | `2.5.5 9.2.0` |
+| `make --version` | `GNU Make 4.4.1` |
+| `cmake --version` | `4.4.5` |
+| `ninja --version` | `1.13.2.git.kitware.jobserver-pipe-1` |
+| `git --version` | `2.55.0.windows.5` |
+| `nproc` | `20` |
+| `df -h .` | size `476G`, available `159G` |
+| `uname -srm` | `MSYS_NT-10.0-26300 3.6.10-5a1665c8.x86_64 x86_64` |
+
+### 7.3 Python
+
+The tests need `numpy` and `pytest`, installed in `.venv` (the `Makefile`
+uses `$(PY)`). CI uses the runner's `python3` and pip-installs `numpy` and
+`pytest` (`.github/workflows/ci.yml`). The pinned QEMU `configure` requires
+Python 3.12 or newer (comment in `.github/workflows/full.yml` lines 73-74;
+section 1 targets Ubuntu 24.04), so CI's runner image supplies 3.12 or
+newer and 3.12 is the enforced floor.
+
+### 7.4 Disk budget
+
+About 15 GB of build output plus about 6 GB of sources, so about 21 GB peak.
+Section 1 says "about 15 GB, most of it the full GCC history"; section 2
+says the full history is "~6 GB". Split: submodule git objects about 6 GB,
+`build/` plus `out/` about 15 GB. This is derived from the document, not
+remeasured: a `du` over the trees was killed after several minutes on
+Windows because it was not cheap there, so no measured figure is claimed.
+
+### 7.5 Time budget
+
+The per-step times in section 3 add up to about 13 minutes (binutils ~3 min,
+gcc 5.3 min, newlib 13 s, libgcc ~1 min, dtc seconds, spike 2.5 min, qemu
+under 1 min), and the README says "about 15 minutes on 16 cores". The total
+is DERIVED from the documented per-step times on this 20-core host, not
+remeasured: only binutils was actually built here (`out/toolchain/bin/riscv64-unknown-elf-as`
+exists; there is no cross gcc, no spike and no qemu binary).
+
+### 7.6 What CI enforces
+
+| Workflow | Job | `runs-on` | `timeout-minutes` | Commands |
+|----------|-----|-----------|-------------------|----------|
+| `.github/workflows/ci.yml` | `fast` | `ubuntu-24.04` | `15` | `scripts/patches.sh apply binutils gcc spike qemu`, `scripts/patches.sh status`, `python3 -m pytest -q tests/`, `shellcheck -x scripts/*.sh`; no toolchain build |
+| `.github/workflows/full.yml` | `build` | `ubuntu-24.04` | `120` | `scripts/patches.sh apply`, `scripts/build.sh` (six steps), `make check`, artifact upload |
+
+CI does not enforce: Windows or MSYS2, macOS, a clang-only build (full.yml
+installs no clang and `make check-sim` uses the built gcc), RISC-V silicon,
+or any build time or disk budget.
+
+See also: `README.md` for the quick start, `docs/spec.md` for the ISA.
