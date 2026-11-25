@@ -66,6 +66,67 @@ import find_opcodes  # noqa: E402
 FORMAT_FIELDS = {"R0": ("funct3", "funct7"), "R1": ("funct3", "funct7"),
                  "R": ("funct3", "funct7"), "R4": ("funct3", "funct2")}
 
+# ---------------------------------------------------------------- templates
+
+TEMPLATES = {
+    "elementwise": """\
+# Elementwise: rd = rs1 + rs2, no memory access.
+# Automatic vectors: there is no 'test:' block on purpose.
+name   = {name}
+inputs = 2
+writes = rd
+memory = no
+slot   = auto
+semantics:
+  return rs1 + rs2;
+""",
+    "reduction": """\
+# Reduction over rs2 32-bit words at rs1:
+# rd = sum of *(uint32_t *) (rs1 + 4 i), 0 <= i < rs2.
+name   = {name}
+inputs = 2
+writes = rd
+memory = yes
+slot   = auto
+semantics:
+  uint64_t s = 0;
+  if (rs2 > 65536)
+    ILLEGAL ();
+  for (uint64_t i = 0; i < rs2; i++)
+    s += LD32 (rs1 + 4 * i);
+  return s;
+test:
+  static uint32_t a[100];
+  for (int i = 0; i < 100; i++)
+    a[i] = i * 2654435761u;
+  uint64_t want = 0;
+  for (int i = 0; i < 100; i++)
+    want += a[i];
+  CHECK (__builtin_riscv_{name} ((uintptr_t) a, 100) == want);
+  CHECK (__builtin_riscv_{name} ((uintptr_t) a, 0) == 0);
+  CHECK (__builtin_riscv_{name} ((uintptr_t) (a + 99), 1) == a[99]);
+""",
+    "memory": """\
+# Store rs1 to rs2 consecutive 64-bit words at rd; rd is an operand,
+# not a result, so writes = none.
+name   = {name}
+inputs = 2
+writes = none
+memory = yes
+slot   = auto
+semantics:
+  for (uint64_t i = 0; i < rs2; i++)
+    ST64 (rd + 8 * i, rs1);
+  return 0;
+test:
+  static uint64_t b[10];
+  __builtin_riscv_{name} ((uintptr_t) (b + 1), 0x1234567890abcdefull, 8);
+  CHECK (b[0] == 0 && b[9] == 0);
+  for (int i = 1; i <= 8; i++)
+    CHECK (b[i] == 0x1234567890abcdefull);
+""",
+}
+
 
 # ---------------------------------------------------------------- spec
 
@@ -869,7 +930,25 @@ def ask_block(prompt):
                      for l in lines)
 
 
-def cmd_new(spec):
+def cmd_new(spec, template=None):
+    if template:
+        if spec:
+            name = Path(spec).stem
+            if not re.fullmatch(r"[a-z][a-z0-9]{1,15}", name):
+                sys.exit("name '%s' must match [a-z][a-z0-9]{1,15}" % name)
+            path = Path(spec)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(TEMPLATES[template].format(name=name))
+            print("wrote %s" % path)
+            return
+        name = ask("name (lower case, e.g. mac)", None,
+                   lambda v: re.fullmatch(r"[a-z][a-z0-9]{1,15}", v))
+        path = REPO / "examples/insns" / (name + ".spec")
+        path.write_text(TEMPLATES[template].format(name=name))
+        print("wrote %s" % path)
+        if ask("apply, rebuild and test now? (y/n)", "y") == "y":
+            cmd_all(path)
+        return
     print("New custom RISC-V instruction.  The C code sees uint64_t rd, rs1,"
           "\nrs2, rs3, unsigned xlen, LD8..LD64(addr), ST8..ST64(addr, v) and"
           "\nILLEGAL(); it returns the value for rd.")
@@ -1036,14 +1115,18 @@ def main():
     ap.add_argument("--no-rebuild", action="store_true",
                     help="remove: edit the trees but do not run\n"
                          "scripts/build.sh, and skip the toolchain check")
+    ap.add_argument("--template", choices=sorted(TEMPLATES),
+                    help="new: write a prefilled spec from TEMPLATE")
     a = ap.parse_args()
     if a.json and (a.cmd != "list" or a.no_rebuild):
         ap.error("--json needs 'list'")
+    if a.template and a.cmd != "new":
+        ap.error("--template needs 'new'")
     if a.cmd in ("show", "verify", "apply", "test", "all", "remove") \
             and not a.arg:
         ap.error("%s needs an argument" % a.cmd)
     if a.cmd == "new":
-        cmd_new(a.arg)
+        cmd_new(a.arg, a.template)
     elif a.cmd == "list":
         cmd_list(a.json)
     elif a.cmd == "remove":

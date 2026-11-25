@@ -274,7 +274,8 @@ file, and `artifacts/` is hand-collected.
 - [ ] Ship a second worked example end to end (a small, non-attention instruction such as `mac` or a RoPE step) as `examples/<name>.spec` plus a demo, with its own tests in `make check`. `[W]`
 - [x] `xinsn.py list --json` for tooling, and `xinsn.py verify SPEC` that checks a spec without touching the trees. `[W]`
   - verified-here: `python -m pytest -q tests/test_xinsn.py` -> `21 passed, 1 skipped`; `python scripts/xinsn.py verify examples/insns/mac.spec` -> `ok: 29 files would change; the trees are not touched`
-- [ ] Templates: `xinsn.py new --template elementwise|reduction|memory` prefilled specs. `[W]`
+- [x] Templates: `xinsn.py new --template elementwise|reduction|memory` prefilled specs. `[W]`
+  - verified-here: `python -m pytest -q tests/test_xinsn.py` -> `26 passed, 1 skipped`; `new --template reduction` then `verify` -> `ok: 28 files would change; the trees are not touched`
 - [ ] Document the failure modes of the method (encoding exhaustion per major opcode, conflicts with other vendor extensions, attribute naming). `[W]`
 
 ### M4.2 Recognizer coverage

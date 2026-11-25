@@ -40,6 +40,13 @@ def xinsn(*args):
                           capture_output=True, text=True, cwd=REPO)
 
 
+def xinsn_no_stdin(*args):
+    """Run xinsn.py with stdin closed: any prompt fails instead of blocking."""
+    return subprocess.run([sys.executable, str(XINSN), *args],
+                          capture_output=True, text=True, cwd=REPO,
+                          stdin=subprocess.DEVNULL)
+
+
 def write_spec(tmp_path, name, text):
     p = tmp_path / (name + ".spec")
     p.write_text(text)
@@ -378,6 +385,71 @@ def test_a_bad_spec_is_refused(tmp_path, text, want):
     assert r.returncode == 1, r.stdout
     assert want in r.stderr, r.stderr
     assert str(spec) in r.stderr
+
+
+# --------------------------------------------------------------- new --template
+
+import xinsn as xi  # noqa: E402
+
+TEMPLATE_NAMES = {"elementwise": "teltest", "reduction": "tredtest",
+                  "memory": "tmemtest"}
+TEMPLATE_WANTS = {
+    "elementwise": "return rs1 + rs2;",
+    "reduction": "uint64_t s = 0;",
+    "memory": "ST64 (rd + 8 * i, rs1);",
+}
+TEMPLATE_SHAPES = {
+    "elementwise": ("2", "rd", "no"),
+    "reduction": ("2", "rd", "yes"),
+    "memory": ("2", "none", "yes"),
+}
+
+
+@pytest.mark.parametrize("template", sorted(TEMPLATE_NAMES))
+def test_new_template_writes_a_valid_spec(tmp_path, template):
+    """new --template T SPEC writes a spec without reading stdin: the file
+    parses, carries the template's distinguishing body, and verify accepts it."""
+    name = TEMPLATE_NAMES[template]
+    spec = tmp_path / (name + ".spec")
+    r = xinsn_no_stdin("new", "--template", template, str(spec))
+    assert r.returncode == 0, r.stderr
+    assert "wrote %s" % spec in r.stdout, r.stdout
+    assert "apply, rebuild and test now?" not in r.stdout
+    sp = xi.Spec(spec)
+    assert sp.name == name
+    inputs, writes, memory = TEMPLATE_SHAPES[template]
+    text = spec.read_text()
+    assert "inputs = %s" % inputs in text
+    assert "writes = %s" % writes in text
+    assert "memory = %s" % memory in text
+    assert (sp.inputs, sp.writes_rd, sp.memory) == (
+        int(inputs), writes == "rd", memory == "yes")
+    assert TEMPLATE_WANTS[template] in text
+    v = xinsn("verify", str(spec))
+    assert v.returncode == 0, v.stderr
+
+
+def test_templates_differ_in_inputs_writes_memory(tmp_path):
+    """The three templates are three different shapes, not one with the
+    comments changed."""
+    shapes = {}
+    for template, name in sorted(TEMPLATE_NAMES.items()):
+        spec = tmp_path / (name + ".spec")
+        r = xinsn_no_stdin("new", "--template", template, str(spec))
+        assert r.returncode == 0, r.stderr
+        sp = xi.Spec(spec)
+        shapes[template] = (sp.inputs, sp.writes_rd, sp.memory)
+    assert len(set(shapes.values())) == 3, shapes
+
+
+def test_new_template_refuses_a_bad_path_stem(tmp_path):
+    """The name comes from the path stem, so a stem that is not a valid
+    mnemonic fails before anything is written."""
+    spec = tmp_path / "Bad.spec"
+    r = xinsn_no_stdin("new", "--template", "elementwise", str(spec))
+    assert r.returncode == 1, r.stdout
+    assert "name 'Bad' must match [a-z][a-z0-9]{1,15}" in r.stderr, r.stderr
+    assert not spec.exists()
 
 
 # ------------------------------------------------- the same on both simulators
