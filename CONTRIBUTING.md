@@ -46,6 +46,52 @@ scripts/patches.sh apply && make check
   `git -C gcc status --porcelain` is not empty afterwards, the change leaks
   outside the branch: fix that before anything else.
 
+## Bump procedure
+
+A bump moves the series to a new upstream head. It touches the five gitlinks,
+`versions.env`, the re-exported `patches/`, and the compatibility table, which
+records the SHA that was tested.
+
+1. Export first. `scripts/patches.sh apply` moves branch `xattn` back to the
+   pin, so a commit that exists only on the branch would drop off it:
+
+   ```bash
+   scripts/patches.sh export && git add patches && git commit -s
+   ```
+
+2. Fetch the branch `versions.env` names for the component, then move the pin
+   in both places it is recorded — the index gitlink and `versions.env`:
+
+   ```bash
+   git -C gcc fetch origin releases/gcc-16
+   git update-index --cacheinfo 160000,<new-sha>,gcc
+   sed -i 's/^GCC_SHA=.*/GCC_SHA=<new-sha>/' versions.env
+   scripts/check-pins.sh
+   ```
+
+3. Rebase the series onto the new pin and prove it. `apply` replays the patches
+   with `git am --3way`; a conflict is resolved, `git am --continue`d, and the
+   re-export then carries the resolution:
+
+   ```bash
+   scripts/patches.sh apply gcc
+   scripts/patches.sh export gcc
+   scripts/patches.sh check
+   make check
+   git add patches && git commit -s
+   ```
+
+4. Re-run the full CI. `.github/workflows/full.yml` is the only job that builds
+   the toolchain and runs every test; it fires on any push that touches
+   `patches/`, so the bump runs it. Do not push the bump until it is green.
+
+5. Update the compatibility table in `docs/build-and-test.md` that the weekly
+   drift job publishes — patch series, upstream branch and tested SHA — with
+   the SHA `scripts/check-pins.sh` printed, so the table names the commit this
+   bump was tested at.
+
+`newlib` carries no patches: only its pin moves (steps 2 and 4).
+
 ## Tests
 
 ```bash
