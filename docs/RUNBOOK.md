@@ -136,3 +136,111 @@ When the numbers disagree, suspect the pinned source (the `attn_core.h` copy or 
 ## 6. What this machine can run right now
 - `make check-core`, `scripts/check-pins.sh` and `scripts/patches.sh status` need no build.
 - Anything that uses `out/toolchain/bin/riscv64-unknown-elf-gcc`, `out/spike/bin/spike` or `build/qemu/*` needs `scripts/build.sh` first (`scripts/build.sh gcc`, `scripts/build.sh spike`, `scripts/build.sh qemu`). On this host binutils is built, but there is no cross gcc, no `out/spike/bin/spike` and no `build/qemu/qemu-system-riscv64`.
+
+## Maintenance cost
+
+The fork set here is five pinned trees, of which four carry patches. Patch counts and patch sizes below are measured in this repository; every time figure is an estimate and is labelled as one.
+
+### Measured patch inventory
+
+| Component | Patches | Patch lines | Carries patches |
+|-----------|---------|-------------|-----------------|
+| binutils | 1 (measured) | not measured | yes |
+| gcc | 5 (measured) | 5081 (measured, `wc -l patches/gcc/*.patch`) | yes |
+| spike | 3 (measured) | not measured | yes |
+| qemu | 3 (measured) | not measured | yes |
+| newlib | 0 (measured) | 0 | no, pin-only |
+| total | 12 (measured) | 5081 for gcc only | 4 of 5 |
+
+Commands behind the counts:
+
+```
+ls patches/*/*.patch | wc -l                  # 12
+ls patches/binutils/*.patch | wc -l           # 1
+ls patches/gcc/*.patch | wc -l                # 5
+ls patches/spike/*.patch | wc -l              # 3
+ls patches/qemu/*.patch | wc -l               # 3
+ls patches/newlib/*.patch 2>/dev/null | wc -l # 0
+wc -l patches/gcc/*.patch                     # 5081 total
+```
+
+The five gcc patches are five commits above the pinned base: `git -C gcc log --oneline xattn`.
+
+### The estimate formula
+
+```
+hours per upstream release
+  = sum over components (patches x hours per patch)
+  + fixed build-and-check hours
+```
+
+Assumptions, all estimates:
+
+| Component | Hours per patch | Reason |
+|-----------|-----------------|--------|
+| binutils | 1.5 | one small patch touching one subsystem |
+| gcc | 2.5 | middle-end pass plus back end; 5081 patch lines measured |
+| spike | 1.5 | one small patch touching one subsystem |
+| qemu | 1.5 | one small patch touching one subsystem |
+| newlib | 0.5 flat | pin bump only, no patch |
+
+Fixed build-and-check: 13 min build + 2 min `make check` = 15 min = 0.25 h per release. The 13 min is derived from the per-step table in `docs/build-and-test.md` section 3 (binutils ~3 min, gcc 5.3 min, newlib 13 s, libgcc ~1 min, dtc seconds, spike 2.5 min, qemu under 1 min), consistent with the README line "about 15 minutes on 16 cores". The 2 min is an estimate from the documented "a few minutes" for `make check`. The workflow timeouts are caps, not measurements: `.github/workflows/full.yml` sets `timeout-minutes: 120` and `.github/workflows/ci.yml` sets `timeout-minutes: 15`.
+
+### Per-release cost
+
+| Component | Arithmetic | Hours |
+|-----------|------------|-------|
+| binutils | 1 x 1.5 | 1.5 |
+| gcc | 5 x 2.5 | 12.5 |
+| spike | 3 x 1.5 | 4.5 |
+| qemu | 3 x 1.5 | 4.5 |
+| newlib | 0 patches, flat | 0.5 |
+| fixed build-and-check | per release | 0.25 |
+| all five bump together | 1.5 + 12.5 + 4.5 + 4.5 + 0.5 = 23.5, then + 0.25 | 23.75 |
+
+If all five components bump at once the release costs 23.5 + 0.25 = 23.75 h, about 24 h. A real release bumps one or two components, so the realistic figure is that component's row plus the fixed 0.25 h: binutils 1.75 h, gcc 12.75 h, spike 4.75 h, qemu 4.75 h, newlib 0.75 h.
+
+### Cadence
+
+All cadences are estimates:
+
+| Component | Releases per year | Reason |
+|-----------|-------------------|--------|
+| gcc | 1 | one release a year |
+| binutils | 2 | two releases a year |
+| qemu | 3.5 | three to four a year, modelled at three and a half |
+| spike | 4 | continuous, modelled as four pin bumps a year |
+| newlib | 4 | continuous, modelled as four pin bumps a year |
+
+Annual total, term by term:
+
+```
+gcc       12.5 x 1   = 12.5
+binutils   1.5 x 2   =  3
+spike      4.5 x 4   = 18
+qemu       4.5 x 3.5 = 15.75
+newlib     0.5 x 4   =  2
+rows total           = 51.25
+bumps per year       = 1 + 2 + 3.5 + 4 + 4 = 14.5
+fixed      0.25 x 14.5 = 3.6
+annual total         = 51.25 + 3.6 = 54.85, about 55 h
+```
+
+Maintaining the five forks costs about 55 h a year. That is work that buys nothing upstream and is paid again on every release.
+
+## Option: upstream the extension and drop the forks
+
+The alternative is one series posted to the lists that own the four patched trees: binutils, gcc-patches, qemu-devel and spike. Once accepted, the five forks go away and maintenance becomes a rebase plus review responses on the releases actually taken.
+
+Post-upstream estimate per release: 0.5 h rebase + 0.25 h build-and-check + 0.25 h review replies = 1 h. At 14.5 releases a year that is 1 x 14.5 = 14.5, about 15 h a year.
+
+Tradeoffs:
+
+- review latency is weeks, not days
+- upstream may require API changes to the descriptor or to the builtin
+- the series may be rejected, and the forks then have to be kept anyway
+- control of the encoding moves to the lists
+
+The 1 h per release estimate assumes acceptance on the first or second revision; a long review pushes it up.
+
+The cost is about 55 h a year as a fork set versus about 15 h a year if upstreamed. Both are estimates. The only measured quantities are 12 patches and gcc's 5081 patch lines.

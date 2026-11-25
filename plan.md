@@ -369,7 +369,8 @@ that a machine can read, failures that name the fix.
   - [x] Host OS, GCC/Clang, Python, disk and time budget for a full build; CI enforces what it can. `[E]`
   - verified-here: docs/build-and-test.md section 7 added (lines 152-231), sections 1-6 unchanged (git diff --numstat 81 0); measured gcc 16.2.0, clang NOT FOUND, python3 3.15.0, numpy 2.5.5 pytest 9.2.0, make 4.4.1, cmake 4.4.5, ninja 1.13.2, git 2.55.0, nproc 20, df -h . 159G available; grep -n '^## ' shows sections 1 to 7
 - **m6.3.3 Honest cost**
-  - [ ] Cost of maintaining five forks stated (hours per upstream release), with the option to upstream the extension and drop the forks. `[E]`
+  - [x] Cost of maintaining five forks stated (hours per upstream release), with the option to upstream the extension and drop the forks. `[E]`
+  - verified-here: ls patches/*/*.patch -> 12 patches (binutils 1, gcc 5, spike 3, qemu 3, newlib 0); git -C gcc log --oneline xattn -> 5 commits above the pin; wc -l patches/gcc/*.patch -> 5081; derived 23.75 h if all five bump, 54.85 h a year as forks, 14.5 h a year if upstreamed; 108 lines appended, no existing line changed
 
 ---
 
