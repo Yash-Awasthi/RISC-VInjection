@@ -13,6 +13,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "tools"))
 import attn_host  # noqa: E402
 import attn_model as am  # noqa: E402
+import tolerances  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -71,7 +72,8 @@ def test_fully_masked_row_is_nan(lib):
     y = case.read_y(mem)
     assert np.all(np.isnan(y[2]))
     keep = [0, 1, 3]
-    np.testing.assert_allclose(y[keep], case.expected()[keep], atol=1e-4)
+    np.testing.assert_allclose(y[keep], case.expected()[keep],
+                               atol=tolerances.ATOL_F32)
 
 
 def bad_cfg(**kw):

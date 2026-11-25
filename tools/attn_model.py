@@ -12,6 +12,8 @@ import struct
 
 import numpy as np
 
+import tolerances
+
 ATTN_MATCH = 0x0600107B
 ATTN_MASK = 0x0600707F
 DT_F32, DT_BF16 = 0, 1
@@ -161,4 +163,4 @@ class Case:
 
     def tolerance(self):
         """Absolute tolerance for comparing Y with expected()."""
-        return 2.0 ** -7 if self.out_dt == DT_BF16 else 1e-4
+        return tolerances.for_dtype(self.out_dt)

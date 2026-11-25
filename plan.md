@@ -308,7 +308,8 @@ file, and `artifacts/` is hand-collected.
 
 - [x] Randomised differential testing: 1,000 random shapes, dtypes, head counts, mask types and scales against `tools/attn_model.py`; report failures by category. `[D]`
   - verified-here: `scripts/random_diff.py --cases 1000` -> `1000 cases, 0 failures`; `.venv/bin/python -m pytest -q tests/test_random_diff.py` -> `3 passed`
-- [ ] State the tolerance derivation once (float32 accumulation order, bf16 input rounding) in `docs/theory.md`, and use it everywhere instead of per-test magic numbers. `[D]`
+- [x] State the tolerance derivation once (float32 accumulation order, bf16 input rounding) in `docs/theory.md`, and use it everywhere instead of per-test magic numbers. `[D]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_tolerances.py tests/test_core.py tests/test_vectors.py` -> `62 passed`; frozen-vector max abs error 1.43e-06 with ATOL_F32=1e-4 and ATOL_BF16=2^-7 now defined once in tools/tolerances.py
 - [x] Accumulation-order analysis: prove the spike, QEMU and host paths sum in the same order, or make the order explicit in `attn_core.h` and assert it. `[D]`
   - verified-here: `.venv/bin/python -m pytest -q tests/test_accumulation_order.py` -> `14 passed`; the host path is bit-exact against the ascending-k order the header states, a reordered sum is detected, and include/attn_core.h is unchanged
 - [ ] Boundary shapes: n=1, e=1, heads=1, head_dim=1, n>cache, empty mask, maximum dims from the descriptor fields. `[D]`
