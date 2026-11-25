@@ -363,7 +363,8 @@ that a machine can read, failures that name the fix.
 - **m6.2.1 Submission package**
   - [ ] Each patch with a commit message in the project's style, a cover letter, and a documented test plan a reviewer can run. `[E]`
 - **m6.2.2 Ownership**
-  - [ ] `CODEOWNERS` for `patches/`, `include/`, `scripts/`; a review checklist for anything touching `attn_core.h` (spec, vectors, all three executions). `[E]`
+  - [x] `CODEOWNERS` for `patches/`, `include/`, `scripts/`; a review checklist for anything touching `attn_core.h` (spec, vectors, all three executions). `[E]`
+  - verified-here: .venv/bin/python -m pytest -q tests/test_repo_layout.py -> 7 passed in 0.09s
 
 ### M6.3 Operability and long-term cost
 
