@@ -47,7 +47,9 @@ write_build_info() {
       "$(uname -sm)" "$(nproc)" "$JOBS"
     printf 'host cc:  %s\n' "$(cc --version 2> /dev/null | head -1)"
     printf 'host c++: %s\n' "$(c++ --version 2> /dev/null | head -1)"
-    printf 'python:   %s\n' "$(python3 --version 2>&1 | head -1)"
+    printf 'python:   %s (floor %s)\n' \
+      "$(python3 --version 2>&1 | head -1)" "$(pin_of PYTHON_VERSION)"
+    printf 'pylock:   %s\n' "$(pin_of PYTHON_LOCK)"
     printf 'numpy:    %s\n' \
       "$(python3 -c 'import numpy; print(numpy.__version__)' 2> /dev/null || echo none)"
     printf '\nsubmodules (pinned = versions.env, built = what is checked out):\n'
@@ -63,12 +65,12 @@ write_build_info() {
     done
     printf '\noutputs:\n'
     printf '  gcc    %s\n' \
-      "$($TC/bin/riscv64-unknown-elf-gcc --version 2> /dev/null | head -1 || echo none)"
+      "$("$TC"/bin/riscv64-unknown-elf-gcc --version 2> /dev/null | head -1 || echo none)"
     # Spike has no --version; its configure-time stamp is the next best record.
     printf '  spike  %s\n' \
       "$(git -C "$REPO/spike" describe --always --dirty 2> /dev/null || echo none)"
     printf '  qemu   %s\n' \
-      "$($B/qemu/qemu-system-riscv64 --version 2> /dev/null | head -1 || echo none)"
+      "$("$B"/qemu/qemu-system-riscv64 --version 2> /dev/null | head -1 || echo none)"
   } > "$file"
   log "$file"
   sed 's/^/   /' "$file"
@@ -188,6 +190,18 @@ step_qemu() {
     --disable-werror
   run_logged "$B/qemu" make.log make -j"$JOBS"
 }
+
+usage() {
+  sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  JOBS       parallelism (default: all cores)\n'
+  printf '  XATTN_OUT  install prefix (default: <repo>/out)\n'
+  printf '  TMPDIR     set to build/tmp by this script\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
 
 steps=("$@")
 [ ${#steps[@]} -eq 0 ] && steps=(binutils gcc newlib libgcc dtc spike qemu)

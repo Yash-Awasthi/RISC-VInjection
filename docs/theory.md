@@ -108,6 +108,19 @@ fixes the order (index order, no fused multiply-add). Spike, QEMU and the
 host model therefore give bit-identical results, and the compiler can
 prove that a C loop computes exactly the same values.
 
+**Tolerance.** The derivation lives once, in `tools/tolerances.py`, and
+every test imports it. Binary32 has unit roundoff `u = 2^-24`. Each dot
+product sums at most `e = 64` terms in index order, so
+`gamma_e = e*u/(1 - e*u) ~ 3.9e-6` bounds its relative error, and the 14
+frozen vectors measure `max |Y - Yref| = 1.43e-6`. `ATOL_F32 = 1e-4` is
+therefore a stated margin for `expf` and libm differences, not an error
+bound. A bf16 output rounds that binary32 result to nearest even, which
+adds at most half an ulp: `2^-7` for `|Y| < 4`. The bf16 vectors reach
+`|Y| = 4.53` (half an ulp `2^-6` there) yet differ by 0, because both
+sides round the same binary32 value. The two bounds differ in kind: the
+f32 one is a margin over accumulated rounding, the bf16 one the output
+quantization step itself.
+
 ### 1.5 Cost
 
 For one layer the work is dominated by the four projections

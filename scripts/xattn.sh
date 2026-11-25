@@ -23,6 +23,16 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 P=$REPO/scripts/patches.sh
 COMPONENTS=(binutils gcc spike qemu)
 
+usage() {
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  none; submodules and out/ are the inputs\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 case ${1:-} in
   remove|restore)
     verb=$1

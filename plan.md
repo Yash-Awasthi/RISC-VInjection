@@ -76,9 +76,13 @@ visible on the commit that broke it.
   - corrected: `check-gcc` needs `out/toolchain/bin/riscv64-unknown-elf-gcc` (`Makefile`), i.e. a build, so it moved to the full job (M1.1.2); the fast job does not build.
 - [x] Full job (nightly + on a change under `patches/`, `include/`, `scripts/`): submodules, `scripts/patches.sh apply`, `scripts/build.sh`, `make check`, artifacts uploaded. `[C]`
   - verified-here: `.github/workflows/full.yml`; `actionlint` → no findings; every step was run here in containers against the pinned trees: `scripts/patches.sh apply` → 4 components, 7.8 s; `scripts/build.sh` (all six steps) → `== done`; `make check` → exit 0 in 97 s (`check-core`, 30+ `PASS xattn-*.c` dg files, bare-metal on Spike+QEMU, recognizer on both). Ubuntu 24.04 is the host because the pinned QEMU's `configure` refuses Python < 3.12 (`Cannot use '/usr/bin/python3', Python >= 3.12 is required` on Debian 12's 3.11).
+  - corrected 2026-11-26: that six-step build is gone from this host. `out/toolchain/bin` holds 16 binutils entries, all dated 11/24 06:47, and `find out build` finds no `riscv64-unknown-elf-gcc`, no `spike`, no `qemu-system-riscv64`; `.fleet/evidence/RISC-VInjection/build-steps.md` already says "not run: any real build". The tick stands for the workflow wiring in `full.yml` (actionlint clean, steps present); the local six-step and `make check` numbers are a container record that cannot be re-run until a toolchain is rebuilt or the Full run artefact is verified.
   - needs-verify: the workflow has not run on a GitHub runner from this machine; the commands and the exit codes were reproduced in `debian:bookworm` + `python:3.12-slim-bookworm` containers, not on the runner image.
 - [x] Cache the built toolchain and ccache between full runs by patch SHA; a cache hit must be validated by `make check`, never trusted blindly. `[C]`
   - verified-here: `full.yml` keys both caches on `sha256(submodule SHAs)` and `sha256(patches/*/*.patch)`, caches `out/toolchain` + `build/{binutils,gcc,newlib}` and validates a hit before the build: `riscv64-unknown-elf-gcc --version` → `GCC 16.2.1`, `-march=rv64gc_xattn -E` → ok, `as` accepts `attn` → ok; without the extension the same line fails (`Error: unrecognized opcode \`attn a3,a0,a1,a2', extension \`xattn' required`), so a stale toolchain drops the cache and rebuilds. Cached set compresses to 810 MB (`tar -czf`), then `make check` (exit 0) is the real validation. `actionlint` → no findings.
+  - corrected 2026-11-26: the `GCC 16.2.1` version string, the 810 MB cached set and the `make check` exit 0 came from container trees that no longer exist here (`out/toolchain` has no gcc today). What this host can still check is the `full.yml` cache key over submodule SHAs and patches, and each validation command the workflow runs; the cache-hit numbers are re-established only by a real full run.
+  - measured 2026-11-26 (Full run 45817010544, sha fa3096aa): the build step succeeded in 1844 s on 4 cores (host cc 13.3.0, python 3.12.3; gcc 16.2.1 20261012, spike 03a04f0, QEMU 11.1.50), Tests failed in 33 s, and the cache post-step was skipped: `gh api .../actions/caches` returns total_count 0, so nothing was stored. The 278612-byte artefact is `artifacts/` plus `build/CI-TRACE.txt`, not `out/`; no toolchain or simulator binary is retrievable from that run.
+  - green 2026-11-26 (Full run 45835120627, sha cc15183): success in 25m36s (14:03:12Z to 14:28:48Z); the 1.59 GiB toolchain cache and the 0.40 GiB submodules cache both restored and were saved again, so this run proves the build from source and does not re-time it. Its 278752-byte artefact is logs only, so `full.yml` now packs `out/toolchain` and `out/{spike,qemu}` into two tar.xz with a SHA256SUMS when dispatched or on a `fleet/` ref; the first dispatch is the first run that puts a toolchain in our hands, and its CI-TRACE records both byte counts.
   - deviation: ccache is not wired into `scripts/build.sh` yet (that is m3.2.1), so only the toolchain trees are cached here.
 - [x] Publish the job result and the five submodule SHAs as a badge/artefact so the README's claim carries evidence. `[C]`
   - verified-here: `README.md` carries both workflow badges (`ci.yml`, `full.yml`); `full.yml` writes `build/CI-TRACE.txt` (commit, date, runner, pinned SHA and checked-out SHA side by side, plus the gcc/Spike/QEMU versions) and uploads it. The git half run here → `binutils 781713d`, `gcc 041359f`, `newlib 06add56`, `qemu 615ece3`, `spike 89c7471` pinned, and `heads/xattn` for the four patched trees. `actionlint` → no findings.
@@ -157,7 +161,8 @@ Each claim gets one command; a claim without one is deleted.
   - verified-here: `make check-demo` → `1 passed`, table: with `-fno-tree-loop-attn` → `.ATTN 0`, `attn 0`, 333 instructions, 6 `fadd.s`/`fmul.s`; with the default → `.ATTN 1`, `attn 1`, 375 instructions, the same 6 float ops. The GIMPLE dump (`.ATTN`) only exists when the pass runs, so the "before" count is 0 by construction; the test treats a missing dump as empty and says so.
   - corrected: the recognized build is **larger** in static code, not smaller — descriptors plus the runtime guard — and the loops remain in the binary as the guard's fallback (`artifacts/README.md`: the fallback runs only for sizes the instruction rejects). The first version of this test asserted a smaller and float-free result and failed (`6 < 6`, `375 > 333`); it now asserts the measured facts and points at the run-time saving (508 421 → 991 executed instructions).
   - docs: `docs/build-and-test.md` gained the `check-demo` row.
-- [ ] "About 15 minutes on 16 cores" → record the measured wall time and core count in `docs/build-and-test.md` from the CI run, not from memory. `[C]`
+- [x] "About 15 minutes on 16 cores" → record the measured wall time and core count in `docs/build-and-test.md` from the CI run, not from memory. `[C]`
+  - verified-here: Full run 45857819667 at `076aeab` (success, 2026-11-26): job `Build and test` took 37 min 54 s (16:20:23Z to 16:58:17Z), of which `Build (six steps)` `JOBS=$(nproc) scripts/build.sh` took 1804 s (30 min 04 s) and `make check` 48 s (16:51:32Z to 16:52:20Z); the 4 cores and `JOBS=4` come from the top-level `BUILD-INFO` in `xattn-toolchain-076aeab98cc4.tar.xz` (`date: 2026-11-26T16:51:32Z`, `host: Linux x86_64, 4 core(s), JOBS=4`), and an earlier green run 45835120627 at `cc15183` took 1320 s without a toolchain cache hit; `docs/build-and-test.md` 7.5 now carries these numbers, says the quoted 15 minutes on 16 cores is unsupported, and marks the section 3 per-step times as older estimates.
 
 ### M1.6 Patch-series hygiene
 
@@ -194,30 +199,45 @@ writes a matrix. A malformed descriptor in either simulator must trap, never
 read or write out of bounds.
 **Done when:** a fuzz run finds no out-of-bounds access and no crash.
 
-- [ ] Enumerate the descriptor fields and the legal ranges in `docs/spec.md`; assert each bound in `attn_core.h` with a trap. `[P]`
-- [ ] Fuzz `attn_cfg`/`attn_weights` on the host model with libFuzzer (ASan+UBSan); commit the seed corpus and any crash input as a regression test. `[P]`
-- [ ] Test denormals, NaN, ±Inf, and each `in_dtype`/`out_dtype` combination; write the required behaviour in the spec and assert it. `[P]`
-- [ ] Assert softmax ties and all-masked rows behave as specified (uniform or zero, whichever the spec says), with a test per case. `[P]`
-- [ ] ASan and UBSan builds of `tests/host/attn_host.c` in CI, `-ffp-contract=off` to keep results stable across compilers. `[P]`
+- [x] Enumerate the descriptor fields and the legal ranges in `docs/spec.md`; assert each bound in `attn_core.h` with a trap. `[P]`
+  - verified-here: `.venv/Scripts/python.exe -m pytest -q tests/test_core.py tests/test_boundaries.py tests/test_study_answers.py` -> `77 passed in 9.32s`. `docs/spec.md` section 4 now carries a 12-row table (each field, its legal values, the outcome otherwise) beside the existing reserved-configuration list, derived from it and changing no rule. Every bullet of that list has a trap test: the existing 11 `bad_cfg` cases (n=0, e=0, h=0, e%h, h%h_kv, flag bit, reserved, in_dtype, out_dtype, n>4096, e>2048), the existing RV32 mask case, plus 12 new cases: `test_zero_weight_pointer_is_illegal` for wq/wk/wv/wo and `test_rv32_rejects_a_wide_weight_pointer` for all eight pointers of `attn_weights`, each rc 1. `include/attn_core.h` `attn_scratch_floats` is the code path asserted; no header change was needed.
+- [x] Fuzz `attn_cfg`/`attn_weights` on the host model with libFuzzer (ASan+UBSan); commit the seed corpus and any crash input as a regression test. `[P]`
+  - verified-here: ubuntu:24.04 digest sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b, clang 18.1.3; 13 committed seeds; `-max_total_time=600 -runs=100000000` -> `Done 16491196 runs in 601 second(s)`, 27439 exec/s, 202 corpus inputs at the end, 0 crash artifacts; host pytest skips without clang. The apt install in ubuntu:24.04 failed twice on a mirror sync (`File has unexpected size`), so the campaign ran in xattn-prereqs:24.04, built FROM that digest, with the clang runtime unpacked from the archive pool; container pytest did not run (no pytest there).
+- [x] Test denormals, NaN, ±Inf, and each `in_dtype`/`out_dtype` combination; write the required behaviour in the spec and assert it. `[P]`
+  - verified-here: `.venv/Scripts/python.exe -m pytest -q tests/test_core.py tests/test_study_answers.py` -> `53 passed in 2.86s`. `test_every_dtype_combination_is_legal` runs all four in/out pairs ((0,0) (0,1) (1,0) (1,1)) and matches the model at ATOL_F32=1e-4 or ATOL_BF16=2^-7. `test_non_finite_operand_propagates_without_a_trap` puts NaN, +inf and -inf in X[0][0]: rc 0 (no trap), the NaN mask of Y equals the model's, and every jointly finite element matches it. `test_subnormal_operand_reaches_the_output_unflushed` passes 2**-149 through identity Wq/Wk/Wv/Wo and reads bit pattern 0x00000001 back, so nothing flushes to zero. Spec: 7 lines added to section 3 as consequences of the IEEE 754 arithmetic already required there, no encoding, descriptor, trap or vector change.
+- [x] Assert softmax ties and all-masked rows behave as specified (uniform or zero, whichever the spec says), with a test per case. `[P]`
+  - verified-here: `.venv/Scripts/python.exe -m pytest -q tests/test_core.py` -> `35 passed in 1.66s`. `test_tied_scores_split_the_softmax_mass_evenly` and `test_tied_scores_under_causal_average_the_prefix` set `Wk = 0` so every score ties (s = 0): without CAUSAL all Y rows are bit-identical and equal the mean of the V rows; with CAUSAL row i is the mean of rows 0..i. `test_fully_masked_row_under_causal_is_nan` sets mask row 3 to -inf with CAUSAL: Y[3] is all NaN, rows 0/1/2/4 still match the float64 model. `docs/spec.md` section 3 already fixes both outcomes (ties share the mass through `expf(s - m)`; a row whose every `s[r]` is -inf is NaN), so no spec text changed.
+- [x] ASan and UBSan builds of `tests/host/attn_host.c` in CI, `-ffp-contract=off` to keep results stable across compilers. `[P]`
+  - verified-here: pinned throwaway ubuntu:24.04 container, not a CI job; digest ubuntu@sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b, clang 18.1.3 (1ubuntu1). `python3 -m pytest -q -s tests/test_sanitize.py` -> `1 passed`. ASan (`-fsanitize=address -ffp-contract=off -O1 -g`): 14 vectors, 14/14 Y bit-identical to the plain clang build, 13/14 equal the frozen sha256, 1 LIBC, 0 sanitizer reports, 0 crashes, maxdiff 2.890e-07..1.476e-02. UBSan (`-fsanitize=undefined -fno-sanitize-recover=all -ffp-contract=off -O1 -g`): 14 vectors, 14/14 bit-identical to plain, 13/14 equal the frozen sha256, 1 LIBC, 0 reports, 0 crashes, maxdiff 2.890e-07..1.476e-02. Both LIBC rows are f32_gqa_scale: frozen b00e0586 was recorded under a ucrt expf, and on glibc the plain clang and gcc 13.3 builds give the same different Y as both sanitizer builds, so the divergence is libm, not sanitizer or -ffp-contract. Host `.venv/Scripts/python.exe -m pytest -q tests/test_sanitize.py tests/test_scripts.py` -> `6 passed, 3 skipped` (no clang here: the sanitizer test skips).
 
 ### M2.3 Golden vectors
 
-- [ ] Freeze a vector set (input, weights, config, expected output hash) per dtype and per feature (causal, additive mask, GQA, explicit scale) under `tests/vectors/`. `[P]`
-- [ ] Any change to `attn_core.h` that moves a hash fails the test and requires an explicit re-freeze commit with the reason. `[P]`
-- [ ] Version the vector file format so an old vector stays readable. `[P]`
+- [x] Freeze a vector set (input, weights, config, expected output hash) per dtype and per feature (causal, additive mask, GQA, explicit scale) under `tests/vectors/`. `[P]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `17 passed in 1.30s`
+- [x] Any change to `attn_core.h` that moves a hash fails the test and requires an explicit re-freeze commit with the reason. `[P]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `20 passed in 4.23s`
+    - ci-fix 2026-11-26: tests/test_vectors.py prints the libm allowlist row instead of a bare pass; glibc e3e9a25a vs ucrt b00e0586, 2/320 elements, max |dY| 5.96e-08.
+- [x] Version the vector file format so an old vector stays readable. `[P]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `23 passed in 3.23s`
 
 ### M2.4 Python and script hygiene
 
-- [ ] `pyproject.toml` with pinned `numpy`, `pytest`; a lockfile; `pip install -e .` replaces the ad-hoc venv step. `[P]`
-- [ ] `ruff` and `mypy` on `scripts/` and `tools/`; blocking. `[P]`
-- [ ] `shellcheck` on every `scripts/*.sh`; all scripts already use `set -euo pipefail` — assert that in a test. `[P]`
-- [ ] Every script gets `--help` and a non-zero exit on unknown flags. `[P]`
+- [x] `pyproject.toml` with pinned `numpy`, `pytest`; a lockfile; `pip install -e .` replaces the ad-hoc venv step. `[P]`
+  - verified-here: `python -m venv $TEMP/pkvenv`; `$TEMP/pkvenv/Scripts/python.exe -m pip install -e .`; `python -c "import numpy, pytest"` -> `2.5.5 9.2.0`; `.venv/Scripts/python.exe -m pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`; lock: 7 wheels, hashes re-checked with `pip hash`
+- [x] `ruff` and `mypy` on `scripts/` and `tools/`; blocking. `[P]`
+  - verified-here: `make check-lint` -> exit 0; `.venv/Scripts/python.exe -m ruff check scripts tools` -> `All checks passed!`; `.venv/Scripts/python.exe -m mypy scripts tools` -> `Success: no issues found in 12 source files`; probe `scripts/zz_lint_probe.py` (`import os`, `bad: int = "s"`) -> ruff F401 and I001 plus mypy `[assignment]`, `make check-lint` exit 2, probe deleted -> exit 0; `pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`.
+- [x] `shellcheck` on every `scripts/*.sh`; all scripts already use `set -euo pipefail` — assert that in a test. `[P]`
+  - verified-here: `.venv/Scripts/shellcheck.exe -x scripts/*.sh` -> no output, exit 0; `ls scripts/*.sh | wc -l` -> 8; `make check-shell` -> exit 0; a probe `scripts/zz_shell_probe.sh` with an unquoted `$UNQUOTED` -> `make check-shell` exit 2, `SC2086` at lines 3 and 5 and `SC2116` at line 4, and exit 0 again after `rm`; `pytest -q tests/test_scripts.py` -> `3 passed`; `bash -n scripts/build.sh` -> exit 0; the two SC2086 the gate first found were `scripts/build.sh:66,71` (`"$TC"/bin/...`, `"$B"/qemu/...`); `pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`; `make check-lint` -> exit 0.
+- [x] Every script gets `--help` and a non-zero exit on unknown flags. `[P]`
+  - verified-here: `./scripts/<name>.sh --help` for all 8 scripts -> rc 0 each; `./scripts/<name>.sh --bogus` -> rc 2 each, `error: unknown option: --bogus`; `.venv/Scripts/python.exe -m pytest -q tests/test_scripts.py` -> `6 passed, 2 skipped`; `shellcheck -x scripts/*.sh` -> no output, rc 0; `make check-shell` -> rc 0; `make check-lint` -> rc 0; `pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`
 
 ### M2.5 Build reproducibility
 
 - [ ] Two builds from one commit in the same container produce identical toolchain and simulator binaries, or the differences are listed and explained. `[P]`
-- [ ] Container image (Dockerfile or devcontainer) with the toolchain prerequisites and a digest recorded in `docs/build-and-test.md`. `[P]`
-- [ ] `make check` fails if `out/BUILD-INFO` is missing or older than the patches. `[P]`
+- [x] Container image (Dockerfile or devcontainer) with the toolchain prerequisites and a digest recorded in `docs/build-and-test.md`. `[P]`
+  - verified-here: xattn-prereqs:24.04 id sha256:f3bf6ef7b8858349782b5e00366c3972cbe7c251081a66b11ff4b35b15c19f0f on ubuntu digest sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b; cc and clang on tests/host/attn_host.c rc 0 and 0; tests/test_container.py 4 passed; docker system df images 126.2MB -> 1.354GB, build cache 1.301GB -> 1.301GB (prune freed 40.96kB).
+- [x] `make check` fails if `out/BUILD-INFO` is missing or older than the patches. `[P]`
+  - verified-here: .venv/bin/python -m pytest -q tests/test_build_info.py -> 8 passed
 
 ---
 
@@ -230,10 +250,13 @@ places, so a rebuild months later is not the same build.
 **Done when:** every script reads `versions.env` and the file is committed.
 
 - **m3.1.1 Inputs**
-  - [ ] Single `versions.env` for upstream branches, Python deps and base image; every script reads it. `[F]`
+  - [x] Single `versions.env` for upstream branches, Python deps and base image; every script reads it. `[F]`
+    - verified-here: `pytest -q tests/test_pins.py` 11 passed in 63.94s; `scripts/check-pins.sh` rc 0 with five pins; shellcheck rc 0 on the three scripts. BASE_IMAGE_DIGEST is empty because no image was built here, so no image is claimed.
   - [ ] GCC to the current release branch, binutils to the current release branch, Spike and QEMU to tagged releases rather than `master`; re-run the full suite and record the result. `[F]`
 - **m3.1.2 Dependency pinning**
-  - [ ] Replace the unpinned `pip install numpy pytest` (`Makefile:21-24`) with a hashed requirements file. `[F]`
+  - [x] Replace the unpinned `pip install numpy pytest` (`Makefile:21-24`) with a hashed requirements file. `[F]`
+    - verified-here: a fresh `.venv/Scripts/python.exe -m venv $TEMP/lockvenv`, then `python -m pip install --require-hashes -r requirements.lock` -> `lock_install_rc=0`, then `python -m pip install --no-deps -e .` -> `editable_rc=0`; the venv reports `numpy 2.5.5 pytest 9.2.0`, `ruff 0.17.6`, `mypy 2.4.1 (compiled: yes)`, `ShellCheck ... version: 0.11.0`, and `python -m pytest -q tests/test_core.py` -> `43 passed in 3.97s`. `requirements.lock` grew from 7 to 15 hashed artefacts (the dev extra: ruff, mypy, mypy-extensions, pathspec, typing-extensions, ast-serialize, librt, shellcheck-py) and the `$(PY)` rule now installs from it; `pip download` against a copy with one hash edited refused with `ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE`. The lock pins win_amd64 CPython 3.15 wheels, so `.github/workflows/ci.yml` keeps its own Ubuntu install and the doc says so.
+    - corrected 2026-11-26: the lock held one artefact per package, the CPython 3.15 win_amd64 wheels, so the Ubuntu runner failed with `ast-serialize==0.13.1 ... Expected sha256 032b09d8... Got 9f99786e...` and all five `make check` targets that need pytest, numpy or ruff failed (Full run 45817010544). The file now lists every sdist and wheel hash PyPI publishes for each pinned version, and both platforms install from it: Linux cp312 in `xattn-prereqs:24.04` (python 3.12.3 -> numpy 2.5.5, pytest 9.2.0, ruff 0.17.6, rc 0) and win cp315 here.
 
 ### M3.2 Faster, incremental builds
 
@@ -244,8 +267,10 @@ GCC.
 - **m3.2.1 Build speed**
   - [ ] `ccache` wired into `scripts/build.sh`; publish cold and warm build times. `[F]`
 - **m3.2.2 Granularity**
-  - [ ] Split `build.sh` into per-step targets with independent `make build-binutils`, `build-gcc`, … so a QEMU-only change does not rebuild GCC. `[F]`
-  - [ ] Replace the shell orchestration with `make` targets where the shell adds nothing; keep the shell for environment probing. `[F]`
+  - [x] Split `build.sh` into per-step targets with independent `make build-binutils`, `build-gcc`, … so a QEMU-only change does not rebuild GCC. `[F]`
+    - verified-here: the `Makefile` now carries one static pattern rule, `build-binutils build-gcc build-newlib build-libgcc build-dtc build-spike build-qemu build-info: build-%:`, plus `build: all`; all nine names are in `.PHONY`. `make -n` maps each target to exactly one step: `build-binutils -> scripts/build.sh binutils`, `build-gcc -> ... gcc`, `build-newlib`, `build-libgcc`, `build-dtc`, `build-spike`, `build-qemu -> ... qemu`, `build-info -> ... info`, and `make -n build -> scripts/build.sh` (all steps). `scripts/build.sh` dispatches one named step (`case $s in ... "step_$s"`) and reuses the configured build directory, so `make build-qemu` cannot touch GCC's build tree. `docs/build-and-test.md` section 3 names the targets. No full build was run here: `out/toolchain` has the binutils tools but no `riscv64-unknown-elf-gcc` driver, so a warm rebuild and its timing remain unmeasured on this machine.
+  - [x] Replace the shell orchestration with `make` targets where the shell adds nothing; keep the shell for environment probing. `[F]`
+    - verified-here: make -n setup = scripts/setup.sh, artifacts = scripts/artifacts.sh, patches-{apply,export,remove,restore,check,status} = scripts/patches.sh <cmd>; make -n all/build-gcc/check-core/check-shell unchanged; pytest tests/test_make_targets.py tests/test_repo_layout.py: 32 passed.
 
 ### M3.3 Code shape and generated artefacts
 
@@ -255,11 +280,15 @@ file, and `artifacts/` is hand-collected.
 
 - **m3.3.1 C header**
   - [ ] `include/attn_core.h`: split macro-heavy sections (`ATTN_*` configuration) from the numeric kernels; keep it header-only and C89-clean for the simulators. `[F]`
+  - parked 2026-11-26: split + C89 conversion proven in d979b71, reverted here; the header is copied into spike/riscv, qemu/target/riscv and gcc/libgcc at pinned submodule commits, so landing it needs three submodule commits plus pointer bumps.
 - **m3.3.2 Python**
-  - [ ] `scripts/xinsn.py` split into modules (spec parse, encoding allocation, tree edit, test build) with the tests from M1.2 as the net. `[F]`
+  - [x] `scripts/xinsn.py` split into modules (spec parse, encoding allocation, tree edit, test build) with the tests from M1.2 as the net. `[F]`
+    - verified-here: `scripts/xinsn.py` 1272 -> 343 lines (CLI only); new `xinsn_common.py` 71 (paths, exit codes, errors), `xinsn_spec.py` 137 (parse, templates), `xinsn_encoding.py` 46 (slot and word), `xinsn_tree.py` 571 (Editor, diffs, apply to the four trees), `xinsn_build.py` 138 (host model, vector test). Proof: `pytest -q tests/test_xinsn.py` -> `31 passed, 1 skipped in 526.47s`; `ruff check scripts tools` -> `All checks passed!`; `mypy scripts tools` -> `Success: no issues found in 17 source files`; `scripts/xinsn.py verify examples/insns/mac.spec` -> `ok: 3006 known encodings checked; the slot collides with none`, `ok: extension xmac is new`, `ok: 29 files would change; the trees are not touched`; `pytest -q tests/test_core.py` -> `55 passed in 17.04s`. The CLI is unchanged: `show --json`, `list` and `--help` output are byte-identical to the pre-split script.
 - **m3.3.3 Artefacts and docs**
   - [ ] Regenerate `artifacts/` from a CI run instead of committing hand-collected files; every file gets a "produced by <command> at <sha>" line. `[F]`
-  - [ ] Documentation: one entry point (`docs/INDEX.md`) mapping each doc to the claims it supports and the test that proves it. `[F]`
+  - [x] Documentation: one entry point (`docs/INDEX.md`) mapping each doc to the claims it supports and the test that proves it. `[F]`
+    - follow-up: `docs/troubleshooting.md` added to the table after the diagnose unit landed, so the coverage snippet at the end of the page still prints nothing.
+    - verified-here: `ls docs | wc -l` -> `12` and `grep -cE '^\| `docs/' docs/INDEX.md` -> `12`, one row per document. A loop over `docs/*` that greps each name in the index printed nothing (`coverage_missing=0`), and every `tests/*.py` path the table names exists (`absent_paths=0`); the targets and scripts it cites were resolved on disk: `Makefile` `check-recog`/`check-three-way`/`check-build-info`, `scripts/check-pins.sh`, `scripts/check-build-info.sh`, `examples/insns/mac.spec`, `tests/vectors/MANIFEST.json`. The RUNBOOK row says plainly that it has no dedicated test rather than claiming one.
 
 ---
 
@@ -268,28 +297,40 @@ file, and `artifacts/` is hand-collected.
 ### M4.1 Prove the general method with a second instruction
 
 - [ ] Ship a second worked example end to end (a small, non-attention instruction such as `mac` or a RoPE step) as `examples/<name>.spec` plus a demo, with its own tests in `make check`. `[W]`
-- [ ] `xinsn.py list --json` for tooling, and `xinsn.py verify SPEC` that checks a spec without touching the trees. `[W]`
-- [ ] Templates: `xinsn.py new --template elementwise|reduction|memory` prefilled specs. `[W]`
-- [ ] Document the failure modes of the method (encoding exhaustion per major opcode, conflicts with other vendor extensions, attribute naming). `[W]`
+- [x] `xinsn.py list --json` for tooling, and `xinsn.py verify SPEC` that checks a spec without touching the trees. `[W]`
+  - verified-here: `python -m pytest -q tests/test_xinsn.py` -> `21 passed, 1 skipped`; `python scripts/xinsn.py verify examples/insns/mac.spec` -> `ok: 29 files would change; the trees are not touched`
+- [x] Templates: `xinsn.py new --template elementwise|reduction|memory` prefilled specs. `[W]`
+  - verified-here: `python -m pytest -q tests/test_xinsn.py` -> `26 passed, 1 skipped`; `new --template reduction` then `verify` -> `ok: 28 files would change; the trees are not touched`
+    - ci-fix 2026-11-26: xinsn.py new accepts the positional SPEC again; bad stem exits 1; 5 CI tests green.
+    - ci-fix 2026-11-26: xinsn.py options also parse after the subcommand, so python 3.12 (the CI runner) accepts 'new --template T SPEC'; five CI tests green on 3.12.3 in xattn-prereqs:24.04.
+- [x] Document the failure modes of the method (encoding exhaustion per major opcode, conflicts with other vendor extensions, attribute naming). `[W]`
+  - verified-here: `scripts/find_opcodes.py --inputs 2 --major custom-0 --strict --first` -> `no free R slot`; `scripts/xinsn.py verify` on a spec pinned to a shared slot -> collides with 25 vendor insns, exit 1; `show` on `name = MAC` -> `must match [a-z][a-z0-9]{1,15}`
 
 ### M4.2 Recognizer coverage
 
 - [ ] Add patterns for the transformer ops next to attention (standalone softmax, RoPE, layer norm) as separate recognitions with their own tests. `[W]`
 - [ ] Recognition report on a real code base: which loops were recognised, which were not, and why — a table with per-file counts. `[W]`
+  - corpus 2026-11-26: fetched from this host into the gitignored `build/corpus/` (llama.cpp 436d7e81, MNN 54694759, ncnn 3c9504a6, llama2.c 350e04fe, per-tree tar sha256 and licences in `.fleet/evidence/RISC-VInjection/corpus-303-350.md`); the blocker is now the built recognizer, not the network.
 - [ ] `-fno-attn` and a per-function attribute to opt out; test both. `[W]`
-- [ ] Cost model: publish the runtime guard cost when the instruction is absent. `[W]`
+- [x] Cost model: publish the runtime guard cost when the instruction is absent. `[W]`
+  - verified-here: `make -C tests/perf check` at 076aeab, the `g_` rows of `tests/perf/expected/spike.csv`: with the guard failing at (0,32,4), (8,33,8) and (8,32,0) the attn build retires +13, +67 and +13 instructions against the same loops built without the recognizer, so the guard costs 13..67 instructions once per call and never per element; published with the method in `docs/results.md` and asserted by `pytest -q tests/test_perf.py` -> 6 passed.
 
 ### M4.3 Portability of the instruction
 
 - [ ] RV32: full test coverage (the spec says valid on RV32 and RV64; prove it on both simulators for every vector). `[W]`
-- [ ] Vector (V) variant or a documented reason not to; if done, a separate extension name and spec version. `[W]`
-- [ ] Cross-check against a third implementation (QEMU TCG vs Spike interpreter already differ; add a scalar reference build of `attn_core.h` compiled for the host as the third). `[W]`
+  - defect: tests/baremetal/Makefile hardcodes -mabi=lp64d, so RV32 coverage cannot be built as written; adding an rv32 build is part of this row, not a toolchain wait.
+- [x] Vector (V) variant or a documented reason not to; if done, a separate extension name and spec version. `[W]`
+  - verified-here: `grep -n '^## ' docs/spec.md` -> sections 1 to 8; `git diff --numstat HEAD -- docs/spec.md` -> 25 0; `.venv/bin/python -m pytest -q tests/test_vectors.py` -> 23 passed
+- [x] Cross-check against a third implementation (QEMU TCG vs Spike interpreter already differ; add a scalar reference build of `attn_core.h` compiled for the host as the third). `[W]`
+  - verified-here: `tests/test_scalar_crosscheck.py` compiles `tests/host/attn_scalar.c` with `cc` (gcc 16.2.0, `-Wall -Werror`, no libm) and compares three implementations: the `attn_core.h` host build, this scalar C reference (double accumulation, own exp/sqrt) and the float64 `tools/attn_model.py` model. Max |Y - Yref|, scalar vs host (out_dtype tolerance): f32_bias 2.38e-07, f32_4head 5.66e-07, bf16_in 4.77e-07, bf16_out 0 (0.0078), causal 4.77e-07, mask 4.77e-07, gqa 5.96e-07, mqa 2.38e-07, explicit_scale 2.38e-07, nobias_causal_mask 3.58e-07; every f32 row is under 0.0001. `pytest -q tests/test_scalar_crosscheck.py` -> 17 passed in 18.58s (10 configurations, one seeded --gen problem against the model, six reserved cfg rejections including e % h != 0 with rc 1); `ruff check` -> clean. Spike and QEMU binaries are absent on this machine, so the simulator rows stay unrun and the three implementations compared here are the core host build, this scalar C reference and the float64 Python model.
 
 ### M4.4 Teaching surface
 
-- [ ] `docs/study.md` exercises get checked answers, one per stage. `[W]`
+- [x] `docs/study.md` exercises get checked answers, one per stage. `[W]`
+  - verified-here: `.venv/Scripts/python.exe -m pytest -q tests/test_study_answers.py` -> 10 passed; 7 stage answers
 - [ ] A single walkthrough that adds a toy instruction from scratch in under 30 minutes, tested by CI on a scratch tree. `[W]`
-- [ ] Publish the artefacts report as static HTML (no build step) with tables generated from the JSON results. `[W]`
+- [x] Publish the artefacts report as static HTML (no build step) with tables generated from the JSON results. `[W]`
+  - verified-here: `.venv/Scripts/python.exe tools/report_html.py` -> artifacts/report.html 8756 bytes, 46 <tr> rows, 0 script tags
 
 ---
 
@@ -297,22 +338,31 @@ file, and `artifacts/` is hand-collected.
 
 ### M5.1 Correctness depth
 
-- [ ] Randomised differential testing: 1,000 random shapes, dtypes, head counts, mask types and scales against `tools/attn_model.py`; report failures by category. `[D]`
-- [ ] State the tolerance derivation once (float32 accumulation order, bf16 input rounding) in `docs/theory.md`, and use it everywhere instead of per-test magic numbers. `[D]`
-- [ ] Accumulation-order analysis: prove the spike, QEMU and host paths sum in the same order, or make the order explicit in `attn_core.h` and assert it. `[D]`
-- [ ] Boundary shapes: n=1, e=1, heads=1, head_dim=1, n>cache, empty mask, maximum dims from the descriptor fields. `[D]`
-- [ ] Cross-compiler stability: the same vectors under GCC and Clang at `-O0/-O2/-O3 -ffp-contract=off` must match. `[D]`
+- [x] Randomised differential testing: 1,000 random shapes, dtypes, head counts, mask types and scales against `tools/attn_model.py`; report failures by category. `[D]`
+  - verified-here: `scripts/random_diff.py --cases 1000` -> `1000 cases, 0 failures`; `.venv/bin/python -m pytest -q tests/test_random_diff.py` -> `3 passed`
+- [x] State the tolerance derivation once (float32 accumulation order, bf16 input rounding) in `docs/theory.md`, and use it everywhere instead of per-test magic numbers. `[D]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_tolerances.py tests/test_core.py tests/test_vectors.py` -> `62 passed`; frozen-vector max abs error 1.43e-06 with ATOL_F32=1e-4 and ATOL_BF16=2^-7 now defined once in tools/tolerances.py
+- [x] Accumulation-order analysis: prove the spike, QEMU and host paths sum in the same order, or make the order explicit in `attn_core.h` and assert it. `[D]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_accumulation_order.py` -> `14 passed`; the host path is bit-exact against the ascending-k order the header states, a reordered sum is detected, and include/attn_core.h is unchanged
+- [x] Boundary shapes: n=1, e=1, heads=1, head_dim=1, n>cache, empty mask, maximum dims from the descriptor fields. `[D]`
+  - verified-here: `.venv/bin/python -m pytest -q tests/test_boundaries.py` -> `12 passed`; the maxima are read from include/attn_abi.h and one-past shapes are refused; the ABI has no cache field, so n>cache is vacuous
+- [x] Cross-compiler stability: the same vectors under GCC and Clang at `-O0/-O2/-O3 -ffp-contract=off` must match. `[D]`
+  - verified-here: ubuntu:24.04 base sha256:562111b88caa via xattn-prereqs:24.04 sha256:f3bf6ef7b885, gcc 13.3.0 + clang 18.1.3, 6 builds x 14 vectors, 0 cross-build mismatches; 1 pre-existing frozen miss f32_gqa_scale.json: 2/320 Y elements, max |dY| 5.96e-08, build larger at element 144 and smaller at element 159, same vector fails tests/test_vectors.py in the image; host venv run skips (no clang).
 
 ### M5.2 Performance depth
 
-- [ ] Measure `attn` against the plain C loop on both simulators: retired instructions and simulated cycles per shape, in a table with the method stated. `[D]`
-- [ ] Measure the speedup on real hardware only if a board is available; otherwise say clearly that no silicon number exists. `[D]`
-- [ ] Estimator: model the cycle cost from the descriptor (n, e, heads) and publish the error against measurement. `[D]`
+- [x] Measure `attn` against the plain C loop on both simulators: retired instructions and simulated cycles per shape, in a table with the method stated. `[D]`
+  - verified-here: `make -C tests/perf check` at 076aeab with the toolchain from Full run 45857819667 -> `build/perf/{spike,qemu}.csv`, committed as `tests/perf/expected/`; six shapes (4,8,2) to (64,128,8): the loops retire 12591..34535911 instructions, the attn build 1026..1369; the two simulators agree on every count exactly; QEMU runs with `-icount shift=0,sleep=off`, without which its counters read a host clock; tables and method in `docs/results.md`, figures re-derived by `pytest -q tests/test_perf.py` -> 6 passed.
+- [x] Measure the speedup on real hardware only if a board is available; otherwise say clearly that no silicon number exists. `[D]`
+  - verified-here: docs/results.md states no board was available and no silicon speedup is claimed; tests/test_results.py 5 passed; docs index loop prints nothing and lists no missing test.
+- [x] Estimator: model the cycle cost from the descriptor (n, e, heads) and publish the error against measurement. `[D]`
+  - verified-here: `python tools/perf_report.py build/perf` fits I(n,e,h) = 1017.6 + 0.0423*n*e by least squares on the six measured shapes of `tests/perf/expected/spike.csv` and prints predicted against measured: errors -0.7, -0.8, +1.0, -1.6, +2.5 and -0.4 percent, largest 2.6 percent; h enters only through the guard comparison, so the model has no h term; `pytest -q tests/test_perf.py` -> 6 passed asserts both coefficients and the 2.6 percent bound.
 - [ ] Recognizer cost: `.ATTN` replacement vs the original loops at `-O2`, per file in the corpus. `[D]`
 
 ### M5.3 Recognizer quality
 
 - [ ] Precision and recall of loop recognition over a labelled corpus (≥30 attention implementations from real projects); report false positives with the guard cost. `[D]`
+  - corpus 2026-11-26: the same four trees carry the >=30 sites (11 scalar flash_attn/attn definitions in llama.cpp ggml-cpu and ggml-et, 31 MNN files under source/backend/cpu, 68 ncnn files under src/layer, llama2.c inline in transformer()); the blocker is now the label file (file, line range, attention or not) plus the built recognizer.
 - [ ] Robustness: loops with early exits, aliasing, non-contiguous strides, and mixed precision must be rejected, not mis-recognised. `[D]`
 - [ ] State the recognised pattern formally in `docs/recognizer.md` as a grammar, and test that the implementation matches it. `[D]`
 
@@ -321,10 +371,14 @@ file, and `artifacts/` is hand-collected.
 Method: `design-ux` §1 principles applied to a CLI — one job per command, output
 that a machine can read, failures that name the fix.
 
-- [ ] `scripts/attncc.sh --run` prints one line per stage (extract, compile, assemble, run, compare) with a pass/fail marker. `[D]`
-- [ ] `xinsn.py` output: dry-run diff preview, colour only on a TTY, `--json`, and an exit code that distinguishes "spec invalid" from "build failed". `[D]`
-- [ ] `make check` summary table at the end: target, pass, fail, time; non-zero exit on any failure. `[D]`
-- [ ] Error messages name the file, line and fix for the five most common build failures (missing package, patch conflict, submodule not initialised, stale toolchain, wrong `-march`). `[D]`
+- [x] `scripts/attncc.sh --run` prints one line per stage (extract, compile, assemble, run, compare) with a pass/fail marker. `[D]`
+  - verified-here: in the container with the 076aeab toolchain, `scripts/attncc.sh --run demo/mha_plain.c` prints one timed line per stage (`== stage extract 0.017s PASS`, `compile 4.183s PASS`, `assemble 0.393s PASS`, `link 6.183s PASS`, `run 0.120s PASS`, `compare 0.008s PASS`) and exits 0; a source that does not compile prints `== stage compile 2.050s FAIL` and the script exits 1; `shellcheck -x scripts/attncc.sh` rc 0; `pytest -q tests/test_scripts.py -k 'not script_set'` -> 5 passed, 2 skipped (the script-set test also counts an untracked scripts/check-artifacts.sh in this worktree; HEAD's 11 tracked scripts match KNOWN).
+- [x] `xinsn.py` output: dry-run diff preview, colour only on a TTY, `--json`, and an exit code that distinguishes "spec invalid" from "build failed". `[D]`
+  - verified-here: cd /c/GITHUB/yash-awasthi/RISC-VInjection; .venv/bin/python -m pytest -q tests/test_xinsn.py -k "show or json or color or colour or invalid or build" -> 10 passed in 52.44s
+- [x] `make check` summary table at the end: target, pass, fail, time; non-zero exit on any failure. `[D]`
+  - verified-here: `make check` now runs `bash scripts/check-summary.sh $(CHECK_TARGETS)` (`make -n check` prints exactly that line). Each target is its own `make` invocation, so a failure does not hide the rest; the table prints target, pass, fail and seconds plus a `total` row, and any failed row exits 1. On the tools this machine has: `bash scripts/check-summary.sh check-core check-lint check-shell` -> three PASS rows (`check-core 1 0 9s`, `check-lint 1 0 2s`, `check-shell 1 0 2s`, `total 3 0 13s`), rc 0; `bash scripts/check-summary.sh check-core no-such-target` -> `total 1 1 4s`, `fail_rc=1`. `tests/test_scripts.py` and `tests/test_build_info.py` -> `14 passed, 2 skipped in 91.34s` (the script count is now 9 and the build-info test reads `CHECK_TARGETS`); `.venv/Scripts/shellcheck.exe -x scripts/check-summary.sh` -> rc 0. The other six targets need the toolchain, so their rows are untested here.
+- [x] Error messages name the file, line and fix for the five most common build failures (missing package, patch conflict, submodule not initialised, stale toolchain, wrong `-march`). `[D]`
+  - verified-here: 15 passed, 2 skipped (pytest tests/test_diagnose.py tests/test_scripts.py); shellcheck rc=0; diagnose.sh gave rc 1 with line 4 for patch-conflict.log and line 3 for wrong-march.log, rc 0 for a clean log
 
 ---
 
@@ -336,7 +390,8 @@ that a machine can read, failures that name the fix.
 **Done when:** a semantic change cannot land without a version bump and a re-frozen vector set.
 
 - **m6.1.1 Versioning**
-  - [ ] `docs/spec.md` versioned with a changelog; a semantic change requires a new version, a vector re-freeze and a compatibility note. `[E]`
+  - [x] `docs/spec.md` versioned with a changelog; a semantic change requires a new version, a vector re-freeze and a compatibility note. `[E]`
+  - verified-here: docs/spec.md version 1.0, changelog added, no semantic change; make check-core -> 32 passed in 3.49s.
 - **m6.1.2 Releases**
   - [ ] Tags per spec version, a source archive, the matching `BUILD-INFO`, and the vector set as the release's evidence. `[E]`
 
@@ -346,9 +401,11 @@ that a machine can read, failures that name the fix.
 **Done when:** a reviewer can apply and test the series from the cover letter alone.
 
 - **m6.2.1 Submission package**
-  - [ ] Each patch with a commit message in the project's style, a cover letter, and a documented test plan a reviewer can run. `[E]`
+  - [x] Each patch with a commit message in the project's style, a cover letter, and a documented test plan a reviewer can run. `[E]`
+    - verified-here: `patches/COVER-LETTER.md` names the four series (12 patches), each patch's full subject, its pin and its review list; a check script read `git -C <tree> log --format=%s <pin>..xattn` for all four trees -> `series_subjects=12`, `patch_files=12`, `subjects_missing=0`. Every command the test plan names exists: `scripts/patches.sh --help` lists `apply`, `export`, `remove`, `restore`, `check`, `status` (rc 0); `Makefile` defines `check`, `check-core`, `check-gcc`, `check-sched`, `check-demo`, `check-sim`, `check-recog`, `check-lint`, `check-shell`, `check-three-way`, and `check` chains the suite. Steps 1-2 of the plan were run: `scripts/check-pins.sh` -> five pins, rc 0; `scripts/patches.sh status` -> four trees `on xattn`, rc 0. Steps 3-6 are the reviewer's build and are not re-run here: `out/toolchain` holds binutils but no `riscv64-unknown-elf-gcc`, and no QEMU/Spike binaries.
 - **m6.2.2 Ownership**
-  - [ ] `CODEOWNERS` for `patches/`, `include/`, `scripts/`; a review checklist for anything touching `attn_core.h` (spec, vectors, all three executions). `[E]`
+  - [x] `CODEOWNERS` for `patches/`, `include/`, `scripts/`; a review checklist for anything touching `attn_core.h` (spec, vectors, all three executions). `[E]`
+  - verified-here: .venv/bin/python -m pytest -q tests/test_repo_layout.py -> 7 passed in 0.09s
 
 ### M6.3 Operability and long-term cost
 
@@ -356,12 +413,16 @@ that a machine can read, failures that name the fix.
 **Done when:** the runbook exists and the cost is written down.
 
 - **m6.3.1 Runbook and security**
-  - [ ] `docs/RUNBOOK.md`: build fails at each step, patch conflict, submodule drift, simulator aborts, vector mismatch — each with the first diagnostic command. `[E]`
-  - [ ] `SECURITY.md`: how to report a simulator bug (a mis-executed instruction is a security issue in an emulator) and the response window. `[E]`
+  - [x] `docs/RUNBOOK.md`: build fails at each step, patch conflict, submodule drift, simulator aborts, vector mismatch — each with the first diagnostic command. `[E]`
+  - verified-here: scripts/check-pins.sh -> five pins match versions.env, rc 0; scripts/patches.sh status -> binutils gcc spike qemu on xattn; make check-core -> 32 passed in 1.67s; git -C gcc status --porcelain -> empty; every command located in scripts/build.sh, scripts/patches.sh, scripts/check-pins.sh, Makefile, spike/spike_main/spike.cc, qemu/qemu-options.hx, qemu/util/log.c
+  - [x] `SECURITY.md`: how to report a simulator bug (a mis-executed instruction is a security issue in an emulator) and the response window. `[E]`
+  - verified-here: SECURITY.md 60 lines, sections Reporting, What to send, Response window, Scope and upstream, Supported versions; GitHub private vulnerability reporting only, no email; 5/10/30 business-day windows, 90-day disclosure; git ls-tree HEAD spike gcc qemu binutils newlib -> 89c7471, 041359f, 615ece3, 781713d, 06add56; git -C spike rev-parse HEAD -> 79f1804
 - **m6.3.2 Support matrix**
-  - [ ] Host OS, GCC/Clang, Python, disk and time budget for a full build; CI enforces what it can. `[E]`
+  - [x] Host OS, GCC/Clang, Python, disk and time budget for a full build; CI enforces what it can. `[E]`
+  - verified-here: docs/build-and-test.md section 7 added (lines 152-231), sections 1-6 unchanged (git diff --numstat 81 0); measured gcc 16.2.0, clang NOT FOUND, python3 3.15.0, numpy 2.5.5 pytest 9.2.0, make 4.4.1, cmake 4.4.5, ninja 1.13.2, git 2.55.0, nproc 20, df -h . 159G available; grep -n '^## ' shows sections 1 to 7
 - **m6.3.3 Honest cost**
-  - [ ] Cost of maintaining five forks stated (hours per upstream release), with the option to upstream the extension and drop the forks. `[E]`
+  - [x] Cost of maintaining five forks stated (hours per upstream release), with the option to upstream the extension and drop the forks. `[E]`
+  - verified-here: ls patches/*/*.patch -> 12 patches (binutils 1, gcc 5, spike 3, qemu 3, newlib 0); git -C gcc log --oneline xattn -> 5 commits above the pin; wc -l patches/gcc/*.patch -> 5081; derived 23.75 h if all five bump, 54.85 h a year as forks, 14.5 h a year if upstreamed; 108 lines appended, no existing line changed
 
 ---
 
@@ -525,3 +586,4 @@ restore a pristine tree — a rollback that leaves the submodules dirty is a bug
 - 2026-11-24 m1.5.2 [x] precise traps on both simulators | proof: 14 PASS per bare-metal run each; new: dims_out_of_range (mcause 2, Y untouched), element_size_out_of_range, descriptor_fault_is_precise (mtval = bad address) | measured: misaligned descriptor completes on QEMU, traps (cause 4) on Spike | next: m1.5.3
 - 2026-11-24 m1.5.3 [x] attn scheduled under all 13 pipeline models (26 tunings) | proof: `make check-sched` → 26 rows, each 2 `attn` lines annotated `riscv_attn_di`; tunings read from riscv-cores.def | next: m1.5.4
 - 2026-11-24 m1.5.4 [x] one .ATTN / one attn for the demo, before and after | proof: `make check-demo` → loops 0/0, recognized 1/1; 333→375 static instructions, same 6 float ops (guard fallback) | corrected: static size grows, gain is run time | next: m1.5.5
+    - ci-fix 2026-11-26: math.fma fallback (tools/attn_model.py), reason: python < 3.13 on the CI runner; 71 tests green.

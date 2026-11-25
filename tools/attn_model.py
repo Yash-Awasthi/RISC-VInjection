@@ -8,9 +8,12 @@ instruction encoding and the byte layout of the rs2/rs3 descriptors, which
 tests/test_core.py checks against the C structs.
 """
 
+import math
 import struct
+from fractions import Fraction
 
 import numpy as np
+import tolerances
 
 ATTN_MATCH = 0x0600107B
 ATTN_MASK = 0x0600707F
@@ -53,10 +56,37 @@ def round_dtype(a, dt):
     return from_bf16_bits(bf16_bits(a)) if dt == DT_BF16 else a
 
 
+def _fma_fallback(a, b, c):
+    """Exact a*b + c, rounded once; raises OverflowError where math.fma does."""
+    q = Fraction(a) * Fraction(b) + Fraction(c)
+    if q == 0:
+        prod_neg = (math.copysign(1.0, a) < 0) != (math.copysign(1.0, b) < 0)
+        return -0.0 if prod_neg and math.copysign(1.0, c) < 0 else 0.0
+    return float(q)
+
+
+def fma(a, b, c):
+    """Fused multiply-add: one rounding, unlike float(a*b) + c.
+
+    math.fma exists from Python 3.13; before that the rational form is exact
+    for every finite input and float(Fraction) rounds correctly, subnormals
+    included.
+    """
+    native = getattr(math, "fma", None)
+    if native is not None:
+        return native(a, b, c)
+    a, b, c = float(a), float(b), float(c)
+    if not all(math.isfinite(v) for v in (a, b, c)):
+        return a * b + c        # NaN/Inf never round, so the split form is exact
+    return _fma_fallback(a, b, c)
+
+
 def reference(x, wq, wk, wv, wo, bq=None, bk=None, bv=None, bo=None,
               h=1, h_kv=0, causal=False, mask=None, scale=None):
     """Multi-head self-attention in float64.  Weights are [in][out]."""
-    f = lambda a: None if a is None else np.asarray(a, np.float64)
+    def f(a):
+        return None if a is None else np.asarray(a, np.float64)
+
     x, wq, wk, wv, wo = map(f, (x, wq, wk, wv, wo))
     bq, bk, bv, bo, mask = map(f, (bq, bk, bv, bo, mask))
     n, e = x.shape
@@ -116,7 +146,8 @@ class Case:
         self.n, self.e, self.h, self.h_kv = n, e, h, h_kv
         self.flags, self.in_dt, self.out_dt = flags, in_dt, out_dt
         kv = (h_kv or h) * (e // h)
-        g = lambda *s: rng.standard_normal(s).astype(np.float32)
+        def g(*s):
+            return rng.standard_normal(s).astype(np.float32)
         w = 1 / np.sqrt(e)
         self.x = g(n, e)
         self.wq, self.wk, self.wv, self.wo = (g(e, e) * w, g(e, kv) * w,
@@ -143,7 +174,8 @@ class Case:
         self.y_addr = im.reserve(n * e * (2 if out_dt == DT_BF16 else 4))
 
     def expected(self):
-        r = lambda a: round_dtype(a, self.in_dt)
+        def r(a):
+            return round_dtype(a, self.in_dt)
         return reference(r(self.x), r(self.wq), r(self.wk), r(self.wv),
                          r(self.wo), *self.b, h=self.h, h_kv=self.h_kv,
                          causal=bool(self.flags & F_CAUSAL), mask=self.mask,
@@ -161,4 +193,4 @@ class Case:
 
     def tolerance(self):
         """Absolute tolerance for comparing Y with expected()."""
-        return 2.0 ** -7 if self.out_dt == DT_BF16 else 1e-4
+        return tolerances.for_dtype(self.out_dt)

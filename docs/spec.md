@@ -5,6 +5,14 @@ form of the same definition is `include/attn_core.h`. Spike, QEMU and the
 host tests all run that file, and the tests compare it with an independent
 float64 model (`tools/attn_model.py`).
 
+## Changelog
+
+| Version | Date | Change | Compatibility |
+|---------|------|--------|---------------|
+| 1.0 | 2026-11-24 | Current encoding, version 1.0. Initial normative definition: encoding, descriptor layouts, semantics, reserved configurations, memory and exception behaviour, software interface. No semantic change accompanies this commit: encoding, MATCH/MASK, descriptors, semantics, traps all unchanged. | First version; no earlier specification exists. Frozen vector set: `tests/vectors/` (14 vectors and `MANIFEST.json`), regenerated only by `tools/freeze_vectors.py`; a header-hash mismatch fails the check until `--refreeze --reason TEXT` records why the set moved. |
+
+Version 1.0 is the current encoding; this commit adds governance text only and changes no semantics.
+
 ## 1. Encoding
 
 ```
@@ -106,6 +114,13 @@ each other but not necessarily with another `expf`.
 A row in which every `s[r]` is `-inf` produces NaN, exactly like the
 equivalent C code. NaN inputs propagate.
 
+Three consequences of that arithmetic are asserted by `tests/test_core.py`
+and add no new behaviour: subnormal operands and results are preserved
+(nothing flushes them to zero, on any of the three executions); an infinite
+or NaN operand makes every output element that depends on it non-finite and
+traps nothing; and both `in_dtype` values with both `out_dtype` values are
+legal, so all four combinations compute.
+
 ## 4. Reserved configurations
 
 The instruction raises an illegal-instruction exception, and writes
@@ -119,6 +134,23 @@ nothing, when any of these holds:
 - on RV32: any pointer in the descriptors has a non-zero upper half
 - `n > ATTN_MAX_N` (4096) or `e > ATTN_MAX_E` (2048), the limits of this
   implementation
+
+The same rules as ranges:
+
+| Field | Legal values | Otherwise |
+|-------|--------------|-----------|
+| `n` | 1 to 4096 | illegal-instruction |
+| `e` | 1 to 2048, with `e % h == 0` | illegal-instruction |
+| `h` | 1 to `e`, so every head has `d = e / h >= 1` | illegal-instruction |
+| `h_kv` | 0 (means `h`), or a divisor of `h` | illegal-instruction |
+| `flags` | bit 0 (CAUSAL) or bit 1 (SCALE), no other bit | illegal-instruction |
+| `in_dtype`, `out_dtype` | 0 (binary32) or 1 (bfloat16) | illegal-instruction |
+| `scale_bits` | any 32 bits; read only when SCALE is set | ignored otherwise |
+| `reserved` | 0 | illegal-instruction |
+| `mask` | 0, or the address of an `[n x n]` binary32 array | 0 means no mask |
+| `wq`, `wk`, `wv`, `wo` | a non-zero address | illegal-instruction |
+| `bq`, `bk`, `bv`, `bo` | 0 (no bias), or the address of a vector | 0 means no bias |
+| every 64-bit pointer in `rs2` and `rs3`, on RV32 | below 2^32 | illegal-instruction |
 
 ## 5. Memory and exceptions
 
@@ -156,3 +188,60 @@ checks whichever of the two outcomes the platform takes.
 - At `-O2`, GCC replaces C code that computes this definition with the
   instruction, with no flags or headers (see `docs/recognizer.md`).
 - Spike: `--isa=rv64gc_xattn`. QEMU: `-cpu rv64,xattn=on`.
+
+## 7. Versioning
+
+This document is normative. Its version is the one in the title and the one
+reported by `__riscv_xattn` (value 1000000 for version 1.0); they change
+together.
+
+A **semantic change** is any change to observable behaviour, including a
+trap: the encoding, MATCH/MASK, the descriptor layouts, section 3 semantics,
+section 4 reserved configurations, section 5 memory and exception behaviour,
+or any other normative statement. It requires all of the following:
+
+- a new spec version in the title and a new row in the changelog;
+- a re-frozen vector set at the new version;
+- a compatibility note in the commit message, stating what existing software
+  observes differently.
+
+A **cosmetic change** (comments, formatting, a bit-identical rewrite)
+requires no version bump, but the frozen check must still pass.
+
+Versions are never reused. MATCH (`0x0600107b`), MASK (`0x0600707f`) and the
+`attn_weights` and `attn_cfg` layouts are part of the ABI: changing any of
+them is a semantic change and cannot land without a version bump.
+
+**Re-freeze.** The frozen vector set is `tests/vectors/` (14 vectors and
+`MANIFEST.json`), produced by `tools/freeze_vectors.py --write` from the
+independent float64 model in `tools/attn_model.py` and checked against the
+host core. The manifest records the hash of `include/attn_core.h`; a change
+to that header fails the check until `tools/freeze_vectors.py --refreeze
+--reason TEXT` records why the set moved. A semantic change requires that
+re-freeze at the new version, and the recorded reason is the changelog's
+evidence.
+
+## 8. No vector (V) variant in version 1.0
+
+Version 1.0 defines one scalar fused instruction. It takes four address
+operands, computes in scalar binary32 arithmetic, and accumulates in the
+index order given in section 3.
+
+A V variant would be a different instruction, not an option on this one. It
+needs vector register operands instead of addresses, shapes expressed in
+units of VLEN and LMUL, a defined tail and mask policy (V0.t rather than the
+additive `mask` descriptor field), a per-lane accumulation order, and its own
+MATCH/MASK. Under section 7 that is a semantic change: it needs a separate
+extension name, a new spec version and a re-frozen vector set.
+
+Before such an instruction could exist, the following would have to be
+specified: how elements group across lanes, the reduction order within a
+lane group, the descriptor layout, trap and restart behaviour, the software
+interface, and a recognizer for the vector form.
+
+Version 1.0 does not define one because the bit-identical three-way evidence
+this specification relies on needs a vector implementation in both
+simulators. Neither Spike nor QEMU in this tree implements one. A
+VLEN-dependent definition would also make the same C code produce different
+results on different vector lengths, so there would be no stable result to
+freeze.

@@ -19,8 +19,33 @@
 
 set -euo pipefail
 
+usage() {
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  JOBS  parallelism for the builds (default: all cores)\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 cd "$REPO"
+
+# versions.env is the single record of the pins.  Read the Python floor and
+# lock path from it instead of repeating either literal here.
+PIN_FILE=$REPO/versions.env
+pin_of() { sed -n "s/^$1=//p" "$PIN_FILE" 2> /dev/null | head -1; }
+PYTHON_LOCK=$(pin_of PYTHON_LOCK)
+PYTHON_VERSION=$(pin_of PYTHON_VERSION)
+if [ -z "$PYTHON_LOCK" ] || [ -z "$PYTHON_VERSION" ]; then
+  echo "error: $PIN_FILE does not define PYTHON_LOCK and PYTHON_VERSION" >&2
+  exit 1
+fi
+if [ ! -f "$PYTHON_LOCK" ]; then
+  echo "error: PYTHON_LOCK=$PYTHON_LOCK from versions.env is missing" >&2
+  exit 1
+fi
 
 step() { printf '\n==== %s\n' "$*"; }
 
@@ -34,6 +59,13 @@ for h in gmp.h mpfr.h mpc.h zlib.h; do
 done
 pkg-config --exists glib-2.0 2> /dev/null || need+=(glib-2.0)
 python3 -c 'import venv' 2> /dev/null || need+=(python3-venv)
+if command -v python3 > /dev/null &&
+  ! python3 -c 'import sys; sys.exit(sys.version_info < tuple(int(p) for p in sys.argv[1].split(".")))' \
+    "$PYTHON_VERSION" 2> /dev/null; then
+  echo "error: python3 $(python3 --version 2>&1) is below" \
+    "PYTHON_VERSION=$PYTHON_VERSION in versions.env" >&2
+  exit 1
+fi
 
 if [ ${#need[@]} -gt 0 ]; then
   echo "missing: ${need[*]}"

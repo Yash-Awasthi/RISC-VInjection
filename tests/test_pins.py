@@ -8,11 +8,13 @@ reverse) fails here, before any toolchain is built.
 
 import os
 import pathlib
+import re
 import subprocess
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 ENV = REPO / "versions.env"
 CHECK = REPO / "scripts" / "check-pins.sh"
+SCRIPTS = REPO / "scripts"
 SUBMODULES = ["binutils", "gcc", "newlib", "qemu", "spike"]
 
 
@@ -117,3 +119,64 @@ def test_newlib_remote_is_the_canonical_source():
         check=True, capture_output=True, text=True,
     ).stdout.strip()
     assert url == "https://sourceware.org/git/newlib-cygwin.git", url
+
+
+def test_every_sha_in_versions_env_is_a_checked_pin():
+    """Every *_SHA belongs to a submodule and is the commit HEAD records."""
+    pins = read_env()
+    recorded = pinned_by_superproject()
+    shas = {k: v for k, v in pins.items() if k.endswith("_SHA")}
+    assert set(shas) == {name.upper() + "_SHA" for name in SUBMODULES}, shas
+    for name, sha in recorded.items():
+        key = name.upper() + "_SHA"
+        assert shas[key] == sha, f"{key} is not the pinned {name}"
+        assert re.fullmatch(r"[0-9a-f]{40}", shas[key]), shas[key]
+
+
+def test_paths_named_by_versions_env_exist():
+    pins = read_env()
+    assert "PYTHON_LOCK" in pins, "versions.env names no Python dependency lock"
+    for key in ("PYTHON_LOCK",):
+        assert (REPO / pins[key]).is_file(), f"{key}={pins[key]} does not exist"
+
+
+def test_no_script_hardcodes_a_sha():
+    """A literal SHA in a script is a second, unchecked copy of a pin."""
+    sha = re.compile(r"(?<![0-9A-Za-z])[0-9a-f]{40}(?![0-9A-Za-z])")
+    for path in sorted(SCRIPTS.glob("*.sh")):
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            found = sha.search(line)
+            assert found is None, (
+                f"{path.name}:{n} hardcodes {found.group()}; "
+                "read it from versions.env"
+            )
+
+
+def test_scripts_read_python_pins_from_versions_env():
+    pins = read_env()
+    assert pins["PYTHON_VERSION"], "versions.env names no Python version"
+    assert pins["PYTHON_LOCK"], "versions.env names no Python lock"
+    for name in ("build.sh", "setup.sh"):
+        text = (SCRIPTS / name).read_text(encoding="utf-8")
+        assert "versions.env" in text, f"{name} never reads versions.env"
+        assert "PYTHON_VERSION" in text, f"{name} ignores PYTHON_VERSION"
+        assert "PYTHON_LOCK" in text, f"{name} ignores PYTHON_LOCK"
+
+
+def test_base_image_and_digest_describe_what_exists():
+    pins = read_env()
+    image = pins.get("BASE_IMAGE", "")
+    assert image, "versions.env names no container base image"
+    assert re.fullmatch(r"[a-z0-9][a-z0-9._/-]*(:[\w.-]+)?", image), image
+    assert "BASE_IMAGE_DIGEST" in pins, "BASE_IMAGE_DIGEST is missing"
+    digest = pins["BASE_IMAGE_DIGEST"]
+    if digest:
+        assert re.fullmatch(r"sha256:[0-9a-f]{64}", digest), digest
+    else:
+        # An empty digest is the claim that no image exists.  Nothing here
+        # builds one, so there must be no recipe claiming otherwise.
+        recipes = [REPO / "Dockerfile", REPO / ".devcontainer" / "Dockerfile"]
+        assert not any(p.is_file() for p in recipes), (
+            "BASE_IMAGE_DIGEST is empty but an image recipe exists"
+        )
+

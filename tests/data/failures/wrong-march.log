@@ -1,0 +1,5 @@
+== demo/mha_plain.c
+out/toolchain/bin/riscv64-unknown-elf-gcc -march=rv64gc_xatn -O2 demo/mha_plain.c
+cc1: error: unrecognized argument in option '-march=rv64gc_xatn'
+cc1: note: valid arguments to '-march=' are: rv32e rv32i rv32im
+make: *** [Makefile:40: demo] Error 1

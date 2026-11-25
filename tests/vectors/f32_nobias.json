@@ -1,0 +1,65 @@
+{
+  "arrays": {
+    "wk": {
+      "data": "Pwh1PnHjoT0QaIC82QbGPor+ozutx6+9MdxevhnP7j7THSK+PRtvvl6TKD1m/ns+a2ptPfX1c72Yp6G8mdLDPf6chL4l2ta+avM3Pv58mb4FBNW8R9pzvoixlr63aB8+85JkPlrwsTtOxg8+mu8WvwX34j4qgxi+dx8lv6Px6r2oJIY+Rl+FPhj9kz3pALQ+bpqqPmlUjzwATh6+jj82vd1SQzy8cCK+kgbMvrUl0z4yyPk9PAl8PTA8JL5xoQi+lpL6vVUyJj9EEpQ+t0qWPZjmEb48GAU82fCKPW+hAT6cuiK/Y3mcPo8Nqj4Jjpm+WgbpvRIBQr8oWoA+dFe0vEn7v7xzlYu+6yeiPp0KG75OIri+rdN3vscpxj3NG/2+RWcgPpGlrz7CRgA9mPGSPvAS37wgtk0+V6lCPpuDNz/VRNE+ZN+WPRg3ir7C4km+Ro/EPSoZBD4OSwW+YDXgvseKDT50bnk9/HGiPixzBjw0OA0/qzizPu1yLr6L9VC9GtC4vBLCFb5cOzW+j0lCPrBNfD59ASO++SycvvFGVT4ul5+8LYrQvm5i/Lwq/ko92jIxPqgEjr4CThS+KRtgPtzOJT4RfBs+7AL5PIeLwr46nY++CgcWPz2wuj4mLom+GVzlPq6jDb59Fhy+ZUuDPEB0K73Gg6u9ch1rvrJRwz7hFgo/GXiLPiGNw73FSAq+TFWxPTZxDL8LM6S9gH4GPpW7u73v38O9vXrHPap0Qb426Me+Wb2xPLJTHz7LC20+",
+      "dtype": "<f4",
+      "shape": [
+        12,
+        12
+      ]
+    },
+    "wo": {
+      "data": "0fvNvuI0gz7r7VQ9G5KFvkjrVD1j9ZS9fjgiPsuQar7jFNG72qyIvUUavj4pscc+0t2avj7vML/X1tc9dSKkvmI6gz4IdYA+nWctvtxyWD4gtOc8xj2lPqo1Ij4Bo+U+vii1PtZ/kz6+qK2+wafMvimeQD6ZU/Y6neYVPmYFDT6RwXc+/g3DPtvgMD/Gs/c8UiMMv0Iomr4kcOO+ZSLtPFQONL6G3Xu+CUWbvQWCm71ltym+BNjXvSPRFD+c9Jw+9sINvnpqUT7sAu4+BbQov31D3r22qyA/mCvMPvwcSD7ve3E+fHMSPoneFz8tPH4+KSTWvAXji75pzlY+QT3hPgkycz76B709tFVBPQkfGr7zTaG+cXG+vD6i07055jQ/tG5Ivnx0vr68Goe+thGQvaNMGb36sbk9Eo9YPrvFSr6e42s+Ut3fvKXJLj7h4cu+/RaaPhxelr6yMKA+NE3pvKfCkb6FJaK+d46CvheLnD57MCa+OJp8vgToj74dGbM+QCGQPnLWJr6Oh4s9Mhi8Poetjr54XUk/X8gnvoicub7Q194+RL8EvwSmzr6AVsM88q25vX/NLz76xPa+bAyTPkSQUb78Lbc9HglEPpb8xD38jQy+R+86vhljCb+MJgk/BgvtvqiRXT3BzY0+ifbWPkP/P73GFxK97KJcPnREgT5c23m+hMYXv3D2Bb7S3ZA+RQ1uvu7QXr4uJpg+WXABPoj1Eb69g9i+MRgQPjiqAr8PhGI9VUMGv1qF0L2JEYQ9",
+      "dtype": "<f4",
+      "shape": [
+        12,
+        12
+      ]
+    },
+    "wq": {
+      "data": "iefPvurlNDwvuiK/QDoiv223f72LAM2+w8nOvXiLTD+oQq4+p0WDvmcP4b0CCbQ+7rjhvXkAqb6MH9a+l17QPjZAHr4mAiA9et1DPo84Bj9A/WI+q9MtvssSRj52zxo/MmAgvuCWjL0/EGk+0AbJPk0UC71SrcY9Z1qLvsl2qjwVko29/59HPlbKlD67Et+9JTP4PQgAlj1Pmw++qG2vvnl4Iz2v2DY+ChtRPk1S9T0VUCo9Y1x6PDsoJj7QPjw9ahTHPXnErD5J3C2+SSZXPjCL47ww6f+9H7CfvvCbAr5wQoI92HsqPg4rdb7d2us+3xoCP1sZvb4CWkU+k9vWvVmiqL6TzVU9EJWePipFfz72//S84guEvtWbHT7ZwhK/TisnvlOmMz28P8q8eBtXv2aZwz1G3+69+H5qPm4PKb1teGG+qJe8vRNHhb7lB/A+31J/v9KTHzxqKBC+MzRJvr4LC7/wI/o91KOSvoTqKT0cxr69xe6RviwGl74mu1u+nTGHPqNwyL5qvyM8htmRPTPOab5bKlO+R3hUPn5vgj5zmQ0/csWmvmvnmz65e6c+uwd2PktoFz4OKcq9zxStPh53hzyqTue+UckVvSBZBb7E2CU+WQlvviGIAT0ea5k9g2smO387hT48Y26+5dSBPnbG3b6rlsu+rBMjO7en1j6Wgzq+8LKCPtp9lz3v85e+PH4tvXDSfz2+8RC8NjOtPvKsfz57bO8+bsVbvqiUfL5TsRw/C8cBPjI5yr1mLd4+",
+      "dtype": "<f4",
+      "shape": [
+        12,
+        12
+      ]
+    },
+    "wv": {
+      "data": "g3kZvpXGjrzsCdK+ZGjHPeRAfj4gxwe+rBVDPmDLM77Cml8+CLwuPpVuBb99SvA733TFPg+ufb3fvAM+rHmZvQW+tL44rYI+8n7ovuSTSL1fJjs+k2+gvr6lxz7gmF++GbEQvoRE8z6lkEo+8GaPvsRqlzyRsEg+kwZTPY8txL53AIK+wfy7u2eyzb6ycXi+D1CwPl85Fb+9vN+9dJEQvlmitD7InsY9uaa0PnBNqr0u/Ic9Oqj5PkQIEL4QvI4+S6svPyMf0b6DrzU+bpjbvYuNpr4zqPE9YINKvv1/IT7XJ+2+zK7ivuNuuz5+ph6/EDLzvhXnDL4QLJQ+h0TLvfAsNb79tBC/P9mcPQ9tGT459EY89o6evmO75zyG1qG9U2+vvuDttb0IU5m9MlAvvsqkyTuv19M9Bey/vW9rOD6TTDk/6YLWveHrsL4BKds8wtjePnmYIb1WgKw97O4fP68KuD3OtEK+0Tibvaj5wLw0ake9I3RPPsn3Jb3R5fC8zvstPieoWr0NVTY9YRcqvlewFr6QLBo+QIJ7vKL6vD6d3sO+cWmmPvR8uT7frC49GtA6vqSYQr7mtyi9sVyYvlT6jD1J7OG+QHJsPGHsHT8m7E4/ggGbvl7WlT65IsQ+KbyZPvjJLL//Ik4+pnddvmPQBj44bpe9u76LvgdTez9y02a+ZsACPzMS3z6sV2s9uw4wvgyk8725GNg8U0E1PkcPc76oorg+rjwXv7vaB74wQHi+y9SOvHPhG78Ukek9",
+      "dtype": "<f4",
+      "shape": [
+        12,
+        12
+      ]
+    },
+    "x": {
+      "data": "sQaOvjy5NT971nU/G6OgP629Sz8026I/jN0/PyMNCb4PY4c++oqXP+UbFz+OngW/a5IWPi5DQ7+HrY8/fHaSPuOdn78K+/q+Ki51v4PNjb5UGjG+qMahPkbjZz8Jg54/gWr+vtz4kL/CGf+/avuZvzXgtr9160W/obUzv/twND/O/sK/kSxgv7Uskz/obII//wrCvk4+rb+gXms/DMh6P2iEib8W0Oq/vcupPwLCCD/+GKe+VjqsP00MvL1QUBvAVL+GPipyYb/bY7u+ZqKgPzN+yr+yA1S+1l2hPvD7Fj5ARpW9gyRRP+pdHz6GfYi/9OWwPwTrdr6lqbK+ZB/Ev6EQgz85RTq+1S/3v2xBkj8E7/M/BMFUPmQJyL/zBPS/3Ib9vwMMqD5WFiA+mevjv8vGlT5hxQI/4H6Nv7A30z7R6q09wk0KP1CogD9+XbM+",
+      "dtype": "<f4",
+      "shape": [
+        7,
+        12
+      ]
+    }
+  },
+  "cfg": {
+    "e": 12,
+    "flags": 0,
+    "h": 3,
+    "h_kv": 0,
+    "in_dtype": 0,
+    "n": 7,
+    "out_dtype": 0,
+    "scale": null
+  },
+  "expected": {
+    "dtype": "<f4",
+    "sha256": "915a278466cb993e30f6afefe1ffc4960cf3d7a3a793d1608e68d922a1b7bfe1",
+    "shape": [
+      7,
+      12
+    ]
+  },
+  "features": [],
+  "format": 2,
+  "name": "f32_nobias"
+}

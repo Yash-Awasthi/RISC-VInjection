@@ -1,0 +1,7 @@
+== scripts/patches.sh apply gcc
+Applying: riscv: add the attn instruction
+Applying: riscv: schedule the attn instruction
+error: patch failed: gcc/config/riscv/riscv.md:4210
+error: gcc/config/riscv/riscv.md: patch does not apply
+Patch failed at 0002 riscv: schedule the attn instruction
+hint: Use 'git am --show-current-patch=diff' to see the failed patch

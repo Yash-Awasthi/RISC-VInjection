@@ -1,0 +1,5 @@
+== scripts/patches.sh apply
+== pinned commits
+git -C binutils rev-parse HEAD
+fatal: not a git repository: 'binutils/.git'
+make: *** [Makefile:12: patches] Error 128

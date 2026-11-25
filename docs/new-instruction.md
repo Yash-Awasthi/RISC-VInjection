@@ -262,3 +262,122 @@ clone.
   assumes one cycle of latency.
 - `apply` does not record what it added. Undo it with
   `git checkout -- . && git clean -f` in each tree.
+
+## 8. Failure modes
+
+### 8.1 Encoding exhaustion per major opcode
+
+A major opcode holds a fixed number of slots: 1024 for R (8 funct3 x 128
+funct7) and 32 for R4 (8 funct3 x 4 funct2), so the four custom opcodes
+give 4096 R slots and 128 R4 slots. `find_opcodes.py` reports what is
+left; `--strict` counts a slot shared with a vendor extension as taken.
+
+```bash
+scripts/find_opcodes.py --inputs 2 --major custom-0 --strict --first
+```
+```
+no free R slot
+```
+
+custom-0 has no R slot left, and the script exits 1. For R4 the same
+search answers with the remaining count on stderr and one slot on stdout:
+
+```bash
+scripts/find_opcodes.py --inputs 3 --major custom-3 --strict --first
+```
+```
+format R4, 3006 known encodings, 3 of 32 slots free
+custom-3 funct3=3 funct2=2      MATCH=0x0400307b MASK=0x0600707f
+```
+
+custom-0 has no R4 slot either:
+
+```bash
+scripts/find_opcodes.py --inputs 3 --major custom-0 --strict --first
+```
+```
+no free R4 slot
+```
+
+When the last strict slot goes, `slot = auto` stops instead of writing a
+colliding encoding: `no R4 slot is free of every known encoding`.
+
+### 8.2 Conflicts with other vendor extensions
+
+Without `--strict`, a slot shared only with vendor extensions counts as
+free, and the slots with the fewest vendor instructions come first.
+`--all` shows the ones at the end of the list:
+
+```bash
+scripts/find_opcodes.py --inputs 3 --major custom-3 --all | tail -3
+```
+```
+custom-3 funct3=0 funct2=0      MATCH=0x0000007b MASK=0x0600707f shared with 25 vendor insns (cv_add_h,cv_sub_h,cv_avg_h)
+custom-3 funct3=1 funct2=0      MATCH=0x0000107b MASK=0x0600707f shared with 25 vendor insns (cv_add_b,cv_sub_b,cv_avg_b)
+custom-3 funct3=7 funct2=0      MATCH=0x0000707b MASK=0x0600707f shared with 25 vendor insns (cv_add_sci_b,cv_sub_sci_b,cv_avg_sci_b)
+```
+
+A shared slot still works because `-march` enables one vendor extension
+at a time, so two instructions that decode the same word are never
+enabled together. `--strict` refuses those slots, and `verify` refuses a
+spec pinned to one. With `slot = custom-3:0:0`, saved as
+`C:/tmp/fm/shared.spec`:
+
+```
+name   = sharer
+inputs = 3
+writes = rd
+memory = no
+slot   = custom-3:0:0
+semantics:
+  return rs1 + rs2 + rs3;
+```
+
+```bash
+scripts/xinsn.py verify C:/tmp/fm/shared.spec
+```
+```
+sharer: format R4, custom-3:0:0, MATCH=0x0000007b MASK=0x0600707f, -march=..._xsharer
+C:/tmp/fm/shared.spec: custom-3:0:0 collides with cv_abs_h, cv_add_h, cv_and_h, cv_avg_h, cv_avgu_h, cv_dotsp_h, cv_dotup_h, cv_dotusp_h, cv_extract_h, cv_max_h, cv_maxu_h, cv_min_h, cv_minu_h, cv_or_h, cv_pack, cv_sdotsp_h, cv_sdotup_h, cv_sdotusp_h, cv_shuffle2_h, cv_shuffle_h, cv_sll_h, cv_sra_h, cv_srl_h, cv_sub_h, cv_xor_h already in the trees; pick a free slot
+```
+
+`verify` exits 1 and names every vendor instruction in the slot.
+
+### 8.3 Attribute naming
+
+The name becomes an extension name (`x<name>`), so it must match
+`[a-z][a-z0-9]{1,15}`. That keeps `-march=..._x<name>`,
+`__riscv_x<name>`, `ext_x<name>`, `-cpu rv64,x<name>=on` and the ELF
+attribute `x<name>1p0` valid. A name that cannot form an extension stops
+before any encoding is chosen. With `name = MAC`:
+
+```bash
+scripts/xinsn.py show C:/tmp/fm/MAC.spec
+```
+```
+C:/tmp/fm/MAC.spec: name 'MAC' must match [a-z][a-z0-9]{1,15}
+```
+
+A name whose extension already exists fails later, because its ELF
+attribute tag is taken. With `name = ventanacondops`:
+
+```
+name   = ventanacondops
+inputs = 2
+writes = rd
+memory = no
+slot   = auto
+semantics:
+  return rs1 + rs2;
+```
+
+```bash
+scripts/xinsn.py verify C:/tmp/fm/vend.spec
+```
+```
+ventanacondops: format R, custom-1 funct3=3 funct7=3, MATCH=0x0600302b MASK=0xfe00707f, -march=..._xventanacondops
+ok: 3006 known encodings checked; the slot collides with none
+C:/tmp/fm/vend.spec: the ELF attribute xventanacondops1p0 is taken; xventanacondops is an existing vendor extension
+```
+
+Both exits are 1.

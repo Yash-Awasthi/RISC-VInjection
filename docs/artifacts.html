@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Artefacts report</title>
+<style>
+body { margin: 2rem auto; max-width: 72rem; padding: 0 1rem;
+       font-family: system-ui, sans-serif; line-height: 1.4; }
+table { border-collapse: collapse; margin: 1rem 0 2rem; }
+th, td { border: 1px solid #bbb; padding: 0.25rem 0.5rem;
+         text-align: left; vertical-align: top; }
+th { background: #eee; }
+code { font-family: ui-monospace, monospace; }
+td.num { text-align: right; }
+caption { text-align: left; font-weight: bold; padding-bottom: 0.25rem; }
+</style>
+</head>
+<body>
+<h1>Artefacts report</h1>
+<p>Tables are generated from tests/vectors/*.json and artifacts/README.md. This page is committed, not built.</p>
+<h2>Committed artefacts</h2>
+<table>
+<thead><tr>
+<th>File</th>
+<th>Content</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>excerpt.c</code></td>
+<td>the input: <code>demo/mha_plain.c</code> without its <code>#include</code> lines</td>
+</tr>
+<tr>
+<td><code>attn/excerpt.s</code>, <code>.o</code>, <code>.dis</code></td>
+<td>assembly, object and disassembly with the recognizer on (the default)</td>
+</tr>
+<tr>
+<td><code>loops/excerpt.s</code>, <code>.o</code>, <code>.dis</code></td>
+<td>the same with <code>-fno-tree-loop-attn</code>: the loops as written</td>
+</tr>
+<tr>
+<td><code>dumps/attn_recog.gimple</code></td>
+<td>GIMPLE after the recognizer: descriptors, guard and the <code>.ATTN</code> call</td>
+</tr>
+<tr>
+<td><code>dumps/expand.rtl</code></td>
+<td>RTL after expansion: the <code>(attn ...)</code> insn</td>
+</tr>
+<tr>
+<td><code>attncc-run.txt</code></td>
+<td><code>scripts/attncc.sh --run</code>: both versions executed on Spike</td>
+</tr>
+</tbody>
+</table>
+<h2>Frozen vectors</h2>
+<table>
+<thead><tr>
+<th>Vector</th>
+<th class="num">Format</th>
+<th class="num">n</th>
+<th class="num">e</th>
+<th class="num">h</th>
+<th class="num">h_kv</th>
+<th class="num">d</th>
+<th>Dtypes</th>
+<th>Flags</th>
+<th>Features</th>
+<th>sha256</th>
+<th>Shape</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>bf16_bf16</code></td>
+<td class="num">2</td>
+<td class="num">16</td>
+<td class="num">32</td>
+<td class="num">4</td>
+<td class="num">0</td>
+<td class="num">8</td>
+<td>bf16 / bf16</td>
+<td>none</td>
+<td>none</td>
+<td><code>60d1960e4673</code></td>
+<td>16x32</td>
+</tr>
+<tr>
+<td><code>bf16_bf16_causal</code></td>
+<td class="num">2</td>
+<td class="num">16</td>
+<td class="num">32</td>
+<td class="num">4</td>
+<td class="num">0</td>
+<td class="num">8</td>
+<td>bf16 / bf16</td>
+<td>causal</td>
+<td>causal</td>
+<td><code>17e522d5dde8</code></td>
+<td>16x32</td>
+</tr>
+<tr>
+<td><code>bf16_f32</code></td>
+<td class="num">2</td>
+<td class="num">16</td>
+<td class="num">32</td>
+<td class="num">4</td>
+<td class="num">0</td>
+<td class="num">8</td>
+<td>bf16 / f32</td>
+<td>none</td>
+<td>none</td>
+<td><code>6fd00427e2ee</code></td>
+<td>16x32</td>
+</tr>
+<tr>
+<td><code>f32_baseline</code></td>
+<td class="num">2</td>
+<td class="num">5</td>
+<td class="num">8</td>
+<td class="num">1</td>
+<td class="num">0</td>
+<td class="num">8</td>
+<td>f32 / f32</td>
+<td>none</td>
+<td>none</td>
+<td><code>e68cd6f1f131</code></td>
+<td>5x8</td>
+</tr>
+<tr>
+<td><code>f32_bf16_out</code></td>
+<td class="num">2</td>
+<td class="num">8</td>
+<td class="num">16</td>
+<td class="num">2</td>
+<td class="num">0</td>
+<td class="num">8</td>
+<td>f32 / bf16</td>
+<td>none</td>
+<td>none</td>
+<td><code>5bf928d3c264</code></td>
+<td>8x16</td>
+</tr>
+<tr>
+<td><code>f32_causal</code></td>
+<td class="num">2</td>
+<td class="num">9</td>
+<td class="num">16</td>
+<td class="num">2</td>
+<td class="num">0</td>
+<td class="num">8</td>
+<td>f32 / f32</td>
+<td>causal</td>
+<td>causal</td>
+<td><code>03504e018c4b</code></td>
+<td>9x16</td>
+</tr>
+<tr>
+<td><code>f32_causal_mask</code></td>
+<td class="num">2</td>
+<td class="num">11</td>
+<td class="num">16</td>
+<td class="num">4</td>
+<td class="num">0</td>
+<td class="num">4</td>
+<td>f32 / f32</td>
+<td>causal</td>
+<td>causal, mask</td>
+<td><code>9d096ca73fc6</code></td>
+<td>11x16</td>
+</tr>
+<tr>
+<td><code>f32_gpt2_head</code></td>
+<td class="num">2</td>
+<td class="num">32</td>
+<td class="num">64</td>
+<td class="num">1</td>
+<td class="num">0</td>
+<td class="num">64</td>
+<td>f32 / f32</td>
+<td>causal</td>
+<td>causal</td>
+<td><code>b183752e463d</code></td>
+<td>32x64</td>
+</tr>
+<tr>
+<td><code>f32_gqa</code></td>
+<td class="num">2</td>
+<td class="num">10</td>
+<td class="num">32</td>
+<td class="num">8</td>
+<td class="num">4</td>
+<td class="num">4</td>
+<td>f32 / f32</td>
+<td>none</td>
+<td>gqa</td>
+<td><code>c58ee5cb58be</code></td>
+<td>10x32</td>
+</tr>
+<tr>
+<td><code>f32_gqa_scale</code></td>
+<td class="num">2</td>
+<td class="num">10</td>
+<td class="num">32</td>
+<td class="num">8</td>
+<td class="num">4</td>
+<td class="num">4</td>
+<td>f32 / f32</td>
+<td>scale</td>
+<td>gqa, scale</td>
+<td><code>b00e05866cc8</code></td>
+<td>10x32</td>
+</tr>
+<tr>
+<td><code>f32_mask</code></td>
+<td class="num">2</td>
+<td class="num">11</td>
+<td class="num">16</td>
+<td class="num">4</td>
+<td class="num">0</td>
+<td class="num">4</td>
+<td>f32 / f32</td>
+<td>none</td>
+<td>mask</td>
+<td><code>77a62423a516</code></td>
+<td>11x16</td>
+</tr>
+<tr>
+<td><code>f32_mqa</code></td>
+<td class="num">2</td>
+<td class="num">10</td>
+<td class="num">32</td>
+<td class="num">4</td>
+<td class="num">1</td>
+<td class="num">8</td>
+<td>f32 / f32</td>
+<td>none</td>
+<td>gqa</td>
+<td><code>891b43f68006</code></td>
+<td>10x32</td>
+</tr>
+<tr>
+<td><code>f32_nobias</code></td>
+<td class="num">2</td>
+<td class="num">7</td>
+<td class="num">12</td>
+<td class="num">3</td>
+<td class="num">0</td>
+<td class="num">4</td>
+<td>f32 / f32</td>
+<td>none</td>
+<td>none</td>
+<td><code>915a278466cb</code></td>
+<td>7x12</td>
+</tr>
+<tr>
+<td><code>f32_scale</code></td>
+<td class="num">2</td>
+<td class="num">6</td>
+<td class="num">8</td>
+<td class="num">2</td>
+<td class="num">0</td>
+<td class="num">4</td>
+<td>f32 / f32</td>
+<td>scale</td>
+<td>scale</td>
+<td><code>ad61d032ef78</code></td>
+<td>6x8</td>
+</tr>
+</tbody>
+</table>
+<h2>Summary</h2>
+<p>14 frozen vectors.</p>
+<table>
+<caption>Input / output dtype pairs</caption>
+<thead><tr>
+<th>Value</th>
+<th class="num">Vectors</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>bf16 / bf16</td>
+<td class="num">2</td>
+</tr>
+<tr>
+<td>bf16 / f32</td>
+<td class="num">1</td>
+</tr>
+<tr>
+<td>f32 / bf16</td>
+<td class="num">1</td>
+</tr>
+<tr>
+<td>f32 / f32</td>
+<td class="num">10</td>
+</tr>
+</tbody>
+</table>
+<table>
+<caption>Feature tags</caption>
+<thead><tr>
+<th>Value</th>
+<th class="num">Vectors</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>causal</td>
+<td class="num">4</td>
+</tr>
+<tr>
+<td>gqa</td>
+<td class="num">3</td>
+</tr>
+<tr>
+<td>mask</td>
+<td class="num">2</td>
+</tr>
+<tr>
+<td>scale</td>
+<td class="num">2</td>
+</tr>
+</tbody>
+</table>
+<table>
+<caption>Head counts</caption>
+<thead><tr>
+<th>Value</th>
+<th class="num">Vectors</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>1</td>
+<td class="num">2</td>
+</tr>
+<tr>
+<td>2</td>
+<td class="num">3</td>
+</tr>
+<tr>
+<td>3</td>
+<td class="num">1</td>
+</tr>
+<tr>
+<td>4</td>
+<td class="num">6</td>
+</tr>
+<tr>
+<td>8</td>
+<td class="num">2</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

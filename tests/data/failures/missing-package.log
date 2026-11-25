@@ -1,0 +1,6 @@
+== scripts/setup.sh: build tools
+missing: bison
+install with: sudo apt-get install -y bison flex
+Reading package lists... Done
+E: Unable to locate package texinfo
+make: *** [Makefile:5: setup] Error 100

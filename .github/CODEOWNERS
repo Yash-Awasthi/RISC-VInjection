@@ -1,0 +1,5 @@
+# Owners whose review a change to these paths needs before it can merge.
+*         @Yash-Awasthi
+/patches/ @Yash-Awasthi
+/include/ @Yash-Awasthi
+/scripts/ @Yash-Awasthi
