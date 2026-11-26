@@ -32,6 +32,45 @@ copy. `clang`/`lld` are optional too: they build the bare-metal tests with
 `.insn` before GCC exists. Disk: about 15 GB, most of it the full GCC
 history.
 
+### Container image
+
+`container/Dockerfile` installs the Ubuntu packages above plus the host
+build tools (gperf, dejagnu, the autotools, gettext, libisl-dev,
+libzstd-dev, libfdt-dev, libslirp-dev, ccache). The base is pinned by
+digest:
+
+```
+FROM ubuntu:24.04@sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b
+```
+
+Build it once; the context is `container/` only:
+
+```bash
+DOCKER_BUILDKIT=0 docker build --memory 4g --cpu-period 100000 \
+    --cpu-quota 400000 -t xattn-prereqs:24.04 container/
+```
+
+The legacy builder has no `--cpus` flag in engine 29; `--cpu-quota` and
+`--cpu-period` cap it at 4 CPUs. Local image id:
+`sha256:f3bf6ef7b8858349782b5e00366c3972cbe7c251081a66b11ff4b35b15c19f0f`.
+
+Run it with the repository mounted read-only:
+
+```bash
+docker run --rm --memory 4g --cpus 4 \
+    -v "$PWD:/src:ro" -w /src xattn-prereqs:24.04 bash
+```
+
+Probes inside that container: cc 13.3.0, clang 18.1.3, flex 2.6.4,
+bison 3.8.2, gperf 3.1, GNU Make 4.3, Python 3.12.3, dtc 1.7.0.
+`tests/host/attn_host.c` builds as a shared object with both compilers at
+`-std=c11 -O2 -Wall -Werror -ffp-contract=off -shared -fPIC -I include
+... -lm`: `cc` exits 0 and `clang` exits 0.
+
+The image holds prerequisites only. There is no RISC-V cross compiler, no
+Spike and no QEMU inside it: sections 2 and 3 build those from the mounted
+repository.
+
 ## 2. Sources
 
 ```bash

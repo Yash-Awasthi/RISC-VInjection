@@ -226,7 +226,8 @@ read or write out of bounds.
 ### M2.5 Build reproducibility
 
 - [ ] Two builds from one commit in the same container produce identical toolchain and simulator binaries, or the differences are listed and explained. `[P]`
-- [ ] Container image (Dockerfile or devcontainer) with the toolchain prerequisites and a digest recorded in `docs/build-and-test.md`. `[P]`
+- [x] Container image (Dockerfile or devcontainer) with the toolchain prerequisites and a digest recorded in `docs/build-and-test.md`. `[P]`
+  - verified-here: xattn-prereqs:24.04 id sha256:f3bf6ef7b8858349782b5e00366c3972cbe7c251081a66b11ff4b35b15c19f0f on ubuntu digest sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b; cc and clang on tests/host/attn_host.c rc 0 and 0; tests/test_container.py 4 passed; docker system df images 126.2MB -> 1.354GB, build cache 1.301GB -> 1.301GB (prune freed 40.96kB).
 - [x] `make check` fails if `out/BUILD-INFO` is missing or older than the patches. `[P]`
   - verified-here: .venv/bin/python -m pytest -q tests/test_build_info.py -> 8 passed
 
