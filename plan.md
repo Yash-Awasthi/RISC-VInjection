@@ -334,7 +334,8 @@ file, and `artifacts/` is hand-collected.
   - verified-here: `.venv/bin/python -m pytest -q tests/test_accumulation_order.py` -> `14 passed`; the host path is bit-exact against the ascending-k order the header states, a reordered sum is detected, and include/attn_core.h is unchanged
 - [x] Boundary shapes: n=1, e=1, heads=1, head_dim=1, n>cache, empty mask, maximum dims from the descriptor fields. `[D]`
   - verified-here: `.venv/bin/python -m pytest -q tests/test_boundaries.py` -> `12 passed`; the maxima are read from include/attn_abi.h and one-past shapes are refused; the ABI has no cache field, so n>cache is vacuous
-- [ ] Cross-compiler stability: the same vectors under GCC and Clang at `-O0/-O2/-O3 -ffp-contract=off` must match. `[D]`
+- [x] Cross-compiler stability: the same vectors under GCC and Clang at `-O0/-O2/-O3 -ffp-contract=off` must match. `[D]`
+  - verified-here: ubuntu:24.04 base sha256:562111b88caa via xattn-prereqs:24.04 sha256:f3bf6ef7b885, gcc 13.3.0 + clang 18.1.3, 6 builds x 14 vectors, 0 cross-build mismatches; 1 pre-existing frozen miss f32_gqa_scale.json: 2/320 Y elements, max |dY| 5.96e-08, build larger at element 144 and smaller at element 159, same vector fails tests/test_vectors.py in the image; host venv run skips (no clang).
 
 ### M5.2 Performance depth
 
