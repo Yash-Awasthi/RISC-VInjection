@@ -8,7 +8,9 @@ instruction encoding and the byte layout of the rs2/rs3 descriptors, which
 tests/test_core.py checks against the C structs.
 """
 
+import math
 import struct
+from fractions import Fraction
 
 import numpy as np
 import tolerances
@@ -52,6 +54,31 @@ def from_bf16_bits(b):
 def round_dtype(a, dt):
     a = np.asarray(a, np.float32)
     return from_bf16_bits(bf16_bits(a)) if dt == DT_BF16 else a
+
+
+def _fma_fallback(a, b, c):
+    """Exact a*b + c, rounded once; raises OverflowError where math.fma does."""
+    q = Fraction(a) * Fraction(b) + Fraction(c)
+    if q == 0:
+        prod_neg = (math.copysign(1.0, a) < 0) != (math.copysign(1.0, b) < 0)
+        return -0.0 if prod_neg and math.copysign(1.0, c) < 0 else 0.0
+    return float(q)
+
+
+def fma(a, b, c):
+    """Fused multiply-add: one rounding, unlike float(a*b) + c.
+
+    math.fma exists from Python 3.13; before that the rational form is exact
+    for every finite input and float(Fraction) rounds correctly, subnormals
+    included.
+    """
+    native = getattr(math, "fma", None)
+    if native is not None:
+        return native(a, b, c)
+    a, b, c = float(a), float(b), float(c)
+    if not all(math.isfinite(v) for v in (a, b, c)):
+        return a * b + c        # NaN/Inf never round, so the split form is exact
+    return _fma_fallback(a, b, c)
 
 
 def reference(x, wq, wk, wv, wo, bq=None, bk=None, bv=None, bo=None,

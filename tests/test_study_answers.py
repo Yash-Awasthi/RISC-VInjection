@@ -6,7 +6,6 @@ Every number asserted here was measured from this repository, so the
 study guide cannot drift away from the code it describes.
 """
 
-import math
 import sys
 from pathlib import Path
 
@@ -39,10 +38,10 @@ def test_stage2_separate_add_loses_fused_keeps():
     sep = f(prod + c)
     assert sep == f(0.0)
     assert sep.tobytes() == b"\x00\x00\x00\x00"
-    fused = f(math.fma(float(a), float(b), float(c)))
+    fused = f(am.fma(float(a), float(b), float(c)))
     assert fused == f(-2.0**-24)
     assert fused.tobytes()[::-1].hex() == "b3800000"
-    assert math.fma(float(a), float(b), float(c)) == -2.0**-24
+    assert am.fma(float(a), float(b), float(c)) == -2.0**-24
 
 
 def test_stage2_trap_pair_does_not_separate():
