@@ -256,7 +256,8 @@ GCC.
 - **m3.2.1 Build speed**
   - [ ] `ccache` wired into `scripts/build.sh`; publish cold and warm build times. `[F]`
 - **m3.2.2 Granularity**
-  - [ ] Split `build.sh` into per-step targets with independent `make build-binutils`, `build-gcc`, … so a QEMU-only change does not rebuild GCC. `[F]`
+  - [x] Split `build.sh` into per-step targets with independent `make build-binutils`, `build-gcc`, … so a QEMU-only change does not rebuild GCC. `[F]`
+    - verified-here: the `Makefile` now carries one static pattern rule, `build-binutils build-gcc build-newlib build-libgcc build-dtc build-spike build-qemu build-info: build-%:`, plus `build: all`; all nine names are in `.PHONY`. `make -n` maps each target to exactly one step: `build-binutils -> scripts/build.sh binutils`, `build-gcc -> ... gcc`, `build-newlib`, `build-libgcc`, `build-dtc`, `build-spike`, `build-qemu -> ... qemu`, `build-info -> ... info`, and `make -n build -> scripts/build.sh` (all steps). `scripts/build.sh` dispatches one named step (`case $s in ... "step_$s"`) and reuses the configured build directory, so `make build-qemu` cannot touch GCC's build tree. `docs/build-and-test.md` section 3 names the targets. No full build was run here: `out/toolchain` has the binutils tools but no `riscv64-unknown-elf-gcc` driver, so a warm rebuild and its timing remain unmeasured on this machine.
   - [ ] Replace the shell orchestration with `make` targets where the shell adds nothing; keep the shell for environment probing. `[F]`
 
 ### M3.3 Code shape and generated artefacts

@@ -25,6 +25,15 @@ export TMPDIR := $(CURDIR)/build/tmp
 all:
 	scripts/build.sh
 
+# Per-step builds: a change that only touches one tree runs one step, so a
+# QEMU-only change does not rebuild GCC.  scripts/build.sh reuses each
+# configured build directory, so every target is incremental after the first.
+build-binutils build-gcc build-newlib build-libgcc build-dtc build-spike \
+build-qemu build-info: build-%:
+	scripts/build.sh $*
+
+build: all
+
 $(PY):
 	$(PYTHON) -m venv .venv
 	$(PY) -m pip install -q --require-hashes -r requirements.lock
@@ -88,4 +97,4 @@ check-xinsn-sim: $(PY)
 check-three-way: $(PY)
 	XATTN_SIM=1 $(PY) -m pytest -q -s tests/test_three_way.py
 
-.PHONY: all check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint check-shell
+.PHONY: all build build-binutils build-gcc build-newlib build-libgcc build-dtc build-spike build-qemu build-info check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint check-shell

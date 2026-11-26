@@ -80,6 +80,12 @@ Notes that save time:
   `build/tmp`, so a small or quota-limited `/tmp` does not break the
   build.
 
+Each step also has its own target, so a change in one tree rebuilds only
+that tree: `make build-binutils build-gcc build-newlib build-libgcc
+build-dtc build-spike build-qemu` (and `make build-info` for the record).
+`make build` runs all of them in order. A configured build directory is
+reused, so a second run of the same target is incremental.
+
 ## 4. Test
 
 ```bash
