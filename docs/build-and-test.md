@@ -86,6 +86,30 @@ build-dtc build-spike build-qemu` (and `make build-info` for the record).
 `make build` runs all of them in order. A configured build directory is
 reused, so a second run of the same target is incremental.
 
+### 3.1 Targets that only name a script
+
+Each of these targets runs exactly one existing script, so the command is
+also visible from `make`:
+
+| Target | Runs |
+|--------|------|
+| `make setup` | `scripts/setup.sh` |
+| `make artifacts` | `scripts/artifacts.sh` |
+| `make patches-apply` | `scripts/patches.sh apply` |
+| `make patches-export` | `scripts/patches.sh export` |
+| `make patches-remove` | `scripts/patches.sh remove` |
+| `make patches-restore` | `scripts/patches.sh restore` |
+| `make patches-check` | `scripts/patches.sh check` |
+| `make patches-status` | `scripts/patches.sh status` |
+
+The six `patches-*` targets are one static pattern rule and cover every
+component; for one component run the script directly, for example
+`scripts/patches.sh apply gcc`. The shell scripts stay: they probe the
+environment (packages, `versions.env` pins, `TMPDIR`, the toolchain paths)
+and print the distribution-specific fix, which make cannot do without a
+second copy of that logic. `tests/test_make_targets.py` checks what each
+target runs with `make -n`; no toolchain is needed.
+
 ## 4. Test
 
 ```bash

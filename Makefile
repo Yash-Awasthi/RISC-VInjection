@@ -13,6 +13,10 @@
 #   make check-shell  shellcheck on scripts/*.sh
 #   make check-xinsn-sim  a generated instruction run on QEMU and Spike (slow)
 #   make check-three-way  Spike, QEMU and the host model agree bit for bit
+#   make setup       packages, submodules, patches, build, check, demo
+#   make artifacts   regenerate artifacts/ (scripts/artifacts.sh)
+#   make patches-<cmd>  scripts/patches.sh <cmd>; cmd is apply, export, remove,
+#                    restore, check or status
 
 # POSIX keeps the interpreter in .venv/bin/python; on Windows it is
 # .venv/Scripts/python.exe, so run `make PYTHON=python` there.
@@ -97,4 +101,19 @@ check-xinsn-sim: $(PY)
 check-three-way: $(PY)
 	XATTN_SIM=1 $(PY) -m pytest -q -s tests/test_three_way.py
 
-.PHONY: all build build-binutils build-gcc build-newlib build-libgcc build-dtc build-spike build-qemu build-info check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint check-shell
+# One script call each.  The scripts stay because they probe the environment
+# (packages, versions.env pins, toolchain paths, TMPDIR), which make cannot.
+setup:
+	scripts/setup.sh
+
+artifacts:
+	scripts/artifacts.sh
+
+# apply, export, remove, restore, check, status; every component by default.
+PATCH_CMDS := apply export remove restore check status
+$(addprefix patches-,$(PATCH_CMDS)): patches-%:
+	scripts/patches.sh $*
+
+.PHONY: all build build-binutils build-gcc build-newlib build-libgcc build-dtc build-spike build-qemu build-info check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint check-shell \
+  setup artifacts patches-apply patches-export patches-remove \
+  patches-restore patches-check patches-status
