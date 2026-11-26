@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 14:36:13 +0530
-Subject: [PATCH 2/5] Move the attention recognizer into the middle end
+Subject: [PATCH 2/6] Move the attention recognizer into the middle end
 
 It runs at -O2 on any target with the new attn optab and emits IFN_ATTN; -mattn-recognize is gone and errno from expf no longer blocks it.
 

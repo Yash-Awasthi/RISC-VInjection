@@ -282,7 +282,8 @@ file, and `artifacts/` is hand-collected.
 **Done when:** each has a boundary and a producer command.
 
 - **m3.3.1 C header**
-  - [ ] `include/attn_core.h`: split macro-heavy sections (`ATTN_*` configuration) from the numeric kernels; keep it header-only and C89-clean for the simulators. `[F]`
+  - [x] `include/attn_core.h`: split macro-heavy sections (`ATTN_*` configuration) from the numeric kernels; keep it header-only and C89-clean for the simulators. `[F]`
+    - verified-here: `include/attn_core.h` is now a 20-line umbrella over `include/attn_config.h` (48 lines: the ATTN_* switches, ATTN_INLINE and the libm mappings) and `include/attn_kernels.h` (257 lines: the numeric kernels, with C89 declarations); one translation unit per header with `cc -std=c89 -pedantic -Wall -Wextra -Iinclude -c` -> exit 0 and no diagnostics, and C11, C++11 and C++17 -> exit 0; `pytest -q tests/test_core.py tests/test_vectors.py tests/test_accumulation_order.py tests/test_boundaries.py tests/test_fma_fallback.py` -> 168 passed; `tools/freeze_vectors.py --refreeze` changed only the header hash, all 14 vector SHA-256 stayed the same, and `pytest -q tests/test_pins.py tests/test_repo_layout.py` -> 18 passed; the three headers are committed in spike, qemu and gcc on branch xattn and `scripts/patches.sh check spike qemu gcc` -> 4, 4 and 6 patches apply to the pinned commits and export matches; the pins and versions.env did not move, so the CI Full run is the toolchain proof.
   - parked 2026-11-26: split + C89 conversion proven in d979b71, reverted here; the header is copied into spike/riscv, qemu/target/riscv and gcc/libgcc at pinned submodule commits, so landing it needs three submodule commits plus pointer bumps.
 - **m3.3.2 Python**
   - [x] `scripts/xinsn.py` split into modules (spec parse, encoding allocation, tree edit, test build) with the tests from M1.2 as the net. `[F]`

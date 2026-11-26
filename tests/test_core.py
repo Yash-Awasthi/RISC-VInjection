@@ -2,7 +2,10 @@
 """attn_core.h (the code Spike and QEMU run) against tools/attn_model.py."""
 
 import ctypes
+import os
+import shutil
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -111,13 +114,33 @@ def test_encoding():
     assert am.decode(w) == dict(rd=13, rs1=10, rs2=11, rs3=12)
 
 
+HEADERS = ("attn_abi.h", "attn_config.h", "attn_kernels.h", "attn_core.h")
+
+
 @pytest.mark.parametrize("copy", ["spike/riscv", "qemu/target/riscv",
                                   "gcc/libgcc"])
 def test_simulator_cores_match_include(copy):
-    for name in ("attn_abi.h", "attn_core.h"):
+    for name in HEADERS:
         assert (REPO / copy / name).read_bytes() == \
             (REPO / "include" / name).read_bytes(), \
             "%s/%s differs from include/; copy it over" % (copy, name)
+
+
+@pytest.mark.parametrize("header", ["attn_config.h", "attn_kernels.h",
+                                    "attn_core.h"])
+def test_header_is_c89_clean(header, tmp_path):
+    """The simulators include these headers from C; prove strict C89."""
+    cc = os.environ.get("CC") or shutil.which("cc")
+    if cc is None:
+        pytest.skip("no C compiler named cc")
+    src = tmp_path / "one.c"
+    src.write_text('#include "%s"\n' % header, encoding="ascii")
+    r = subprocess.run([cc, "-std=c89", "-pedantic", "-Wall", "-Wextra",
+                        "-I", str(REPO / "include"), "-c", str(src),
+                        "-o", str(tmp_path / "one.o")],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stderr.strip() == "", r.stderr
 
 
 def weight_ptr(case, name):

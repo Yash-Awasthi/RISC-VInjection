@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash Vaibhav Awasthi <132498904+Yash-Awasthi@users.noreply.github.com>
 Date: Tue, 24 Nov 2026 12:29:22 +0530
-Subject: [PATCH 3/3] riscv: attn_core.h, attn_abi.h: add the SPDX licence line
+Subject: [PATCH 3/4] riscv: attn_core.h, attn_abi.h: add the SPDX licence line
 
 Without this patch the two headers carry no licence identifier, so a downstream copy cannot tell what terms they are under. The patch adds the SPDX-License-Identifier line to riscv/attn_core.h and riscv/attn_abi.h and changes nothing else.
 

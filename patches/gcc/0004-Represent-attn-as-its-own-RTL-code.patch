@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 14:36:13 +0530
-Subject: [PATCH 4/5] Represent attn as its own RTL code
+Subject: [PATCH 4/6] Represent attn as its own RTL code
 
 It uses four registers, sets none and orders only memory; codes with more than three e operands now take the generic subrtx walk.
 

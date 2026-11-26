@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Yash-Awasthi <yashawasthi12032006@gmail.com>
 Date: Tue, 13 Oct 2026 14:36:19 +0530
-Subject: [PATCH 2/3] target/riscv: let attn_core.h build without libc headers
+Subject: [PATCH 2/4] target/riscv: let attn_core.h build without libc headers
 
 With ATTN_FREESTANDING it maps expf, sqrtf and INFINITY to GCC builtins, so libgcc can share the definition.
 
