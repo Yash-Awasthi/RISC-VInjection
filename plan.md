@@ -351,7 +351,8 @@ that a machine can read, failures that name the fix.
   - verified-here: cd /c/GITHUB/yash-awasthi/RISC-VInjection; .venv/bin/python -m pytest -q tests/test_xinsn.py -k "show or json or color or colour or invalid or build" -> 10 passed in 52.44s
 - [x] `make check` summary table at the end: target, pass, fail, time; non-zero exit on any failure. `[D]`
   - verified-here: `make check` now runs `bash scripts/check-summary.sh $(CHECK_TARGETS)` (`make -n check` prints exactly that line). Each target is its own `make` invocation, so a failure does not hide the rest; the table prints target, pass, fail and seconds plus a `total` row, and any failed row exits 1. On the tools this machine has: `bash scripts/check-summary.sh check-core check-lint check-shell` -> three PASS rows (`check-core 1 0 9s`, `check-lint 1 0 2s`, `check-shell 1 0 2s`, `total 3 0 13s`), rc 0; `bash scripts/check-summary.sh check-core no-such-target` -> `total 1 1 4s`, `fail_rc=1`. `tests/test_scripts.py` and `tests/test_build_info.py` -> `14 passed, 2 skipped in 91.34s` (the script count is now 9 and the build-info test reads `CHECK_TARGETS`); `.venv/Scripts/shellcheck.exe -x scripts/check-summary.sh` -> rc 0. The other six targets need the toolchain, so their rows are untested here.
-- [ ] Error messages name the file, line and fix for the five most common build failures (missing package, patch conflict, submodule not initialised, stale toolchain, wrong `-march`). `[D]`
+- [x] Error messages name the file, line and fix for the five most common build failures (missing package, patch conflict, submodule not initialised, stale toolchain, wrong `-march`). `[D]`
+  - verified-here: 15 passed, 2 skipped (pytest tests/test_diagnose.py tests/test_scripts.py); shellcheck rc=0; diagnose.sh gave rc 1 with line 4 for patch-conflict.log and line 3 for wrong-march.log, rc 0 for a clean log
 
 ---
 

@@ -1,0 +1,6 @@
+== scripts/build.sh gcc
+PATH=out/toolchain/bin:out/host/bin:/usr/bin
+checking for riscv64-unknown-elf-gcc... no
+out/toolchain/bin/riscv64-unknown-elf-gcc: not found
+configure: error: C compiler cannot create executables
+make: *** [Makefile:88: all-gcc] Error 1
