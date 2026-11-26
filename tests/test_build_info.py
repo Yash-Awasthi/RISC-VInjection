@@ -33,11 +33,11 @@ def build_info(tmp_path):
 
 
 def makefile_check_prereqs():
-    """Prerequisites of the Makefile's check target, in order."""
+    """Targets the Makefile's check target runs, in order."""
     for line in (REPO / "Makefile").read_text(encoding="utf-8").splitlines():
-        if line.startswith("check:"):
-            return line.split(":", 1)[1].split()
-    raise AssertionError("no check: target in Makefile")
+        if line.startswith("CHECK_TARGETS :="):
+            return line.split(":=", 1)[1].split()
+    raise AssertionError("no CHECK_TARGETS in Makefile")
 
 
 def check_build_info(outdir):

@@ -30,7 +30,11 @@ $(PY):
 	$(PY) -m pip install -q --require-hashes -r requirements.lock
 	$(PY) -m pip install -q --no-deps -e .
 
-check: check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-lint check-shell
+# One summary row per target at the end; a failing row exits non-zero.
+CHECK_TARGETS := check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-lint check-shell
+
+check:
+	bash scripts/check-summary.sh $(CHECK_TARGETS)
 
 # The build record must exist, be at least as new as patches/, and name the
 # SHAs versions.env pins.  The check only reads; scripts/build.sh refreshes it.
