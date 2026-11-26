@@ -275,6 +275,7 @@ file, and `artifacts/` is hand-collected.
 - **m3.3.3 Artefacts and docs**
   - [ ] Regenerate `artifacts/` from a CI run instead of committing hand-collected files; every file gets a "produced by <command> at <sha>" line. `[F]`
   - [x] Documentation: one entry point (`docs/INDEX.md`) mapping each doc to the claims it supports and the test that proves it. `[F]`
+    - follow-up: `docs/troubleshooting.md` added to the table after the diagnose unit landed, so the coverage snippet at the end of the page still prints nothing.
     - verified-here: `ls docs | wc -l` -> `12` and `grep -cE '^\| `docs/' docs/INDEX.md` -> `12`, one row per document. A loop over `docs/*` that greps each name in the index printed nothing (`coverage_missing=0`), and every `tests/*.py` path the table names exists (`absent_paths=0`); the targets and scripts it cites were resolved on disk: `Makefile` `check-recog`/`check-three-way`/`check-build-info`, `scripts/check-pins.sh`, `scripts/check-build-info.sh`, `examples/insns/mac.spec`, `tests/vectors/MANIFEST.json`. The RUNBOOK row says plainly that it has no dedicated test rather than claiming one.
 
 ---
