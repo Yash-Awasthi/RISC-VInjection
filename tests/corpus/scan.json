@@ -1,0 +1,143 @@
+{
+ "toolchain": "riscv64-unknown-elf-gcc (GCC) 16.2.1 20261012",
+ "rows": [
+  {
+   "file": "demo/mha_plain.c",
+   "language": "c",
+   "status": "built",
+   "attn": 1,
+   "why": "replaced with attn",
+   "insns_on": 393,
+   "insns_off": 351,
+   "same": false
+  },
+  {
+   "file": "build/corpus/llama2c/run.c",
+   "language": "c",
+   "status": "built",
+   "attn": 0,
+   "why": "no candidate nest: the pass printed no rejection line",
+   "insns_on": 2827,
+   "insns_off": 2827,
+   "same": true
+  },
+  {
+   "file": "build/corpus/llama2c/runq.c",
+   "language": "c",
+   "status": "built",
+   "attn": 0,
+   "why": "no candidate nest: the pass printed no rejection line",
+   "insns_on": 3183,
+   "insns_off": 3183,
+   "same": true
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml.c",
+   "language": "c",
+   "status": "built",
+   "attn": 0,
+   "why": "no candidate nest: the pass printed no rejection line",
+   "insns_on": 22943,
+   "insns_off": 22943,
+   "same": true
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-cpu/ggml-cpu.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-cpu/ggml-cpu.c:484:28: error: implicit declaration of function 'pthread_create'; did you mean 'ggml_thread_create'? [-Wimplicit-function-declaration]"
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/flash_attn_ext_f32.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/platform.h:10:10: fatal error: etsoc/common/utils.h: No such file or directory"
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/flash_attn_ext_f16_me.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/platform.h:10:10: fatal error: etsoc/common/utils.h: No such file or directory"
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/softmax_f32.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/platform.h:10:10: fatal error: etsoc/common/utils.h: No such file or directory"
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/rope_f32.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/platform.h:10:10: fatal error: etsoc/common/utils.h: No such file or directory"
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/gated_delta_net_f32.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/platform.h:10:10: fatal error: etsoc/common/utils.h: No such file or directory"
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/rwkv_wkv6_f32.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-et/et-kernels/src/platform.h:10:10: fatal error: etsoc/common/utils.h: No such file or directory"
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-hexagon/htp/flash-attn-ops.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-hexagon/htp/flash-attn-ops.c:2:10: fatal error: HAP_compute_res.h: No such file or directory"
+  },
+  {
+   "file": "build/corpus/llamacpp/ggml/src/ggml-hexagon/htp/softmax-ops.c",
+   "language": "c",
+   "status": "not built",
+   "attn": null,
+   "why": "build/corpus/llamacpp/ggml/src/ggml-hexagon/htp/softmax-ops.c:1:10: fatal error: HAP_farf.h: No such file or directory"
+  },
+  {
+   "file": "build/corpus/mnn/source/backend/cpu/CPUAttention.cpp",
+   "language": "c++",
+   "status": "not built",
+   "attn": null,
+   "why": "this toolchain has no C++ front end (--enable-languages=c)"
+  },
+  {
+   "file": "build/corpus/mnn/source/backend/cpu/CPULinearAttention.cpp",
+   "language": "c++",
+   "status": "not built",
+   "attn": null,
+   "why": "this toolchain has no C++ front end (--enable-languages=c)"
+  },
+  {
+   "file": "build/corpus/mnn/source/backend/cpu/riscv/rvv/MNNRvvAttentionFunctions.cpp",
+   "language": "c++",
+   "status": "not built",
+   "attn": null,
+   "why": "this toolchain has no C++ front end (--enable-languages=c)"
+  },
+  {
+   "file": "build/corpus/ncnn/src/layer/multiheadattention.cpp",
+   "language": "c++",
+   "status": "not built",
+   "attn": null,
+   "why": "this toolchain has no C++ front end (--enable-languages=c)"
+  },
+  {
+   "file": "build/corpus/ncnn/src/layer/arm/multiheadattention_arm.cpp",
+   "language": "c++",
+   "status": "not built",
+   "attn": null,
+   "why": "this toolchain has no C++ front end (--enable-languages=c)"
+  }
+ ]
+}

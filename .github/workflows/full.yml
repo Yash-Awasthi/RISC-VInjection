@@ -124,6 +124,11 @@ jobs:
           make check
           echo "make check: $(( $(date +%s) - start ))s"
 
+      - name: Regenerate the artefacts
+        run: |
+          scripts/artifacts.sh
+          scripts/check-artifacts.sh
+
       # The claim "verified on these sources" needs the names of the sources.
       # Pinned (superproject) and checked out (submodule) are printed side by
       # side, so a drift between them is visible in the artefact.

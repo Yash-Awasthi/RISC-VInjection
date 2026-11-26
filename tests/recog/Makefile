@@ -45,7 +45,23 @@ $(OUT)/recog-%.elf: recog_test.c $(OBJS) $(BM)/bm.c $(BM)/crt.S
 	$(CC) $(CFLAGS) $(if $(filter spike,$*),-DBM_SPIKE) $(LDFLAGS) \
 	  $(BM)/crt.S $(BM)/bm.c recog_test.c $(OBJS) -lm -lc -lgcc -o $@
 
-check: all
+# Loops the instruction cannot compute stay loops.  Each file here is the
+# demo with one property broken; it must compile with no attn and say why.
+REJECT := $(wildcard reject/*.c)
+
+reject:
+	@mkdir -p $(OUT)/reject
+	@for f in $(REJECT); do \
+	  n=$$(basename $$f .c); \
+	  $(CC) $(CFLAGS) -fopt-info-loop-missed -c $$f -o $(OUT)/reject/$$n.o \
+	    2> $(OUT)/reject/$$n.msg; \
+	  test "$$($(BIN)/riscv64-unknown-elf-objdump -d $(OUT)/reject/$$n.o \
+	    | grep -cw attn)" = 0; \
+	  grep -q 'attention loops not replaced' $(OUT)/reject/$$n.msg; \
+	  printf 'reject %-18s ok\n' $$n; \
+	done
+
+check: all reject
 	$(QEMU) -M virt -bios none -nographic -monitor none -serial stdio \
 	  -cpu rv64,xattn=on -kernel $(OUT)/recog-qemu.elf
 	$(SPIKE) --isa=rv64gc_xattn $(OUT)/recog-spike.elf
@@ -53,4 +69,4 @@ check: all
 clean:
 	rm -rf $(OUT)
 
-.PHONY: all check clean
+.PHONY: all check reject clean

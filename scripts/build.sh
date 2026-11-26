@@ -34,6 +34,18 @@ export PATH=$TC/bin:$OUT/host/bin:$PATH
 
 log() { printf '\n== %s\n' "$*"; }
 
+# Host-side objects (GCC's build tools, Spike, QEMU) go through ccache when it
+# is installed; without it the build runs exactly as before.
+if command -v ccache > /dev/null 2>&1; then
+  export CCACHE_DIR="$B/ccache"
+  export CCACHE_BASEDIR="$REPO"
+  export CCACHE_NOHASHDIR=1
+  export CCACHE_COMPRESS=1
+  export CC="ccache ${CC:-cc}"
+  export CXX="ccache ${CXX:-c++}"
+  log "ccache $(ccache --version | head -1)"
+fi
+
 # The record of what produced out/: five submodule SHAs, host tools, versions.
 # Written at the end of every build and by `scripts/build.sh info`; `make
 # check` copies it into artifacts/ so a result always names its inputs.

@@ -1,7 +1,14 @@
 {
   "format": 2,
-  "header_sha256": "1ade1605d7b303f3648caf897f040190b6a0f1f00015ce0eba9918898686fe2a",
-  "refreeze": [],
+  "header_sha256": "86d374f4eac17109c81f5ea9f668bb05f48b2d7b62e69e889129d2d7f8f9a198",
+  "refreeze": [
+    {
+      "date": "2026-11-27",
+      "new_sha256": "86d374f4eac17109c81f5ea9f668bb05f48b2d7b62e69e889129d2d7f8f9a198",
+      "old_sha256": "1ade1605d7b303f3648caf897f040190b6a0f1f00015ce0eba9918898686fe2a",
+      "reason": "attn_core.h split into attn_config.h (macros) and attn_kernels.h (kernels); every vector output is unchanged"
+    }
+  ],
   "vectors": [
     "bf16_bf16.json",
     "bf16_bf16_causal.json",

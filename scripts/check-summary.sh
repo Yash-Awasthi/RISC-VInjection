@@ -28,7 +28,8 @@ MAKE=${MAKE:-make}
 targets=("$@")
 if [ ${#targets[@]} -eq 0 ]; then
   targets=(check-build-info check-info check-core check-gcc check-sched
-           check-demo check-sim check-recog check-lint check-shell)
+           check-demo check-sim check-recog check-lint check-shell
+           check-artifacts)
 fi
 
 fails=0

@@ -1,0 +1,14 @@
+# artifacts/PROVENANCE: one line per file, written by scripts/artifacts.sh
+# BUILD-INFO is the build record itself (date, toolchain shas); make check-info refreshes it.
+excerpt.c	produced by grep\ -v\ \'\^#include\'\ \"demo/mha_plain.c\"\ \|\ tr\ -d\ \'\\r\'\ \>\ \"artifacts/excerpt.c\" at a852ab0d2ed9a067ad791321526157a84d997439
+attn/excerpt.s	produced by out/toolchain/bin/riscv64-unknown-elf-gcc -O2 -S build/tmp/artifacts-full.c -o artifacts/attn/excerpt.s at a852ab0d2ed9a067ad791321526157a84d997439
+attn/excerpt.o	produced by out/toolchain/bin/riscv64-unknown-elf-gcc -O2 -c build/tmp/artifacts-full.c -o artifacts/attn/excerpt.o at a852ab0d2ed9a067ad791321526157a84d997439
+attn/excerpt.dis	produced by \"out/toolchain/bin/riscv64-unknown-elf-objdump\"\ -d\ \"artifacts/attn/excerpt.o\"\ \|\ sed\ \"s\|artifacts/attn/\|\|\"\ \>\ \"artifacts/attn/excerpt.dis\" at a852ab0d2ed9a067ad791321526157a84d997439
+loops/excerpt.s	produced by out/toolchain/bin/riscv64-unknown-elf-gcc -O2 -fno-tree-loop-attn -S build/tmp/artifacts-full.c -o artifacts/loops/excerpt.s at a852ab0d2ed9a067ad791321526157a84d997439
+loops/excerpt.o	produced by out/toolchain/bin/riscv64-unknown-elf-gcc -O2 -fno-tree-loop-attn -c build/tmp/artifacts-full.c -o artifacts/loops/excerpt.o at a852ab0d2ed9a067ad791321526157a84d997439
+loops/excerpt.dis	produced by \"out/toolchain/bin/riscv64-unknown-elf-objdump\"\ -d\ \"artifacts/loops/excerpt.o\"\ \|\ sed\ \"s\|artifacts/loops/\|\|\"\ \>\ \"artifacts/loops/excerpt.dis\" at a852ab0d2ed9a067ad791321526157a84d997439
+dumps/attn_recog.gimple	produced by out/toolchain/bin/riscv64-unknown-elf-gcc -O2 -fdump-tree-attn_recog -fdump-rtl-expand -S build/tmp/artifacts-full.c -o /dev/null at a852ab0d2ed9a067ad791321526157a84d997439
+dumps/expand.rtl	produced by out/toolchain/bin/riscv64-unknown-elf-gcc -O2 -fdump-tree-attn_recog -fdump-rtl-expand -S build/tmp/artifacts-full.c -o /dev/null at a852ab0d2ed9a067ad791321526157a84d997439
+attncc-run.txt	produced by cd\ \"\$REPO\"\ \&\&\ scripts/attncc.sh\ --run\ artifacts/excerpt.c\ build/tmp/artifacts-run.o\ \|\ sed\ \"s\|\$REPO/\|\|g\"\ \>\ artifacts/attncc-run.txt at a852ab0d2ed9a067ad791321526157a84d997439
+README.md	produced by scripts/artifacts.sh at a852ab0d2ed9a067ad791321526157a84d997439
+report.html	produced by python3 tools/report_html.py --out artifacts/report.html at a852ab0d2ed9a067ad791321526157a84d997439

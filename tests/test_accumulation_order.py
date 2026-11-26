@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-HEADER = REPO / "include" / "attn_core.h"
+HEADER = REPO / "include" / "attn_kernels.h"
 
 
 def bits(x):
