@@ -298,12 +298,26 @@ Windows because it was not cheap there, so no measured figure is claimed.
 
 ### 7.5 Time budget
 
-The per-step times in section 3 add up to about 13 minutes (binutils ~3 min,
-gcc 5.3 min, newlib 13 s, libgcc ~1 min, dtc seconds, spike 2.5 min, qemu
-under 1 min), and the README says "about 15 minutes on 16 cores". The total
-is DERIVED from the documented per-step times on this 20-core host, not
-remeasured: only binutils was actually built here (`out/toolchain/bin/riscv64-unknown-elf-as`
-exists; there is no cross gcc, no spike and no qemu binary).
+Measured on the runner, not derived and not from this host. Full run
+45857819667, commit `076aeab98cc467f9a0b8029d45035506af39492e`
+(`workflow_dispatch` on `fleet/recal-2026-11-26`, 2026-11-26, concluded
+success), ran its `Build (six steps)` step, which is `JOBS=$(nproc)
+scripts/build.sh`, from 16:21:28Z to 16:51:32Z: 1804 s, or 30 min 04 s.
+`nproc` on that runner is 4: the `BUILD-INFO` packed at the top level of
+`xattn-toolchain-076aeab98cc4.tar.xz` records
+`host: Linux x86_64, 4 core(s), JOBS=4` with `date: 2026-11-26T16:51:32Z`.
+`make check` took a further 48 s (16:51:32Z to 16:52:20Z), and the whole job
+37 min 54 s (16:20:23Z to 16:58:17Z). The run restored a cached toolchain
+before the build, so 30 min 04 s is not a cold-cache time.
+
+An earlier green run, 45835120627 at `cc15183`, took 1320 s (22 min 00 s) in
+the same step without a toolchain cache hit. So the build measured on CI is
+22 to 30 minutes on a 4-core runner, not 15.
+
+The README's "about 15 minutes on 16 cores" is not supported by either run:
+the CI runner has 4 cores, and the measured time is twice the quoted figure.
+Use 30 minutes on 4 cores for the last full run. The per-step times quoted in
+section 3 are older estimates, not measurements from a run.
 
 ### 7.6 What CI enforces
 
