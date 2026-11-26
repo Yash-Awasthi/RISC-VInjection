@@ -371,7 +371,8 @@ that a machine can read, failures that name the fix.
 **Done when:** a reviewer can apply and test the series from the cover letter alone.
 
 - **m6.2.1 Submission package**
-  - [ ] Each patch with a commit message in the project's style, a cover letter, and a documented test plan a reviewer can run. `[E]`
+  - [x] Each patch with a commit message in the project's style, a cover letter, and a documented test plan a reviewer can run. `[E]`
+    - verified-here: `patches/COVER-LETTER.md` names the four series (12 patches), each patch's full subject, its pin and its review list; a check script read `git -C <tree> log --format=%s <pin>..xattn` for all four trees -> `series_subjects=12`, `patch_files=12`, `subjects_missing=0`. Every command the test plan names exists: `scripts/patches.sh --help` lists `apply`, `export`, `remove`, `restore`, `check`, `status` (rc 0); `Makefile` defines `check`, `check-core`, `check-gcc`, `check-sched`, `check-demo`, `check-sim`, `check-recog`, `check-lint`, `check-shell`, `check-three-way`, and `check` chains the suite. Steps 1-2 of the plan were run: `scripts/check-pins.sh` -> five pins, rc 0; `scripts/patches.sh status` -> four trees `on xattn`, rc 0. Steps 3-6 are the reviewer's build and are not re-run here: `out/toolchain` holds binutils but no `riscv64-unknown-elf-gcc`, and no QEMU/Spike binaries.
 - **m6.2.2 Ownership**
   - [x] `CODEOWNERS` for `patches/`, `include/`, `scripts/`; a review checklist for anything touching `attn_core.h` (spec, vectors, all three executions). `[E]`
   - verified-here: .venv/bin/python -m pytest -q tests/test_repo_layout.py -> 7 passed in 0.09s
