@@ -306,6 +306,7 @@ file, and `artifacts/` is hand-collected.
 - [x] Vector (V) variant or a documented reason not to; if done, a separate extension name and spec version. `[W]`
   - verified-here: `grep -n '^## ' docs/spec.md` -> sections 1 to 8; `git diff --numstat HEAD -- docs/spec.md` -> 25 0; `.venv/bin/python -m pytest -q tests/test_vectors.py` -> 23 passed
 - [ ] Cross-check against a third implementation (QEMU TCG vs Spike interpreter already differ; add a scalar reference build of `attn_core.h` compiled for the host as the third). `[W]`
+  - verified-here: `tests/test_scalar_crosscheck.py` compiles `tests/host/attn_scalar.c` with `cc` (gcc 16.2.0, `-Wall -Werror`, no libm) and compares three implementations: the `attn_core.h` host build, this scalar C reference (double accumulation, own exp/sqrt) and the float64 `tools/attn_model.py` model. Max |Y - Yref|, scalar vs host (out_dtype tolerance): f32_bias 2.38e-07, f32_4head 5.66e-07, bf16_in 4.77e-07, bf16_out 0 (0.0078), causal 4.77e-07, mask 4.77e-07, gqa 5.96e-07, mqa 2.38e-07, explicit_scale 2.38e-07, nobias_causal_mask 3.58e-07; every f32 row is under 0.0001. `pytest -q tests/test_scalar_crosscheck.py` -> 17 passed in 18.58s (10 configurations, one seeded --gen problem against the model, six reserved cfg rejections including e % h != 0 with rc 1); `ruff check` -> clean. Spike and QEMU binaries are absent on this machine, so the simulator rows stay unrun and the three implementations compared here are the core host build, this scalar C reference and the float64 Python model.
 
 ### M4.4 Teaching surface
 
