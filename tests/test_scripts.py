@@ -12,7 +12,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 KNOWN = {
     "artifacts.sh", "attncc.sh", "build.sh", "check-build-info.sh",
     "check-pins.sh", "check-summary.sh", "diagnose.sh", "patches.sh",
-    "setup.sh", "xattn.sh",
+    "sanitize.sh", "setup.sh", "xattn.sh",
 }
 STRICT = re.compile(r"^set -euo pipefail$", re.M)
 EXIT_STATUS = re.compile(r"\bexit\s+(\$[\w{}]+|[1-9]\d*|0)\b")
@@ -47,7 +47,7 @@ def output(cp):
 
 def test_script_set_is_deliberate():
     files = sorted(SCRIPTS.glob("*.sh"))
-    assert len(files) == len(set(files)) == 10
+    assert len(files) == len(set(files)) == 11
     assert {p.name for p in files} == KNOWN
 
 
