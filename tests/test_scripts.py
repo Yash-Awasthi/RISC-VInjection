@@ -10,7 +10,7 @@ import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 KNOWN = {
-    "artifacts.sh", "attncc.sh", "build.sh", "check-build-info.sh",
+    "artifacts.sh", "attncc.sh", "build.sh", "check-artifacts.sh", "check-build-info.sh",
     "check-pins.sh", "check-summary.sh", "diagnose.sh", "patches.sh",
     "sanitize.sh", "setup.sh", "xattn.sh",
 }
@@ -47,7 +47,7 @@ def output(cp):
 
 def test_script_set_is_deliberate():
     files = sorted(SCRIPTS.glob("*.sh"))
-    assert len(files) == len(set(files)) == 11
+    assert len(files) == len(set(files)) == 12
     assert {p.name for p in files} == KNOWN
 
 
