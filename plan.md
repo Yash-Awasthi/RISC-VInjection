@@ -270,7 +270,8 @@ file, and `artifacts/` is hand-collected.
 - **m3.3.1 C header**
   - [ ] `include/attn_core.h`: split macro-heavy sections (`ATTN_*` configuration) from the numeric kernels; keep it header-only and C89-clean for the simulators. `[F]`
 - **m3.3.2 Python**
-  - [ ] `scripts/xinsn.py` split into modules (spec parse, encoding allocation, tree edit, test build) with the tests from M1.2 as the net. `[F]`
+  - [x] `scripts/xinsn.py` split into modules (spec parse, encoding allocation, tree edit, test build) with the tests from M1.2 as the net. `[F]`
+    - verified-here: `scripts/xinsn.py` 1272 -> 343 lines (CLI only); new `xinsn_common.py` 71 (paths, exit codes, errors), `xinsn_spec.py` 137 (parse, templates), `xinsn_encoding.py` 46 (slot and word), `xinsn_tree.py` 571 (Editor, diffs, apply to the four trees), `xinsn_build.py` 138 (host model, vector test). Proof: `pytest -q tests/test_xinsn.py` -> `31 passed, 1 skipped in 526.47s`; `ruff check scripts tools` -> `All checks passed!`; `mypy scripts tools` -> `Success: no issues found in 17 source files`; `scripts/xinsn.py verify examples/insns/mac.spec` -> `ok: 3006 known encodings checked; the slot collides with none`, `ok: extension xmac is new`, `ok: 29 files would change; the trees are not touched`; `pytest -q tests/test_core.py` -> `55 passed in 17.04s`. The CLI is unchanged: `show --json`, `list` and `--help` output are byte-identical to the pre-split script.
 - **m3.3.3 Artefacts and docs**
   - [ ] Regenerate `artifacts/` from a CI run instead of committing hand-collected files; every file gets a "produced by <command> at <sha>" line. `[F]`
   - [x] Documentation: one entry point (`docs/INDEX.md`) mapping each doc to the claims it supports and the test that proves it. `[F]`
