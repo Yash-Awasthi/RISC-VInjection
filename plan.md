@@ -211,7 +211,8 @@ read or write out of bounds.
 
 ### M2.4 Python and script hygiene
 
-- [ ] `pyproject.toml` with pinned `numpy`, `pytest`; a lockfile; `pip install -e .` replaces the ad-hoc venv step. `[P]`
+- [x] `pyproject.toml` with pinned `numpy`, `pytest`; a lockfile; `pip install -e .` replaces the ad-hoc venv step. `[P]`
+  - verified-here: `python -m venv $TEMP/pkvenv`; `$TEMP/pkvenv/Scripts/python.exe -m pip install -e .`; `python -c "import numpy, pytest"` -> `2.5.5 9.2.0`; `.venv/Scripts/python.exe -m pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`; lock: 7 wheels, hashes re-checked with `pip hash`
 - [ ] `ruff` and `mypy` on `scripts/` and `tools/`; blocking. `[P]`
 - [ ] `shellcheck` on every `scripts/*.sh`; all scripts already use `set -euo pipefail` — assert that in a test. `[P]`
 - [ ] Every script gets `--help` and a non-zero exit on unknown flags. `[P]`

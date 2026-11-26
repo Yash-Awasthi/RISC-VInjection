@@ -12,7 +12,10 @@
 #   make check-xinsn-sim  a generated instruction run on QEMU and Spike (slow)
 #   make check-three-way  Spike, QEMU and the host model agree bit for bit
 
-PY      := .venv/bin/python
+# POSIX keeps the interpreter in .venv/bin/python; on Windows it is
+# .venv/Scripts/python.exe, so run `make PYTHON=python` there.
+PYTHON  ?= python3
+PY      := $(firstword $(wildcard .venv/bin/python) $(wildcard .venv/Scripts/python.exe) .venv/bin/python)
 GCC     := $(CURDIR)/out/toolchain/bin/riscv64-unknown-elf-gcc
 export TMPDIR := $(CURDIR)/build/tmp
 
@@ -20,8 +23,8 @@ all:
 	scripts/build.sh
 
 $(PY):
-	python3 -m venv .venv
-	$(PY) -m pip install -q numpy pytest
+	$(PYTHON) -m venv .venv
+	$(PY) -m pip install -q -e .
 
 check: check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog
 
