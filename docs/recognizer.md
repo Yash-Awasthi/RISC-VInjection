@@ -113,6 +113,60 @@ Requirements on the compilation:
 - the output must be provably distinct from every input. `restrict` on
   the parameters is the usual way.
 
+### The pattern as a grammar
+
+Section 2 explains the proof; this section states the shape the proof is
+applied to, so the accepted set is a definition and not a description of
+today's code. The nonterminals are source-level. `X[r,k]` stands for the
+row-major addressing the pass accepts (`x[i*e+k]`, `q[i*e+hd*d+t]` and so
+on, with `d = e / h`).
+
+```
+region     ::= prologue projection projection projection attention output
+projection ::= "for" r "in" [0,n) "for" c "in" [0,e)
+               "{" "acc = 0.0f" "for" k "in" [0,e)
+                     "acc +=" A[r,k] "*" W[k,c]
+                   OUT[r,c] = acc [ "+" b[c] ] "}"
+attention  ::= "for" hd "in" [0,h) "for" i "in" [0,n)
+               "{" "mx = -inf"
+                   span "{" "s = 0.0f" "for" t "in" [0,d)
+                            "s +=" Q[i,t] "*" K[j,t]
+                          "s = s * scale" [ "+" mask[i,j] ]
+                          "p[j] = s" "if (s > mx) mx = s" "}"
+                   span "{" "p[j] = expf (p[j] - mx)" "l += p[j]" "}"
+                   "for" t "in" [0,d)
+                     "{" "acc = 0.0f"
+                         span "acc +=" p[j] "*" V[j,t]
+                         C[i,t] = acc "/" l "}"
+               "}"
+output     ::= projection
+span       ::= "[0,i]" | "[0,n)"
+```
+
+A source matches when it matches that skeleton and every clause below
+holds. The last column names the case that `tests/test_recognizer_grammar.py`
+compiles; the test asserts the verdict the clause predicts, and that the
+reason the compiler gives for a rejection contains the text shown.
+
+| Clause | Condition | Case | Verdict |
+|---|---|---|---|
+| G1 | The region is the three projections, the attention nest, then the output projection, with no other side effect inside it. | `demo/mha_plain.c` | one `attn` |
+| G2 | `span` is `[0,i]` (causal) or `[0,n)` (full). | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c` | one `attn` |
+| G3 | Each projection's bias is optional and independent of the others. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-1.c` | one `attn` |
+| G4 | The additive mask is optional. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-2.c` | one `attn` |
+| G5 | `scale` is any value computed before the loops; it must multiply the score, not divide it. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-7.c` | no `attn`: score is not scaled by a multiplication |
+| G6 | The head loop may be outside the row loop. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-3.c` | one `attn` |
+| G7 | Indices may be any integer type, and both RV32 and RV64 are accepted. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-4.c` | one `attn` |
+| G8 | The running maximum is `if (s > mx) mx = s` from `-inf`; `>=` is not the instruction's maximum. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-8.c` | no `attn`: running maximum is not |
+| G9 | Scratch buffers are local allocations; outside the matched accesses they may only be freed or null-tested. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-9.c` | no `attn`: a scratch buffer escapes |
+| G10 | The output and every scratch buffer are distinct from every input. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-5.c` | no `attn`: output may alias an input |
+| G11 | `expf` is a constant call, which `-fmath-errno` takes away. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-6.c` | no `attn`: exponential is not a const call |
+| G12 | Every branch inside the region is decided by dimensions and counters, so an early exit breaks the match. | `tests/recog/reject/early-exit.c` | no `attn`: loop is not in simple form |
+| G13 | Addresses are affine row-major polynomials over the dimensions; any other stride breaks the product. | `tests/recog/reject/strided.c` | no `attn`: projections of Q, K, V or the output product not found |
+| G14 | Every arithmetic operation is `float`; a `double` accumulator is not the instruction's computation. | `tests/recog/reject/mixed-precision.c` | no `attn`: projections of Q, K, V or the output product not found |
+| G15 | Xattn is enabled and the pass is on; `-fno-tree-loop-attn` leaves the loops. | `gcc/gcc/testsuite/gcc.target/riscv/xattn-recog-10.c` | no `attn` |
+
+
 ## 2. How the proof works
 
 ### 2.1 Addresses are polynomials
