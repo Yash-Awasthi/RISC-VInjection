@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RISC-VInjection attention vectors</title>
+<style>
+body{margin:2rem;background:#fff;color:#1d1f21;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.45}
+h1{font-size:1.4rem;margin:0 0 .25rem}
+h2{font-size:1.05rem;margin:2rem 0 .5rem;border-bottom:1px solid #c8ccd0;padding-bottom:.2rem}
+p{margin:.35rem 0}
+.tagline{color:#555}
+table{border-collapse:collapse;margin:.75rem 0;font-size:.85rem}
+th,td{border:1px solid #c8ccd0;padding:.25rem .5rem;text-align:left;vertical-align:top}
+th{background:#eef1f4;font-weight:600}
+code{background:#eef1f4;padding:0 .2rem}
+span[title]{cursor:help;border-bottom:1px dotted #999}
+</style>
+</head>
+<body>
+<h1>RISC-VInjection attention vectors</h1>
+<p class="tagline">static, no build step</p>
+<p>Every table below is generated from the frozen JSON manifest and vector files. 14 vectors.</p>
+<h2>Manifest</h2>
+<table>
+<tr><th>field</th><th>value</th></tr>
+<tr><td>format</td><td>2</td></tr>
+<tr><td>header_sha256</td><td><span title="1ade1605d7b303f3648caf897f040190b6a0f1f00015ce0eba9918898686fe2a">1ade1605d7b303f3</span></td></tr>
+<tr><td>vector count</td><td>14</td></tr>
+<tr><td>refreeze entries</td><td>0</td></tr>
+<tr><td>generator</td><td><code>python tools/freeze_vectors.py --write</code></td></tr>
+</table>
+<h2>Vectors</h2>
+<table>
+<tr><th>name</th><th>n</th><th>e</th><th>h</th><th>h_kv</th><th>d</th><th>kv</th><th>in dtype</th><th>out dtype</th><th>flags</th><th>Y shape</th><th>Y dtype</th><th>expected sha256</th><th>features</th><th>provenance</th></tr>
+<tr><td>bf16_bf16</td><td>16</td><td>32</td><td>4</td><td>=h</td><td>8</td><td>32</td><td>bf16</td><td>bf16</td><td>none</td><td>16x32</td><td>bf16</td><td><span title="60d1960e467331a1de819fca5eaafa16e05e5f9173c525ce0499e8ffc18ca866">60d1960e4673</span></td><td>none</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>bf16_bf16_causal</td><td>16</td><td>32</td><td>4</td><td>=h</td><td>8</td><td>32</td><td>bf16</td><td>bf16</td><td>causal</td><td>16x32</td><td>bf16</td><td><span title="17e522d5dde8cbce6064a10fa3b3eda71d806774db6f78e9ab58a875a16f2222">17e522d5dde8</span></td><td>causal</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>bf16_f32</td><td>16</td><td>32</td><td>4</td><td>=h</td><td>8</td><td>32</td><td>bf16</td><td>f32</td><td>none</td><td>16x32</td><td>f32</td><td><span title="6fd00427e2ee8aa2d949a0bfd3885fab0f438bd7f59278fbcee69b9a9f426f14">6fd00427e2ee</span></td><td>none</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_baseline</td><td>5</td><td>8</td><td>1</td><td>=h</td><td>8</td><td>8</td><td>f32</td><td>f32</td><td>none</td><td>5x8</td><td>f32</td><td><span title="e68cd6f1f1315715c83c45fd487fc080040588d33eb5393f42592e08f854387f">e68cd6f1f131</span></td><td>none</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_bf16_out</td><td>8</td><td>16</td><td>2</td><td>=h</td><td>8</td><td>16</td><td>f32</td><td>bf16</td><td>none</td><td>8x16</td><td>bf16</td><td><span title="5bf928d3c264ef5b247532f2a47737819648f4551f49a0b1a64ebd450f217e74">5bf928d3c264</span></td><td>none</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_causal</td><td>9</td><td>16</td><td>2</td><td>=h</td><td>8</td><td>16</td><td>f32</td><td>f32</td><td>causal</td><td>9x16</td><td>f32</td><td><span title="03504e018c4b8a0bced7753e9bfdcd7f34cb9e9076bad2e73cb7f27a385a333d">03504e018c4b</span></td><td>causal</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_causal_mask</td><td>11</td><td>16</td><td>4</td><td>=h</td><td>4</td><td>16</td><td>f32</td><td>f32</td><td>causal</td><td>11x16</td><td>f32</td><td><span title="9d096ca73fc6f01c38aafbd076bdf4c12f8e2c5d64d6a611ace12b4ef1a7a368">9d096ca73fc6</span></td><td>causal, mask</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_gpt2_head</td><td>32</td><td>64</td><td>1</td><td>=h</td><td>64</td><td>64</td><td>f32</td><td>f32</td><td>causal</td><td>32x64</td><td>f32</td><td><span title="b183752e463d9e97803db5040d8fa6327cf4ba3bd78a31c2726fc2c05fbf11a6">b183752e463d</span></td><td>causal</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_gqa</td><td>10</td><td>32</td><td>8</td><td>4</td><td>4</td><td>16</td><td>f32</td><td>f32</td><td>none</td><td>10x32</td><td>f32</td><td><span title="c58ee5cb58be2158e1010d7efa02bf9dccf4fb8bc24dab2aee760bc8cf18b2a4">c58ee5cb58be</span></td><td>gqa</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_gqa_scale</td><td>10</td><td>32</td><td>8</td><td>4</td><td>4</td><td>16</td><td>f32</td><td>f32</td><td>scale</td><td>10x32</td><td>f32</td><td><span title="b00e05866cc8f2cda79a364a649796c02788474a237d3632b288c21e26464ef1">b00e05866cc8</span></td><td>gqa, scale</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_mask</td><td>11</td><td>16</td><td>4</td><td>=h</td><td>4</td><td>16</td><td>f32</td><td>f32</td><td>none</td><td>11x16</td><td>f32</td><td><span title="77a62423a5161d221831e2a52e6857bb81f3ec785788aa49763c6267c7a537fb">77a62423a516</span></td><td>mask</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_mqa</td><td>10</td><td>32</td><td>4</td><td>1</td><td>8</td><td>8</td><td>f32</td><td>f32</td><td>none</td><td>10x32</td><td>f32</td><td><span title="891b43f68006859afe394728ce11de168f2a1ad07b0d2a6747cf560f038a1200">891b43f68006</span></td><td>gqa</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_nobias</td><td>7</td><td>12</td><td>3</td><td>=h</td><td>4</td><td>12</td><td>f32</td><td>f32</td><td>none</td><td>7x12</td><td>f32</td><td><span title="915a278466cb993e30f6afefe1ffc4960cf3d7a3a793d1608e68d922a1b7bfe1">915a278466cb</span></td><td>none</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+<tr><td>f32_scale</td><td>6</td><td>8</td><td>2</td><td>=h</td><td>4</td><td>8</td><td>f32</td><td>f32</td><td>scale</td><td>6x8</td><td>f32</td><td><span title="ad61d032ef78314f16708c7ff82f7c4fb7f1b7ff988317a8e36573ddb143d652">ad61d032ef78</span></td><td>scale</td><td>freeze_vectors.py &lt;- attn_model.py; header 1ade1605d7b3; format 2</td></tr>
+</table>
+<h2>Summary: in/out dtype pairs</h2>
+<table>
+<tr><th>in dtype</th><th>out dtype</th><th>vectors</th></tr>
+<tr><td>f32</td><td>f32</td><td>10</td></tr>
+<tr><td>f32</td><td>bf16</td><td>1</td></tr>
+<tr><td>bf16</td><td>f32</td><td>1</td></tr>
+<tr><td>bf16</td><td>bf16</td><td>2</td></tr>
+</table>
+<h2>Summary: flags</h2>
+<table>
+<tr><th>flags</th><th>value</th><th>vectors</th></tr>
+<tr><td>none</td><td>0</td><td>8</td></tr>
+<tr><td>causal</td><td>1</td><td>4</td></tr>
+<tr><td>scale</td><td>2</td><td>2</td></tr>
+<tr><td>causal+scale</td><td>3</td><td>0</td></tr>
+</table>
+<h2>Expected sha256</h2>
+<table>
+<tr><th>name</th><th>sha256</th></tr>
+<tr><td>bf16_bf16</td><td>60d1960e467331a1de819fca5eaafa16e05e5f9173c525ce0499e8ffc18ca866</td></tr>
+<tr><td>bf16_bf16_causal</td><td>17e522d5dde8cbce6064a10fa3b3eda71d806774db6f78e9ab58a875a16f2222</td></tr>
+<tr><td>bf16_f32</td><td>6fd00427e2ee8aa2d949a0bfd3885fab0f438bd7f59278fbcee69b9a9f426f14</td></tr>
+<tr><td>f32_baseline</td><td>e68cd6f1f1315715c83c45fd487fc080040588d33eb5393f42592e08f854387f</td></tr>
+<tr><td>f32_bf16_out</td><td>5bf928d3c264ef5b247532f2a47737819648f4551f49a0b1a64ebd450f217e74</td></tr>
+<tr><td>f32_causal</td><td>03504e018c4b8a0bced7753e9bfdcd7f34cb9e9076bad2e73cb7f27a385a333d</td></tr>
+<tr><td>f32_causal_mask</td><td>9d096ca73fc6f01c38aafbd076bdf4c12f8e2c5d64d6a611ace12b4ef1a7a368</td></tr>
+<tr><td>f32_gpt2_head</td><td>b183752e463d9e97803db5040d8fa6327cf4ba3bd78a31c2726fc2c05fbf11a6</td></tr>
+<tr><td>f32_gqa</td><td>c58ee5cb58be2158e1010d7efa02bf9dccf4fb8bc24dab2aee760bc8cf18b2a4</td></tr>
+<tr><td>f32_gqa_scale</td><td>b00e05866cc8f2cda79a364a649796c02788474a237d3632b288c21e26464ef1</td></tr>
+<tr><td>f32_mask</td><td>77a62423a5161d221831e2a52e6857bb81f3ec785788aa49763c6267c7a537fb</td></tr>
+<tr><td>f32_mqa</td><td>891b43f68006859afe394728ce11de168f2a1ad07b0d2a6747cf560f038a1200</td></tr>
+<tr><td>f32_nobias</td><td>915a278466cb993e30f6afefe1ffc4960cf3d7a3a793d1608e68d922a1b7bfe1</td></tr>
+<tr><td>f32_scale</td><td>ad61d032ef78314f16708c7ff82f7c4fb7f1b7ff988317a8e36573ddb143d652</td></tr>
+</table>
+</body>
+</html>

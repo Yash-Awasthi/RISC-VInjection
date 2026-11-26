@@ -300,7 +300,7 @@ file, and `artifacts/` is hand-collected.
   - verified-here: `.venv/Scripts/python.exe -m pytest -q tests/test_study_answers.py` -> 10 passed; 7 stage answers
 - [ ] A single walkthrough that adds a toy instruction from scratch in under 30 minutes, tested by CI on a scratch tree. `[W]`
 - [x] Publish the artefacts report as static HTML (no build step) with tables generated from the JSON results. `[W]`
-  - verified-here: `.venv/bin/python -m pytest -q tests/test_artifacts_html.py` -> `5 passed`
+  - verified-here: `.venv/Scripts/python.exe tools/report_html.py` -> artifacts/report.html 8756 bytes, 46 <tr> rows, 0 script tags
 
 ---
 
