@@ -300,6 +300,7 @@ file, and `artifacts/` is hand-collected.
 - [x] Templates: `xinsn.py new --template elementwise|reduction|memory` prefilled specs. `[W]`
   - verified-here: `python -m pytest -q tests/test_xinsn.py` -> `26 passed, 1 skipped`; `new --template reduction` then `verify` -> `ok: 28 files would change; the trees are not touched`
     - ci-fix 2026-11-26: xinsn.py new accepts the positional SPEC again; bad stem exits 1; 5 CI tests green.
+    - ci-fix 2026-11-26: xinsn.py options also parse after the subcommand, so python 3.12 (the CI runner) accepts 'new --template T SPEC'; five CI tests green on 3.12.3 in xattn-prereqs:24.04.
 - [x] Document the failure modes of the method (encoding exhaustion per major opcode, conflicts with other vendor extensions, attribute naming). `[W]`
   - verified-here: `scripts/find_opcodes.py --inputs 2 --major custom-0 --strict --first` -> `no free R slot`; `scripts/xinsn.py verify` on a spec pinned to a shared slot -> collides with 25 vendor insns, exit 1; `show` on `name = MAC` -> `must match [a-z][a-z0-9]{1,15}`
 

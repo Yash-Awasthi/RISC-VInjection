@@ -293,39 +293,61 @@ def cmd_remove(what, build=True):
 
 
 def main():
+    # Options live on a parent parser added to the top-level parser and to every
+    # subcommand, so both `xinsn.py --json list` and `xinsn.py list --json`
+    # parse (Python 3.12 rejects an option between top-level positionals).
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--json", action="store_true",
+                        default=argparse.SUPPRESS,
+                        help="list: print one JSON array instead of text;\n"
+                             "show: print the encoding and every diff as one\n"
+                             "JSON document")
+    common.add_argument("--color", choices=("auto", "always", "never"),
+                        default=argparse.SUPPRESS,
+                        help="show: colour the diff; auto (the default) colours\n"
+                             "only when stdout is a terminal")
+    common.add_argument("--no-rebuild", action="store_true",
+                        default=argparse.SUPPRESS,
+                        help="remove: edit the trees but do not run\n"
+                             "scripts/build.sh, and skip the toolchain check")
+    common.add_argument("--template", choices=sorted(TEMPLATES),
+                        default=argparse.SUPPRESS,
+                        help="new: write a prefilled spec from TEMPLATE")
     ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawTextHelpFormatter)
-    ap.add_argument("cmd", choices=["new", "show", "verify", "apply", "test",
-                                    "all", "list", "remove"])
-    ap.add_argument("arg", nargs="?")
-    ap.add_argument("--json", action="store_true",
-                    help="list: print one JSON array instead of text;\n"
-                         "show: print the encoding and every diff as one\n"
-                         "JSON document")
-    ap.add_argument("--color", choices=("auto", "always", "never"),
-                    default="auto",
-                    help="show: colour the diff; auto (the default) colours\n"
-                         "only when stdout is a terminal")
-    ap.add_argument("--no-rebuild", action="store_true",
-                    help="remove: edit the trees but do not run\n"
-                         "scripts/build.sh, and skip the toolchain check")
-    ap.add_argument("--template", choices=sorted(TEMPLATES),
-                    help="new: write a prefilled spec from TEMPLATE")
+                                 formatter_class=argparse.RawTextHelpFormatter,
+                                 parents=[common])
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def add(name, help_text, metavar=None, optional=False):
+        p = sub.add_parser(name, parents=[common], help=help_text)
+        if metavar:
+            p.add_argument("arg", nargs="?" if optional else None,
+                           metavar=metavar)
+        return p
+
+    add("new", "ask for the instruction and write SPEC", "SPEC", True)
+    add("show", "encoding and the diff; writes nothing", "SPEC")
+    add("verify", "check a spec without touching the trees", "SPEC")
+    add("apply", "edit the four source trees", "SPEC")
+    add("test", "build a test and run it on Spike and QEMU", "SPEC")
+    add("all", "apply, rebuild and test", "SPEC")
+    add("list", "custom instructions in the trees")
+    add("remove", "take one out again and rebuild", "WHAT")
     a = ap.parse_args()
-    if a.json and (a.cmd not in ("list", "show") or a.no_rebuild):
+    as_json = getattr(a, "json", False)
+    no_rebuild = getattr(a, "no_rebuild", False)
+    template = getattr(a, "template", None)
+    if as_json and (a.cmd not in ("list", "show") or no_rebuild):
         ap.error("--json needs 'list' or 'show'")
-    if a.template and a.cmd != "new":
+    if template and a.cmd != "new":
         ap.error("--template needs 'new'")
-    if a.cmd in ("show", "verify", "apply", "test", "all", "remove") \
-            and not a.arg:
-        ap.error("%s needs an argument" % a.cmd)
     try:
         if a.cmd == "new":
-            cmd_new(a.arg, a.template)
+            cmd_new(a.arg, template)
         elif a.cmd == "list":
-            cmd_list(a.json)
+            cmd_list(as_json)
         elif a.cmd == "remove":
-            cmd_remove(a.arg, build=not a.no_rebuild)
+            cmd_remove(a.arg, build=not no_rebuild)
         elif a.cmd == "verify":
             cmd_verify(a.arg)
         elif a.cmd == "all":
@@ -333,8 +355,8 @@ def main():
         elif a.cmd == "test":
             run_test(Spec(a.arg))
         else:
-            cmd_apply(a.arg, dry=a.cmd == "show", as_json=a.json,
-                      colour=colour_wanted(a.color))
+            cmd_apply(a.arg, dry=a.cmd == "show", as_json=as_json,
+                      colour=colour_wanted(getattr(a, "color", "auto")))
             if a.cmd == "apply":
                 print("next: scripts/build.sh binutils gcc spike qemu && "
                       "scripts/xinsn.py test " + a.arg)
