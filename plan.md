@@ -312,7 +312,8 @@ file, and `artifacts/` is hand-collected.
 - [ ] Recognition report on a real code base: which loops were recognised, which were not, and why — a table with per-file counts. `[W]`
   - corpus 2026-11-26: fetched from this host into the gitignored `build/corpus/` (llama.cpp 436d7e81, MNN 54694759, ncnn 3c9504a6, llama2.c 350e04fe, per-tree tar sha256 and licences in `.fleet/evidence/RISC-VInjection/corpus-303-350.md`); the blocker is now the built recognizer, not the network.
 - [ ] `-fno-attn` and a per-function attribute to opt out; test both. `[W]`
-- [ ] Cost model: publish the runtime guard cost when the instruction is absent. `[W]`
+- [x] Cost model: publish the runtime guard cost when the instruction is absent. `[W]`
+  - verified-here: `make -C tests/perf check` at 076aeab, the `g_` rows of `tests/perf/expected/spike.csv`: with the guard failing at (0,32,4), (8,33,8) and (8,32,0) the attn build retires +13, +67 and +13 instructions against the same loops built without the recognizer, so the guard costs 13..67 instructions once per call and never per element; published with the method in `docs/results.md` and asserted by `pytest -q tests/test_perf.py` -> 6 passed.
 
 ### M4.3 Portability of the instruction
 
@@ -350,10 +351,12 @@ file, and `artifacts/` is hand-collected.
 
 ### M5.2 Performance depth
 
-- [ ] Measure `attn` against the plain C loop on both simulators: retired instructions and simulated cycles per shape, in a table with the method stated. `[D]`
+- [x] Measure `attn` against the plain C loop on both simulators: retired instructions and simulated cycles per shape, in a table with the method stated. `[D]`
+  - verified-here: `make -C tests/perf check` at 076aeab with the toolchain from Full run 45857819667 -> `build/perf/{spike,qemu}.csv`, committed as `tests/perf/expected/`; six shapes (4,8,2) to (64,128,8): the loops retire 12591..34535911 instructions, the attn build 1026..1369; the two simulators agree on every count exactly; QEMU runs with `-icount shift=0,sleep=off`, without which its counters read a host clock; tables and method in `docs/results.md`, figures re-derived by `pytest -q tests/test_perf.py` -> 6 passed.
 - [x] Measure the speedup on real hardware only if a board is available; otherwise say clearly that no silicon number exists. `[D]`
   - verified-here: docs/results.md states no board was available and no silicon speedup is claimed; tests/test_results.py 5 passed; docs index loop prints nothing and lists no missing test.
-- [ ] Estimator: model the cycle cost from the descriptor (n, e, heads) and publish the error against measurement. `[D]`
+- [x] Estimator: model the cycle cost from the descriptor (n, e, heads) and publish the error against measurement. `[D]`
+  - verified-here: `python tools/perf_report.py build/perf` fits I(n,e,h) = 1017.6 + 0.0423*n*e by least squares on the six measured shapes of `tests/perf/expected/spike.csv` and prints predicted against measured: errors -0.7, -0.8, +1.0, -1.6, +2.5 and -0.4 percent, largest 2.6 percent; h enters only through the guard comparison, so the model has no h term; `pytest -q tests/test_perf.py` -> 6 passed asserts both coefficients and the 2.6 percent bound.
 - [ ] Recognizer cost: `.ATTN` replacement vs the original loops at `-O2`, per file in the corpus. `[D]`
 
 ### M5.3 Recognizer quality
