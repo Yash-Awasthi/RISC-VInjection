@@ -336,7 +336,8 @@ file, and `artifacts/` is hand-collected.
 ### M5.2 Performance depth
 
 - [ ] Measure `attn` against the plain C loop on both simulators: retired instructions and simulated cycles per shape, in a table with the method stated. `[D]`
-- [ ] Measure the speedup on real hardware only if a board is available; otherwise say clearly that no silicon number exists. `[D]`
+- [x] Measure the speedup on real hardware only if a board is available; otherwise say clearly that no silicon number exists. `[D]`
+  - verified-here: docs/results.md states no board was available and no silicon speedup is claimed; tests/test_results.py 5 passed; docs index loop prints nothing and lists no missing test.
 - [ ] Estimator: model the cycle cost from the descriptor (n, e, heads) and publish the error against measurement. `[D]`
 - [ ] Recognizer cost: `.ATTN` replacement vs the original loops at `-O2`, per file in the corpus. `[D]`
 

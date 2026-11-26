@@ -21,6 +21,7 @@ and so on) that runs it.
 | `docs/review.md` | The minimum review for any change to `include/attn_core.h`: spec, vectors, all three executions. | `tests/test_repo_layout.py` (CODEOWNERS, and every target and script the checklist cites exists). |
 | `docs/RUNBOOK.md` | The first diagnostic for each failure mode: build step, patch conflict, submodule drift, simulator abort, vector mismatch. | No dedicated test. Its two scripts are exercised by `make check`: `scripts/check-build-info.sh` (stale or missing build record) and `scripts/check-pins.sh` (drifted pin); `tests/test_scripts.py` covers their flags. |
 | `docs/artifacts.html` | The static report of the collected results, generated from the JSON, no build step. | `tests/test_artifacts_html.py` (`tools/report_html.py` regenerates it). |
+| `docs/results.md` | That there is no measurement on real hardware and no silicon speedup claimed anywhere: no board was available; what a board run would record, and where the simulator results live instead. | `tests/test_results.py` (the no-silicon statement is present, no numeric speedup claim appears, and this row exists). |
 | `docs/troubleshooting.md` | The five most common build failures (missing package, patch conflict, submodule not initialised, stale toolchain, wrong `-march`): the message, the line it came from, and the fix. | `tests/test_diagnose.py` (five fixture logs, exact line numbers and exit codes). |
 | `docs/INDEX.md` | This table. | `ls docs` against the first column: every row names a file that exists, and every file has a row. |
 
