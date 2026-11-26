@@ -296,7 +296,8 @@ file, and `artifacts/` is hand-collected.
 
 ### M4.4 Teaching surface
 
-- [ ] `docs/study.md` exercises get checked answers, one per stage. `[W]`
+- [x] `docs/study.md` exercises get checked answers, one per stage. `[W]`
+  - verified-here: `.venv/Scripts/python.exe -m pytest -q tests/test_study_answers.py` -> 10 passed; 7 stage answers
 - [ ] A single walkthrough that adds a toy instruction from scratch in under 30 minutes, tested by CI on a scratch tree. `[W]`
 - [x] Publish the artefacts report as static HTML (no build step) with tables generated from the JSON results. `[W]`
   - verified-here: `.venv/bin/python -m pytest -q tests/test_artifacts_html.py` -> `5 passed`
