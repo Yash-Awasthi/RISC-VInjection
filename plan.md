@@ -217,7 +217,8 @@ read or write out of bounds.
   - verified-here: `make check-lint` -> exit 0; `.venv/Scripts/python.exe -m ruff check scripts tools` -> `All checks passed!`; `.venv/Scripts/python.exe -m mypy scripts tools` -> `Success: no issues found in 12 source files`; probe `scripts/zz_lint_probe.py` (`import os`, `bad: int = "s"`) -> ruff F401 and I001 plus mypy `[assignment]`, `make check-lint` exit 2, probe deleted -> exit 0; `pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`.
 - [x] `shellcheck` on every `scripts/*.sh`; all scripts already use `set -euo pipefail` — assert that in a test. `[P]`
   - verified-here: `.venv/Scripts/shellcheck.exe -x scripts/*.sh` -> no output, exit 0; `ls scripts/*.sh | wc -l` -> 8; `make check-shell` -> exit 0; a probe `scripts/zz_shell_probe.sh` with an unquoted `$UNQUOTED` -> `make check-shell` exit 2, `SC2086` at lines 3 and 5 and `SC2116` at line 4, and exit 0 again after `rm`; `pytest -q tests/test_scripts.py` -> `3 passed`; `bash -n scripts/build.sh` -> exit 0; the two SC2086 the gate first found were `scripts/build.sh:66,71` (`"$TC"/bin/...`, `"$B"/qemu/...`); `pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`; `make check-lint` -> exit 0.
-- [ ] Every script gets `--help` and a non-zero exit on unknown flags. `[P]`
+- [x] Every script gets `--help` and a non-zero exit on unknown flags. `[P]`
+  - verified-here: `./scripts/<name>.sh --help` for all 8 scripts -> rc 0 each; `./scripts/<name>.sh --bogus` -> rc 2 each, `error: unknown option: --bogus`; `.venv/Scripts/python.exe -m pytest -q tests/test_scripts.py` -> `6 passed, 2 skipped`; `shellcheck -x scripts/*.sh` -> no output, rc 0; `make check-shell` -> rc 0; `make check-lint` -> rc 0; `pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`
 
 ### M2.5 Build reproducibility
 

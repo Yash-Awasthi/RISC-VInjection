@@ -189,6 +189,18 @@ step_qemu() {
   run_logged "$B/qemu" make.log make -j"$JOBS"
 }
 
+usage() {
+  sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  JOBS       parallelism (default: all cores)\n'
+  printf '  XATTN_OUT  install prefix (default: <repo>/out)\n'
+  printf '  TMPDIR     set to build/tmp by this script\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 steps=("$@")
 [ ${#steps[@]} -eq 0 ] && steps=(binutils gcc newlib libgcc dtc spike qemu)
 for s in "${steps[@]}"; do

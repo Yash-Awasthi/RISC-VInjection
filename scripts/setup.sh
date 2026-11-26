@@ -19,6 +19,16 @@
 
 set -euo pipefail
 
+usage() {
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  JOBS  parallelism for the builds (default: all cores)\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 cd "$REPO"
 

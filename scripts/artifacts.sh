@@ -9,6 +9,16 @@
 
 set -euo pipefail
 
+usage() {
+  sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  none; TMPDIR and PATH are set by this script\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 A=$REPO/artifacts
 BIN=$REPO/out/toolchain/bin

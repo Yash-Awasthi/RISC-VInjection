@@ -12,6 +12,16 @@
 
 set -euo pipefail
 
+usage() {
+  sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  XATTN_OUT  output dir holding BUILD-INFO (default: <repo>/out)\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 OUT=${XATTN_OUT:-$REPO/out}
 INFO=$OUT/BUILD-INFO

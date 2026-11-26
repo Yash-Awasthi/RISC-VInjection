@@ -11,6 +11,16 @@
 
 set -euo pipefail
 
+usage() {
+  sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  VERSIONS_FILE  pins file to check (default: <repo>/versions.env)\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 FILE=${VERSIONS_FILE:-$REPO/versions.env}
 

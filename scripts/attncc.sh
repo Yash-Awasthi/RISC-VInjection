@@ -23,6 +23,18 @@
 
 set -euo pipefail
 
+usage() {
+  sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  TMPDIR     scratch dir (default: <repo>/build/tmp)\n'
+  printf '  ATTN_N ATTN_E ATTN_H  sizes for --run (default: 16 32 4)\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  --run) : ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 BIN=$REPO/out/toolchain/bin
 CC=$BIN/riscv64-unknown-elf-gcc

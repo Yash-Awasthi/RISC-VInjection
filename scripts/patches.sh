@@ -226,6 +226,16 @@ do_check() {
   return $rc
 }
 
+usage() {
+  sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'env:\n'
+  printf '  none; the superproject, submodules and patches/ are the inputs\n'
+}
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+  -*) printf 'error: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+esac
+
 cmd=${1:-}
 shift || true
 comps=("$@")
