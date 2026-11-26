@@ -63,12 +63,12 @@ write_build_info() {
     done
     printf '\noutputs:\n'
     printf '  gcc    %s\n' \
-      "$($TC/bin/riscv64-unknown-elf-gcc --version 2> /dev/null | head -1 || echo none)"
+      "$("$TC"/bin/riscv64-unknown-elf-gcc --version 2> /dev/null | head -1 || echo none)"
     # Spike has no --version; its configure-time stamp is the next best record.
     printf '  spike  %s\n' \
       "$(git -C "$REPO/spike" describe --always --dirty 2> /dev/null || echo none)"
     printf '  qemu   %s\n' \
-      "$($B/qemu/qemu-system-riscv64 --version 2> /dev/null | head -1 || echo none)"
+      "$("$B"/qemu/qemu-system-riscv64 --version 2> /dev/null | head -1 || echo none)"
   } > "$file"
   log "$file"
   sed 's/^/   /' "$file"

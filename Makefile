@@ -10,6 +10,7 @@
 #   make check-sim   bare-metal tests on QEMU and Spike
 #   make check-recog recognizer: recognized loops vs plain loops, at run time
 #   make check-lint  ruff and mypy over scripts/ and tools/
+#   make check-shell  shellcheck on scripts/*.sh
 #   make check-xinsn-sim  a generated instruction run on QEMU and Spike (slow)
 #   make check-three-way  Spike, QEMU and the host model agree bit for bit
 
@@ -18,6 +19,7 @@
 PYTHON  ?= python3
 PY      := $(firstword $(wildcard .venv/bin/python) $(wildcard .venv/Scripts/python.exe) .venv/bin/python)
 GCC     := $(CURDIR)/out/toolchain/bin/riscv64-unknown-elf-gcc
+SHCK    := $(firstword $(wildcard .venv/bin/shellcheck) $(wildcard .venv/Scripts/shellcheck.exe) shellcheck)
 export TMPDIR := $(CURDIR)/build/tmp
 
 all:
@@ -27,7 +29,7 @@ $(PY):
 	$(PYTHON) -m venv .venv
 	$(PY) -m pip install -q -e ".[dev]"
 
-check: check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-lint
+check: check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-lint check-shell
 
 # The build record must exist, be at least as new as patches/, and name the
 # SHAs versions.env pins.  The check only reads; scripts/build.sh refreshes it.
@@ -67,6 +69,9 @@ check-lint: $(PY)
 	$(PY) -m ruff check scripts tools
 	$(PY) -m mypy scripts tools
 
+check-shell: $(PY)
+	$(SHCK) -x scripts/*.sh
+
 # Slow: applies examples/insns/mac.spec to the four trees, rebuilds them and
 # runs the generated test on QEMU and Spike.  Needs scripts/build.sh first.
 check-xinsn-sim: $(PY)
@@ -78,4 +83,4 @@ check-xinsn-sim: $(PY)
 check-three-way: $(PY)
 	XATTN_SIM=1 $(PY) -m pytest -q -s tests/test_three_way.py
 
-.PHONY: all check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint
+.PHONY: all check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint check-shell
