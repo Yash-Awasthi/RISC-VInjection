@@ -1,10 +1,22 @@
 # Regenerate: python -m pip download -d "$TEMP/lockdir" numpy==2.5.5 pytest==9.2.0
+#   ruff==0.17.6 mypy==2.4.1 shellcheck-py==0.11.0.1
 #   then python -m pip hash on each file there; one line per resolved artefact.
+# The hashes are the wheels for CPython 3.15 on win_amd64; regenerate on another
+# platform, and keep the runtime and dev pins in step with pyproject.toml.
 # Install with: python -m pip install --require-hashes -r requirements.lock
+# (the .venv rule in the Makefile does this, then `-e . --no-deps`).
+ast-serialize==0.13.1 --hash=sha256:032b09d86c785c3984e975378b7861f2a68ac44e22ba7b07b93a536b2524eeb8
 colorama==0.4.6 --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
 iniconfig==2.3.1 --hash=sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7
+librt==0.17.0 --hash=sha256:42a03a994c352193eea319779a11b7e96962de59c19189f5fd902515cef57401
+mypy==2.4.1 --hash=sha256:080cf64a60b90a73435542feecf4171904cc5710658165b40c6869115d4aa100
+mypy-extensions==1.2.0 --hash=sha256:993e7a20aa5671eb41a7132cf555af30062da99729601601b9a8382b11cae768
 numpy==2.5.5 --hash=sha256:ae9cfe4e985139c5f2db69d4310de7348bd0abc02cfdc06991c4419065f6fdca
 packaging==26.4 --hash=sha256:81383611a09c1bc0b08b76e0fd5829d7c6824c65b27a6aee339da133f4233ea2
+pathspec==1.1.1 --hash=sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189
 pluggy==1.7.0 --hash=sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec
 pygments==2.21.0 --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9
 pytest==9.2.0 --hash=sha256:07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588
+ruff==0.17.6 --hash=sha256:9cd2fd9923e9806b8b6b67a3469e2258e84bd4d21e45d5a1a690afdfb9c8e57d
+shellcheck-py==0.11.0.1 --hash=sha256:784156289ecb17e91c692cd783ab5152333309588cabb10032a047331c63e759
+typing-extensions==4.16.0 --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8

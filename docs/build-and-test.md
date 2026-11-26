@@ -192,9 +192,15 @@ Windows / MSYS2, 20 cores. Re-run for this section:
 
 ### 7.3 Python
 
-The tests need `numpy` and `pytest`, installed in `.venv` (the `Makefile`
-uses `$(PY)`). CI uses the runner's `python3` and pip-installs `numpy` and
-`pytest` (`.github/workflows/ci.yml`). The pinned QEMU `configure` requires
+The tests need `numpy` and `pytest`; the lint and shell checks need `ruff`,
+`mypy` and `shellcheck-py`. The `$(PY)` rule in the `Makefile` installs all
+of them from `requirements.lock` with `--require-hashes`, so a version or a
+hash that moves fails the install instead of the test run, then installs the
+package itself with `-e . --no-deps`. Regenerate the lock with the commands
+in its header after changing a pin in `pyproject.toml`. CI uses the runner's
+`python3` and pip-installs `numpy` and `pytest`
+(`.github/workflows/ci.yml`); its Ubuntu wheels are not in this
+Windows-generated lock. The pinned QEMU `configure` requires
 Python 3.12 or newer (comment in `.github/workflows/full.yml` lines 73-74;
 section 1 targets Ubuntu 24.04), so CI's runner image supplies 3.12 or
 newer and 3.12 is the enforced floor.

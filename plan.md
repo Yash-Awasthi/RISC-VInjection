@@ -243,7 +243,8 @@ places, so a rebuild months later is not the same build.
   - [ ] Single `versions.env` for upstream branches, Python deps and base image; every script reads it. `[F]`
   - [ ] GCC to the current release branch, binutils to the current release branch, Spike and QEMU to tagged releases rather than `master`; re-run the full suite and record the result. `[F]`
 - **m3.1.2 Dependency pinning**
-  - [ ] Replace the unpinned `pip install numpy pytest` (`Makefile:21-24`) with a hashed requirements file. `[F]`
+  - [x] Replace the unpinned `pip install numpy pytest` (`Makefile:21-24`) with a hashed requirements file. `[F]`
+    - verified-here: a fresh `.venv/Scripts/python.exe -m venv $TEMP/lockvenv`, then `python -m pip install --require-hashes -r requirements.lock` -> `lock_install_rc=0`, then `python -m pip install --no-deps -e .` -> `editable_rc=0`; the venv reports `numpy 2.5.5 pytest 9.2.0`, `ruff 0.17.6`, `mypy 2.4.1 (compiled: yes)`, `ShellCheck ... version: 0.11.0`, and `python -m pytest -q tests/test_core.py` -> `43 passed in 3.97s`. `requirements.lock` grew from 7 to 15 hashed artefacts (the dev extra: ruff, mypy, mypy-extensions, pathspec, typing-extensions, ast-serialize, librt, shellcheck-py) and the `$(PY)` rule now installs from it; `pip download` against a copy with one hash edited refused with `ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE`. The lock pins win_amd64 CPython 3.15 wheels, so `.github/workflows/ci.yml` keeps its own Ubuntu install and the doc says so.
 
 ### M3.2 Faster, incremental builds
 
