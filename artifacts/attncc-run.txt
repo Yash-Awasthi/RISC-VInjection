@@ -1,5 +1,7 @@
-== compile: riscv64-unknown-elf-gcc -O2 excerpt.c
-artifacts/excerpt.c:51:23: optimized: multi-head self-attention (causal, biased) replaced with attn
+== stage extract   0.005s PASS
+== stage compile   0.836s PASS
+artifacts/excerpt.c:52:23: optimized: multi-head self-attention (causal, biased) replaced with attn
+== stage assemble  0.019s PASS
 
 == result
 function                   attn    insns (attn on)   insns (attn off)
@@ -19,8 +21,11 @@ mha                           1                387                345
 The loops that remain run only when the sizes fail the guard
 (n or e outside the instruction's limits, e % h != 0); every valid
 size executes the single attn above.
+== stage link      1.473s PASS
 
 == run on Spike: mha(n=16, e=32, h=4)
 instructions executed, attn build:  991
 instructions executed, loops build: 508421
 largest output difference (ulp-scale expf only): <= 1e-5, PASS
+== stage run       0.235s PASS
+== stage compare   0.017s PASS

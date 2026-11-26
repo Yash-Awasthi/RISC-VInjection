@@ -11,6 +11,7 @@
 #   make check-recog recognizer: recognized loops vs plain loops, at run time
 #   make check-lint  ruff and mypy over scripts/ and tools/
 #   make check-shell  shellcheck on scripts/*.sh
+#   make check-artifacts  every file in artifacts/ names the command that produced it
 #   make check-xinsn-sim  a generated instruction run on QEMU and Spike (slow)
 #   make check-three-way  Spike, QEMU and the host model agree bit for bit
 #   make setup       packages, submodules, patches, build, check, demo
@@ -44,7 +45,7 @@ $(PY):
 	$(PY) -m pip install -q --no-deps -e .
 
 # One summary row per target at the end; a failing row exits non-zero.
-CHECK_TARGETS := check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-lint check-shell
+CHECK_TARGETS := check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-lint check-shell check-artifacts
 
 check:
 	bash scripts/check-summary.sh $(CHECK_TARGETS)
@@ -90,6 +91,10 @@ check-lint: $(PY)
 check-shell: $(PY)
 	$(SHCK) -x scripts/*.sh
 
+# Every file in artifacts/ carries the command and commit that produced it.
+check-artifacts:
+	scripts/check-artifacts.sh
+
 # Slow: applies examples/insns/mac.spec to the four trees, rebuilds them and
 # runs the generated test on QEMU and Spike.  Needs scripts/build.sh first.
 check-xinsn-sim: $(PY)
@@ -114,6 +119,6 @@ PATCH_CMDS := apply export remove restore check status
 $(addprefix patches-,$(PATCH_CMDS)): patches-%:
 	scripts/patches.sh $*
 
-.PHONY: all build build-binutils build-gcc build-newlib build-libgcc build-dtc build-spike build-qemu build-info check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint check-shell \
+.PHONY: all build build-binutils build-gcc build-newlib build-libgcc build-dtc build-spike build-qemu build-info check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint check-shell check-artifacts \
   setup artifacts patches-apply patches-export patches-remove \
   patches-restore patches-check patches-status
