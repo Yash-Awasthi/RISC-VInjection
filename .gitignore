@@ -2,6 +2,7 @@
 /out/
 /.venv/
 __pycache__/
+*.egg-info/
 *.core
 
 # Written by `make check` from out/BUILD-INFO: a build record, not source.

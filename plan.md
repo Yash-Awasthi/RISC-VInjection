@@ -213,7 +213,8 @@ read or write out of bounds.
 
 - [x] `pyproject.toml` with pinned `numpy`, `pytest`; a lockfile; `pip install -e .` replaces the ad-hoc venv step. `[P]`
   - verified-here: `python -m venv $TEMP/pkvenv`; `$TEMP/pkvenv/Scripts/python.exe -m pip install -e .`; `python -c "import numpy, pytest"` -> `2.5.5 9.2.0`; `.venv/Scripts/python.exe -m pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`; lock: 7 wheels, hashes re-checked with `pip hash`
-- [ ] `ruff` and `mypy` on `scripts/` and `tools/`; blocking. `[P]`
+- [x] `ruff` and `mypy` on `scripts/` and `tools/`; blocking. `[P]`
+  - verified-here: `make check-lint` -> exit 0; `.venv/Scripts/python.exe -m ruff check scripts tools` -> `All checks passed!`; `.venv/Scripts/python.exe -m mypy scripts tools` -> `Success: no issues found in 12 source files`; probe `scripts/zz_lint_probe.py` (`import os`, `bad: int = "s"`) -> ruff F401 and I001 plus mypy `[assignment]`, `make check-lint` exit 2, probe deleted -> exit 0; `pytest -q tests/test_xinsn.py tests/test_vectors.py` -> `54 passed, 1 skipped`.
 - [ ] `shellcheck` on every `scripts/*.sh`; all scripts already use `set -euo pipefail` — assert that in a test. `[P]`
 - [ ] Every script gets `--help` and a non-zero exit on unknown flags. `[P]`
 

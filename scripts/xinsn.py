@@ -510,8 +510,8 @@ DEFINE_RISCV_EXT(
     unspec = ("UNSPECV_" if volatile else "UNSPEC_") + sp.EXT
     code = "unspec_volatile" if volatile else "unspec"
     if sp.writes_rd:
-        body = (f'(set (match_operand:X 0 "register_operand" "=r")\n'
-                f'\t(%s:X [%s]\n\t\t   %s))' % (code, ins, unspec))
+        body = ('(set (match_operand:X 0 "register_operand" "=r")\n'
+                '\t(%s:X [%s]\n\t\t   %s))' % (code, ins, unspec))
     else:
         body = '(%s:X [%s]\n\t\t   %s)' % (code, ins, unspec)
     clobber = "\n   (clobber (mem:BLK (scratch)))" if sp.memory else ""
@@ -1034,8 +1034,8 @@ def ask_block(prompt):
         if line.strip() == ".":
             break
         lines.append(line)
-    return "\n".join("  " + l if l and not l.startswith("  ") else l
-                     for l in lines)
+    return "\n".join("  " + ln if ln and not ln.startswith("  ") else ln
+                     for ln in lines)
 
 
 def cmd_new(spec, template=None):

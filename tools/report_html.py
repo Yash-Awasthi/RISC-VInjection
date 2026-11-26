@@ -13,6 +13,7 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import NoReturn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST = REPO_ROOT / "tests" / "vectors" / "MANIFEST.json"
@@ -35,7 +36,7 @@ class ValidationError(Exception):
     """A manifest or vector file does not match the frozen format."""
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     raise ValidationError(message)
 
 

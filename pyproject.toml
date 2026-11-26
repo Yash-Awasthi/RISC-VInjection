@@ -11,5 +11,29 @@ dependencies = [
     "pytest==9.2.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff==0.17.6",
+    "mypy==2.4.1",
+]
+
 [tool.setuptools]
 packages = ["tools", "scripts"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 79
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "W", "I"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "tools"
+explicit_package_bases = true
+
+# scripts/xinsn.py imports its sibling find_opcodes by flat name after a
+# runtime sys.path insert; the file itself is still checked.
+[[tool.mypy.overrides]]
+module = "find_opcodes"
+ignore_missing_imports = true

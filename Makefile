@@ -9,6 +9,7 @@
 #   make check-demo  demo/mha_plain.c: one .ATTN and one attn at -O2
 #   make check-sim   bare-metal tests on QEMU and Spike
 #   make check-recog recognizer: recognized loops vs plain loops, at run time
+#   make check-lint  ruff and mypy over scripts/ and tools/
 #   make check-xinsn-sim  a generated instruction run on QEMU and Spike (slow)
 #   make check-three-way  Spike, QEMU and the host model agree bit for bit
 
@@ -24,9 +25,9 @@ all:
 
 $(PY):
 	$(PYTHON) -m venv .venv
-	$(PY) -m pip install -q -e .
+	$(PY) -m pip install -q -e ".[dev]"
 
-check: check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog
+check: check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-lint
 
 # The build record must exist, be at least as new as patches/, and name the
 # SHAs versions.env pins.  The check only reads; scripts/build.sh refreshes it.
@@ -62,6 +63,10 @@ check-sim: $(PY)
 check-recog:
 	$(MAKE) -C tests/recog check
 
+check-lint: $(PY)
+	$(PY) -m ruff check scripts tools
+	$(PY) -m mypy scripts tools
+
 # Slow: applies examples/insns/mac.spec to the four trees, rebuilds them and
 # runs the generated test on QEMU and Spike.  Needs scripts/build.sh first.
 check-xinsn-sim: $(PY)
@@ -73,4 +78,4 @@ check-xinsn-sim: $(PY)
 check-three-way: $(PY)
 	XATTN_SIM=1 $(PY) -m pytest -q -s tests/test_three_way.py
 
-.PHONY: all check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way
+.PHONY: all check check-build-info check-info check-core check-gcc check-sched check-demo check-sim check-recog check-xinsn-sim check-three-way check-lint

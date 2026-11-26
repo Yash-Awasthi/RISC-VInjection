@@ -11,7 +11,6 @@ tests/test_core.py checks against the C structs.
 import struct
 
 import numpy as np
-
 import tolerances
 
 ATTN_MATCH = 0x0600107B
@@ -58,7 +57,9 @@ def round_dtype(a, dt):
 def reference(x, wq, wk, wv, wo, bq=None, bk=None, bv=None, bo=None,
               h=1, h_kv=0, causal=False, mask=None, scale=None):
     """Multi-head self-attention in float64.  Weights are [in][out]."""
-    f = lambda a: None if a is None else np.asarray(a, np.float64)
+    def f(a):
+        return None if a is None else np.asarray(a, np.float64)
+
     x, wq, wk, wv, wo = map(f, (x, wq, wk, wv, wo))
     bq, bk, bv, bo, mask = map(f, (bq, bk, bv, bo, mask))
     n, e = x.shape
@@ -118,7 +119,8 @@ class Case:
         self.n, self.e, self.h, self.h_kv = n, e, h, h_kv
         self.flags, self.in_dt, self.out_dt = flags, in_dt, out_dt
         kv = (h_kv or h) * (e // h)
-        g = lambda *s: rng.standard_normal(s).astype(np.float32)
+        def g(*s):
+            return rng.standard_normal(s).astype(np.float32)
         w = 1 / np.sqrt(e)
         self.x = g(n, e)
         self.wq, self.wk, self.wv, self.wo = (g(e, e) * w, g(e, kv) * w,
@@ -145,7 +147,8 @@ class Case:
         self.y_addr = im.reserve(n * e * (2 if out_dt == DT_BF16 else 4))
 
     def expected(self):
-        r = lambda a: round_dtype(a, self.in_dt)
+        def r(a):
+            return round_dtype(a, self.in_dt)
         return reference(r(self.x), r(self.wq), r(self.wk), r(self.wv),
                          r(self.wo), *self.b, h=self.h, h_kv=self.h_kv,
                          causal=bool(self.flags & F_CAUSAL), mask=self.mask,
