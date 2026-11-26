@@ -190,3 +190,62 @@ def test_fully_masked_row_under_causal_is_nan(lib):
     keep = [0, 1, 2, 4]
     np.testing.assert_allclose(y[keep], exp[keep], rtol=0,
                                atol=case.tolerance())
+
+
+DTYPE_PAIRS = [(am.DT_F32, am.DT_F32), (am.DT_F32, am.DT_BF16),
+               (am.DT_BF16, am.DT_F32), (am.DT_BF16, am.DT_BF16)]
+
+
+@pytest.mark.parametrize("in_dt,out_dt", DTYPE_PAIRS)
+def test_every_dtype_combination_is_legal(lib, in_dt, out_dt):
+    """in_dtype and out_dtype are each 0 or 1; all four pairs compute."""
+    case = am.Case(np.random.default_rng(5), n=6, e=8, h=2,
+                   in_dt=in_dt, out_dt=out_dt)
+    rc, mem = run(lib, case)
+    assert rc == 0
+    np.testing.assert_allclose(case.read_y(mem),
+                               am.round_dtype(case.expected(), out_dt),
+                               rtol=0, atol=case.tolerance())
+
+
+def set_x(case, x):
+    """Overwrite X in guest memory, f32 only (the non-finite cases)."""
+    case.x = np.ascontiguousarray(x, np.float32)
+    off = case.x_addr - case.image.base
+    case.image.buf[off:off + case.x.nbytes] = case.x.tobytes()
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+def test_non_finite_operand_propagates_without_a_trap(lib, value):
+    """Section 3: NaN propagates; an infinite operand behaves as IEEE 754 says."""
+    case = am.Case(np.random.default_rng(6), n=3, e=8, h=2, bias=False)
+    x = case.x.copy()
+    x[0, 0] = value
+    set_x(case, x)
+    rc, mem = run(lib, case)
+    assert rc == 0, "a non-finite operand must not trap"
+    y = case.read_y(mem)
+    exp = case.expected()
+    assert np.isnan(y).any(), "the non-finite operand vanished from Y"
+    np.testing.assert_array_equal(np.isnan(y), np.isnan(exp))
+    fin = np.isfinite(exp)
+    np.testing.assert_allclose(y[fin], exp[fin], rtol=0,
+                               atol=case.tolerance())
+
+
+def test_subnormal_operand_reaches_the_output_unflushed(lib):
+    """2**-149 with identity weights is a pass-through: no flush to zero."""
+    tiny = np.float32(2.0 ** -149)
+    case = am.Case(np.random.default_rng(0), n=1, e=2, h=1, bias=False)
+    x = np.zeros((1, 2), np.float32)
+    x[0, 0] = tiny
+    set_x(case, x)
+    eye = np.eye(2, dtype=np.float32)
+    for name in ("wq", "wk", "wv", "wo"):
+        set_matrix(case, name, eye)
+    rc, mem = run(lib, case)
+    assert rc == 0
+    y = case.read_y(mem)
+    assert struct.unpack("<I", y[0, 0].tobytes())[0] == 0x00000001, y
+    assert y[0, 1] == 0.0

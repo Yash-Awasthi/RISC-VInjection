@@ -114,6 +114,13 @@ each other but not necessarily with another `expf`.
 A row in which every `s[r]` is `-inf` produces NaN, exactly like the
 equivalent C code. NaN inputs propagate.
 
+Three consequences of that arithmetic are asserted by `tests/test_core.py`
+and add no new behaviour: subnormal operands and results are preserved
+(nothing flushes them to zero, on any of the three executions); an infinite
+or NaN operand makes every output element that depends on it non-finite and
+traps nothing; and both `in_dtype` values with both `out_dtype` values are
+legal, so all four combinations compute.
+
 ## 4. Reserved configurations
 
 The instruction raises an illegal-instruction exception, and writes
