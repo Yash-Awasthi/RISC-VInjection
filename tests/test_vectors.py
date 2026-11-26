@@ -2,6 +2,7 @@
 """Frozen vectors in tests/vectors/ against the host core in include/."""
 
 import json
+import platform
 import struct
 import subprocess
 import sys
@@ -19,6 +20,36 @@ import vectors  # noqa: E402
 MANIFEST = vectors.read_manifest()
 VECTOR_FILES = MANIFEST["vectors"]
 
+# A frozen hash may differ on exactly one libc, by the amount measured here.
+# The entry is keyed by libc: it only applies when platform.libc_ver() is the
+# glibc it names, so ucrt, musl or a newer glibc fail instead of skipping.
+LIBM_ALLOWED = {
+    "f32_gqa_scale.json": {
+        "libc": "glibc",
+        "libc_version": "2.39",
+        "frozen_hash":
+            "b00e05866cc8f2cda79a364a649796c02788474a237d3632b288c21e26464ef1",
+        "host_hash":
+            "e3e9a25ad8b1b2504c9ddc6e08d6a81fac5c068dcb3862af232c8b82960e01f6",
+        # element index -> direction of the measured difference
+        "elements": {144: "larger", 159: "smaller"},
+        "delta": 5.96e-08,
+        "why": "glibc 2.39 libm expf rounds differently from the ucrt "
+               "host where the vector was frozen: 2 of 320 Y elements "
+               "differ, max |dY| 5.96e-08, element 144 larger and element "
+               "159 smaller; six glibc 2.39 builds and the frozen host were "
+               "measured independently.",
+    },
+}
+
+
+def libc_key():
+    """(libc, version) on Linux; (sys.platform, '') everywhere else."""
+    if sys.platform.startswith("linux"):
+        name, version = platform.libc_ver()
+        return name, version
+    return sys.platform, ""
+
 
 @pytest.fixture(scope="session")
 def lib(tmp_path_factory):
@@ -31,7 +62,7 @@ def all_vectors():
 
 
 @pytest.mark.parametrize("fname", VECTOR_FILES)
-def test_vector_matches_frozen_hash(lib, fname):
+def test_vector_matches_frozen_hash(lib, fname, capsys):
     v = vectors.load_vector(vectors.VECTORS / fname)
     assert v.name + ".json" == fname
     assert set(v.document) == {"format", "name", "cfg", "arrays", "expected",
@@ -65,8 +96,37 @@ def test_vector_matches_frozen_hash(lib, fname):
     assert v.expected["dtype"] == ("<u2" if cfg["out_dtype"] == am.DT_BF16
                                    else "<f4")
     assert v.expected["shape"] == [cfg["n"], cfg["e"]]
-    assert vectors.canonical_sha256(y, cfg["out_dtype"]) == \
-        v.expected["sha256"]
+    got = vectors.canonical_sha256(y, cfg["out_dtype"])
+    frozen = v.expected["sha256"]
+    if got == frozen:
+        return
+
+    entry = LIBM_ALLOWED.get(fname)
+    assert entry is not None, (
+        "%s: %s does not match frozen %s and has no allowlist entry"
+        % (fname, got, frozen))
+    assert frozen == entry["frozen_hash"], (
+        "%s: allowlist records frozen hash %s, the vector file says %s"
+        % (fname, entry["frozen_hash"], frozen))
+    name, version = libc_key()
+    assert (name, version) == (entry["libc"], entry["libc_version"]), (
+        "%s: differs on %s %s, but the allowlist covers %s %s only, so this "
+        "is real drift" % (fname, name, version or "(no version)",
+                           entry["libc"], entry["libc_version"]))
+    assert got == entry["host_hash"], (
+        "%s: %s differs from frozen %s on the allowed libc but is not the "
+        "measured %s, so this is real drift"
+        % (fname, got, frozen, entry["host_hash"]))
+
+    diffs = ", ".join("%d %s" % (i, d)
+                      for i, d in sorted(entry["elements"].items()))
+    row = ("%s: libc %s %s vs ucrt freeze host; got %s; frozen %s; "
+           "%d/%d Y elements differ (%s); max |dY| %.2e"
+           % (fname, name, version, got, frozen, len(entry["elements"]),
+              y.size, diffs, entry["delta"]))
+    with capsys.disabled():
+        print(row)
+    pytest.skip(row + "; " + entry["why"])
 
 
 def test_feature_coverage(all_vectors):

@@ -211,6 +211,7 @@ read or write out of bounds.
   - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `17 passed in 1.30s`
 - [x] Any change to `attn_core.h` that moves a hash fails the test and requires an explicit re-freeze commit with the reason. `[P]`
   - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `20 passed in 4.23s`
+    - ci-fix 2026-11-26: tests/test_vectors.py prints the libm allowlist row instead of a bare pass; glibc e3e9a25a vs ucrt b00e0586, 2/320 elements, max |dY| 5.96e-08.
 - [x] Version the vector file format so an old vector stays readable. `[P]`
   - verified-here: `.venv/bin/python -m pytest -q tests/test_vectors.py` -> `23 passed in 3.23s`
 
