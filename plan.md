@@ -297,6 +297,7 @@ file, and `artifacts/` is hand-collected.
   - verified-here: `python -m pytest -q tests/test_xinsn.py` -> `21 passed, 1 skipped`; `python scripts/xinsn.py verify examples/insns/mac.spec` -> `ok: 29 files would change; the trees are not touched`
 - [x] Templates: `xinsn.py new --template elementwise|reduction|memory` prefilled specs. `[W]`
   - verified-here: `python -m pytest -q tests/test_xinsn.py` -> `26 passed, 1 skipped`; `new --template reduction` then `verify` -> `ok: 28 files would change; the trees are not touched`
+    - ci-fix 2026-11-26: xinsn.py new accepts the positional SPEC again; bad stem exits 1; 5 CI tests green.
 - [x] Document the failure modes of the method (encoding exhaustion per major opcode, conflicts with other vendor extensions, attribute naming). `[W]`
   - verified-here: `scripts/find_opcodes.py --inputs 2 --major custom-0 --strict --first` -> `no free R slot`; `scripts/xinsn.py verify` on a spec pinned to a shared slot -> collides with 25 vendor insns, exit 1; `show` on `name = MAC` -> `must match [a-z][a-z0-9]{1,15}`
 

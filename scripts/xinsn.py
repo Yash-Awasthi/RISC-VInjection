@@ -144,6 +144,15 @@ def ask_block(prompt):
                      for ln in lines)
 
 
+def write_spec(path, text):
+    """Write a spec, or exit 1 with one line when the path is unwritable."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    except OSError as e:
+        sys.exit("cannot write %s: %s" % (path, e.strerror or e))
+
+
 def cmd_new(spec, template=None):
     if template:
         if spec:
@@ -151,14 +160,13 @@ def cmd_new(spec, template=None):
             if not re.fullmatch(r"[a-z][a-z0-9]{1,15}", name):
                 sys.exit("name '%s' must match [a-z][a-z0-9]{1,15}" % name)
             path = Path(spec)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(TEMPLATES[template].format(name=name))
+            write_spec(path, TEMPLATES[template].format(name=name))
             print("wrote %s" % path)
             return
         name = ask("name (lower case, e.g. mac)", None,
                    lambda v: re.fullmatch(r"[a-z][a-z0-9]{1,15}", v))
         path = REPO / "examples/insns" / (name + ".spec")
-        path.write_text(TEMPLATES[template].format(name=name))
+        write_spec(path, TEMPLATES[template].format(name=name))
         print("wrote %s" % path)
         if ask("apply, rebuild and test now? (y/n)", "y") == "y":
             cmd_all(path)
@@ -178,7 +186,7 @@ def cmd_new(spec, template=None):
     test = ask_block("test: body of main(), CHECK (cond) per check; "
                      "empty for automatic vectors")
     spec = Path(spec or REPO / "examples/insns" / (name + ".spec"))
-    spec.write_text(f"""# Written by xinsn.py new.
+    write_spec(spec, f"""# Written by xinsn.py new.
 name   = {name}
 inputs = {inputs}
 writes = {writes}
