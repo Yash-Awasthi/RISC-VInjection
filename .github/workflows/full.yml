@@ -173,7 +173,14 @@ jobs:
           # gcc, binutils, newlib and libgcc, with the build record beside them.
           XZ_OPT=-T0 tar -cJf "dist/xattn-toolchain-$sha.tar.xz" -C out toolchain BUILD-INFO
           # Both simulators in one tarball: together they are small next to gcc.
-          XZ_OPT=-T0 tar -cJf "dist/xattn-simulators-$sha.tar.xz" -C out spike qemu
+          # spike installs into out/spike; qemu is built in tree, so only its
+          # binaries are packed rather than the object files beside them.
+          sim=$(mktemp -d)
+          cp -a out/spike "$sim/spike"
+          mkdir -p "$sim/qemu"
+          cp build/qemu/qemu-system-riscv64 build/qemu/qemu-riscv64 "$sim/qemu/"
+          XZ_OPT=-T0 tar -cJf "dist/xattn-simulators-$sha.tar.xz" -C "$sim" spike qemu
+          rm -rf "$sim"
           (cd dist && sha256sum ./*.tar.xz > SHA256SUMS)
           for f in dist/*.tar.xz; do
             printf '%s %s bytes\n' "$f" "$(stat -c%s "$f")" >> build/CI-TRACE.txt
