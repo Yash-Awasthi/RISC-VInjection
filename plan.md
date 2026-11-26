@@ -197,7 +197,8 @@ read or write out of bounds.
 - [ ] Enumerate the descriptor fields and the legal ranges in `docs/spec.md`; assert each bound in `attn_core.h` with a trap. `[P]`
 - [ ] Fuzz `attn_cfg`/`attn_weights` on the host model with libFuzzer (ASan+UBSan); commit the seed corpus and any crash input as a regression test. `[P]`
 - [ ] Test denormals, NaN, ±Inf, and each `in_dtype`/`out_dtype` combination; write the required behaviour in the spec and assert it. `[P]`
-- [ ] Assert softmax ties and all-masked rows behave as specified (uniform or zero, whichever the spec says), with a test per case. `[P]`
+- [x] Assert softmax ties and all-masked rows behave as specified (uniform or zero, whichever the spec says), with a test per case. `[P]`
+  - verified-here: `.venv/Scripts/python.exe -m pytest -q tests/test_core.py` -> `35 passed in 1.66s`. `test_tied_scores_split_the_softmax_mass_evenly` and `test_tied_scores_under_causal_average_the_prefix` set `Wk = 0` so every score ties (s = 0): without CAUSAL all Y rows are bit-identical and equal the mean of the V rows; with CAUSAL row i is the mean of rows 0..i. `test_fully_masked_row_under_causal_is_nan` sets mask row 3 to -inf with CAUSAL: Y[3] is all NaN, rows 0/1/2/4 still match the float64 model. `docs/spec.md` section 3 already fixes both outcomes (ties share the mass through `expf(s - m)`; a row whose every `s[r]` is -inf is NaN), so no spec text changed.
 - [ ] ASan and UBSan builds of `tests/host/attn_host.c` in CI, `-ffp-contract=off` to keep results stable across compilers. `[P]`
 
 ### M2.3 Golden vectors

@@ -118,3 +118,75 @@ def test_simulator_cores_match_include(copy):
         assert (REPO / copy / name).read_bytes() == \
             (REPO / "include" / name).read_bytes(), \
             "%s/%s differs from include/; copy it over" % (copy, name)
+
+
+def weight_ptr(case, name):
+    """Address of one matrix inside the case's attn_weights descriptor."""
+    k = am.WEIGHTS_FIELDS.index(name)
+    return struct.unpack_from("<Q", case.image.buf,
+                              case.w_addr - case.image.base + 8 * k)[0]
+
+
+def set_matrix(case, name, mat):
+    """Overwrite one weight matrix in place and keep the Case in step."""
+    mat = np.ascontiguousarray(mat, np.float32)
+    off = weight_ptr(case, name) - case.image.base
+    case.image.buf[off:off + mat.nbytes] = mat.tobytes()
+    setattr(case, name, mat)
+
+
+def test_tied_scores_split_the_softmax_mass_evenly(lib):
+    """Wk = 0 ties every score, so each key gets 1/n and Y is the row mean."""
+    case = am.Case(np.random.default_rng(11), n=4, e=4, h=1, bias=False)
+    d = case.e // case.h
+    set_matrix(case, "wk", np.zeros((case.e, d), np.float32))
+    set_matrix(case, "wv", np.eye(case.e, dtype=np.float32))
+    set_matrix(case, "wo", np.eye(case.e, dtype=np.float32))
+    rc, mem = run(lib, case)
+    assert rc == 0
+    y = case.read_y(mem)
+    want = case.x.astype(np.float64).mean(axis=0)
+    np.testing.assert_allclose(y, np.tile(want, (case.n, 1)),
+                               rtol=0, atol=tolerances.ATOL_F32)
+    np.testing.assert_array_equal(y, np.tile(y[0], (case.n, 1)))
+    np.testing.assert_allclose(y, case.expected(), rtol=0,
+                               atol=case.tolerance())
+
+
+def test_tied_scores_under_causal_average_the_prefix(lib):
+    """A tie over the causal key range 0..i averages rows 0..i of V."""
+    case = am.Case(np.random.default_rng(13), n=5, e=4, h=1, bias=False,
+                   flags=am.F_CAUSAL)
+    d = case.e // case.h
+    set_matrix(case, "wk", np.zeros((case.e, d), np.float32))
+    set_matrix(case, "wv", np.eye(case.e, dtype=np.float32))
+    set_matrix(case, "wo", np.eye(case.e, dtype=np.float32))
+    rc, mem = run(lib, case)
+    assert rc == 0
+    y = case.read_y(mem)
+    for i in range(case.n):
+        want = case.x[:i + 1].astype(np.float64).mean(axis=0)
+        np.testing.assert_allclose(y[i], want, rtol=0,
+                                   atol=tolerances.ATOL_F32)
+    np.testing.assert_allclose(y, case.expected(), rtol=0,
+                               atol=case.tolerance())
+
+
+def test_fully_masked_row_under_causal_is_nan(lib):
+    """Causal truncates the key range; a row that is -inf over it is NaN."""
+    case = am.Case(np.random.default_rng(12), n=5, e=8, h=2, bias=False,
+                   mask=True, flags=am.F_CAUSAL)
+    case.mask[3, :] = -np.inf
+    mp = struct.unpack_from("<Q", case.image.buf,
+                            case.c_addr - case.image.base + 32)[0]
+    off = mp - case.image.base
+    case.image.buf[off:off + case.mask.nbytes] = case.mask.tobytes()
+    rc, mem = run(lib, case)
+    assert rc == 0
+    y = case.read_y(mem)
+    exp = case.expected()
+    assert np.all(np.isnan(y[3]))
+    assert np.all(np.isnan(exp[3]))
+    keep = [0, 1, 2, 4]
+    np.testing.assert_allclose(y[keep], exp[keep], rtol=0,
+                               atol=case.tolerance())
