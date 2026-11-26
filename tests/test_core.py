@@ -249,3 +249,29 @@ def test_subnormal_operand_reaches_the_output_unflushed(lib):
     y = case.read_y(mem)
     assert struct.unpack("<I", y[0, 0].tobytes())[0] == 0x00000001, y
     assert y[0, 1] == 0.0
+
+
+def bad_weights(**kw):
+    """A valid case with fields of the attn_weights descriptor replaced."""
+    case = am.Case(np.random.default_rng(0), n=4, e=8, h=2)
+    off = case.w_addr - case.image.base
+    vals = dict(zip(am.WEIGHTS_FIELDS,
+                    struct.unpack_from(am.WEIGHTS_FMT, case.image.buf, off)))
+    vals.update(kw)
+    struct.pack_into(am.WEIGHTS_FMT, case.image.buf, off,
+                     *[vals[f] for f in am.WEIGHTS_FIELDS])
+    return case
+
+
+@pytest.mark.parametrize("field", ["wq", "wk", "wv", "wo"])
+def test_zero_weight_pointer_is_illegal(lib, field):
+    """Section 4: a weight matrix pointer of 0 is a reserved configuration."""
+    rc, _ = run(lib, bad_weights(**{field: 0}))
+    assert rc == 1
+
+
+@pytest.mark.parametrize("field", ["wq", "wk", "wv", "wo",
+                                   "bq", "bk", "bv", "bo"])
+def test_rv32_rejects_a_wide_weight_pointer(lib, field):
+    """Section 4: on RV32 every 64-bit pointer in rs2 must fit in 32 bits."""
+    assert run(lib, bad_weights(**{field: 1 << 32}), xlen=32)[0] == 1

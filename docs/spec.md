@@ -135,6 +135,23 @@ nothing, when any of these holds:
 - `n > ATTN_MAX_N` (4096) or `e > ATTN_MAX_E` (2048), the limits of this
   implementation
 
+The same rules as ranges:
+
+| Field | Legal values | Otherwise |
+|-------|--------------|-----------|
+| `n` | 1 to 4096 | illegal-instruction |
+| `e` | 1 to 2048, with `e % h == 0` | illegal-instruction |
+| `h` | 1 to `e`, so every head has `d = e / h >= 1` | illegal-instruction |
+| `h_kv` | 0 (means `h`), or a divisor of `h` | illegal-instruction |
+| `flags` | bit 0 (CAUSAL) or bit 1 (SCALE), no other bit | illegal-instruction |
+| `in_dtype`, `out_dtype` | 0 (binary32) or 1 (bfloat16) | illegal-instruction |
+| `scale_bits` | any 32 bits; read only when SCALE is set | ignored otherwise |
+| `reserved` | 0 | illegal-instruction |
+| `mask` | 0, or the address of an `[n x n]` binary32 array | 0 means no mask |
+| `wq`, `wk`, `wv`, `wo` | a non-zero address | illegal-instruction |
+| `bq`, `bk`, `bv`, `bo` | 0 (no bias), or the address of a vector | 0 means no bias |
+| every 64-bit pointer in `rs2` and `rs3`, on RV32 | below 2^32 | illegal-instruction |
+
 ## 5. Memory and exceptions
 
 - Every load happens before the first store. A load fault (page fault,
