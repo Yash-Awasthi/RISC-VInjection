@@ -314,7 +314,8 @@ file, and `artifacts/` is hand-collected.
 ### M4.2 Recognizer coverage
 
 - [ ] Add patterns for the transformer ops next to attention (standalone softmax, RoPE, layer norm) as separate recognitions with their own tests. `[W]`
-- [ ] Recognition report on a real code base: which loops were recognised, which were not, and why — a table with per-file counts. `[W]`
+- [x] Recognition report on a real code base: which loops were recognised, which were not, and why — a table with per-file counts. `[W]`
+  - verified-here: `python3 tools/corpus_scan.py --out tests/corpus/scan.json` over the four corpus trees (llama.cpp, MNN, ncnn, llama2.c) selects 17 attention files plus `demo/mha_plain.c` as control and compiles each at -O2 with the toolchain at 076aeab: 4 build, 13 do not and record the error; the control gives one `attn`, the three corpus files that build give none and byte-identical objects with `-ftree-loop-attn` and `-fno-tree-loop-attn`; `docs/corpus.md` tabulates the per-file rows and classifies every miss (no candidate nest, C++ front end absent, vendor SDK headers absent); `pytest -q tests/test_corpus_report.py` -> 5 passed regenerates the page table from the JSON.
   - corpus 2026-11-26: fetched from this host into the gitignored `build/corpus/` (llama.cpp 436d7e81, MNN 54694759, ncnn 3c9504a6, llama2.c 350e04fe, per-tree tar sha256 and licences in `.fleet/evidence/RISC-VInjection/corpus-303-350.md`); the blocker is now the built recognizer, not the network.
 - [ ] `-fno-attn` and a per-function attribute to opt out; test both. `[W]`
 - [x] Cost model: publish the runtime guard cost when the instruction is absent. `[W]`
@@ -362,7 +363,8 @@ file, and `artifacts/` is hand-collected.
   - verified-here: docs/results.md states no board was available and no silicon speedup is claimed; tests/test_results.py 5 passed; docs index loop prints nothing and lists no missing test.
 - [x] Estimator: model the cycle cost from the descriptor (n, e, heads) and publish the error against measurement. `[D]`
   - verified-here: `python tools/perf_report.py build/perf` fits I(n,e,h) = 1017.6 + 0.0423*n*e by least squares on the six measured shapes of `tests/perf/expected/spike.csv` and prints predicted against measured: errors -0.7, -0.8, +1.0, -1.6, +2.5 and -0.4 percent, largest 2.6 percent; h enters only through the guard comparison, so the model has no h term; `pytest -q tests/test_perf.py` -> 6 passed asserts both coefficients and the 2.6 percent bound.
-- [ ] Recognizer cost: `.ATTN` replacement vs the original loops at `-O2`, per file in the corpus. `[D]`
+- [x] Recognizer cost: `.ATTN` replacement vs the original loops at `-O2`, per file in the corpus. `[D]`
+  - verified-here: the same scan compiles every file twice at -O2, with the recognizer and with `-fno-tree-loop-attn`, and compares the objects: `llama2c/run.c` 2827 instructions both ways, `llama2c/runq.c` 3183 both ways, `llamacpp/ggml/src/ggml.c` 22943 both ways, sha256 identical, so the replacement costs nothing on these files because it does not fire; on the control `demo/mha_plain.c` the loops take 351 instructions and the object with one `attn` takes 393, the 42-instruction guard and descriptor cost at -O2; the per-file numbers are in `docs/corpus.md` and the rows they come from in `tests/corpus/scan.json`, which `pytest -q tests/test_corpus_report.py` (5 passed) checks.
 
 ### M5.3 Recognizer quality
 
