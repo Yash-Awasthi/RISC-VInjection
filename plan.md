@@ -233,7 +233,10 @@ read or write out of bounds.
 
 ### M2.5 Build reproducibility
 
-- [ ] Two builds from one commit in the same container produce identical toolchain and simulator binaries, or the differences are listed and explained. `[P]`
+- [x] Two builds from one commit in the same container produce identical toolchain and simulator binaries, or the differences are listed and explained. `[P]`
+  - verified-here: two full builds of 6c3c8f6 in one xattn-run:24.04 container hashed the same 5238 files (`find out build -type f | sort | xargs sha256sum`); 302 differ and are counted by group in docs/build-and-test.md "Two builds from one commit" (7.7), with two probes: `decodetree.py -o d1.inc target/riscv/insn32.decode` then again gives 54170c01 then c563574c, and PYTHONHASHSEED=0 gives 914e5a6f twice; `ar rc` on one object twice gives f063316e then fb11e8bd with member date 2026-11-26, and `ar rcD` gives be531c35 twice with member date 1970-01-01. Manifests, diff and both probe scripts: .fleet/evidence/RISC-VInjection/two-build-determinism/.
+  - identical: all 16 programs in out/toolchain/bin (gcc, cc1, as, ld, ar, objdump), all 68 build/spike entries including the spike binary, 1409 of the 1412 qemu objects, config-host.mak, configure.args, config.status; differing: 256 meson .pyc, 9 build records, 21 decodetree .c.inc plus the 3 target_riscv_tcg_translate.c.o that include them, the 3 qemu simulators that link those objects, 9 static archives whose members carry ar's build-time metadata, out/BUILD-INFO.
+  - not done: PYTHONHASHSEED=0 for the qemu configure and deterministic ar are named in 7.7 but not wired into scripts/build.sh, so a rerun still differs in these 302 files.
 - [x] Container image (Dockerfile or devcontainer) with the toolchain prerequisites and a digest recorded in `docs/build-and-test.md`. `[P]`
   - verified-here: xattn-prereqs:24.04 id sha256:f3bf6ef7b8858349782b5e00366c3972cbe7c251081a66b11ff4b35b15c19f0f on ubuntu digest sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b; cc and clang on tests/host/attn_host.c rc 0 and 0; tests/test_container.py 4 passed; docker system df images 126.2MB -> 1.354GB, build cache 1.301GB -> 1.301GB (prune freed 40.96kB).
 - [x] `make check` fails if `out/BUILD-INFO` is missing or older than the patches. `[P]`

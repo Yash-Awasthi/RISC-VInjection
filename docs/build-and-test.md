@@ -330,4 +330,59 @@ CI does not enforce: Windows or MSYS2, macOS, a clang-only build (full.yml
 installs no clang and `make check-sim` uses the built gcc), RISC-V silicon,
 or any build time or disk budget.
 
+### 7.7 Two builds from one commit
+
+`scripts/build.sh` was run twice from `6c3c8f6`, build A then build B, in one
+`xattn-run:24.04` container on the same four cores, with no cache shared between
+them. Each tree was hashed with
+`find out build -type f -print0 | sort -z | xargs -0 sha256sum`: 5238 files, 990
+under `out/` and 4248 under `build/qemu`. A took 1161 s (binutils 57, gcc 609,
+newlib 25, libgcc 11, dtc 1, spike 289, qemu 169); B took 1972 s (60, 1255, 31,
+12, 0, 403, 211), the gcc step slower because its page cache was cold.
+
+302 of the 5238 files differ. They fall into seven groups, and each cause was
+reproduced on its own:
+
+| Group | Files | Why it differs |
+|-------|-------|----------------|
+| meson bytecode | 256 `.pyc` | CPython bytecode meson writes while configuring: the header holds the source mtime and size and the code objects hold the absolute source path |
+| build records | 9 | `config.log`, `configure.log`, `make.log`, `meson-log.txt`, `meson-private/build.dat`, `meson-private/coredata.dat`, `.ninja_log`, `.ninja_deps`, `meson-info/intro-buildoptions.json` record times, paths and per-run command text |
+| decodetree tables | 21 `.c.inc` | `qemu/scripts/decodetree.py` emits rules in Python hash order |
+| objects that include them | 3 `target_riscv_tcg_translate.c.o` | they `#include` the tables above |
+| qemu simulators | 3 binaries | `qemu-system-riscv64`, `qemu-system-riscv32` and `qemu-riscv64` link those three objects |
+| static archives | 9 `.a` | GNU ar 2.47 is non-deterministic by default |
+| `out/BUILD-INFO` | 1 | the build record itself |
+
+The hash-order cause is visible in two runs of the generator on one input:
+
+```
+python3 qemu/scripts/decodetree.py -o d1.inc target/riscv/insn32.decode   # 54170c01...
+python3 qemu/scripts/decodetree.py -o d2.inc target/riscv/insn32.decode   # c563574c...
+PYTHONHASHSEED=0 ... -o e1.inc ... ; PYTHONHASHSEED=0 ... -o e2.inc ...    # 914e5a6f... twice
+```
+
+The archive cause is visible in two archives built from one object:
+
+```
+ar rc first.a one.o ; sleep 2 ; ar rc second.a one.o
+  f063316e... vs fb11e8bd..., member date Nov 26 19:18 2026
+ar rcD d1.a one.o   ; sleep 2 ; ar rcD d2.a one.o
+  be531c35... twice, member date Jan  1 00:00 1970
+```
+
+The shipped `libc.a` carries its members stamped with the build time and
+uid/gid 1001, so it was archived without `D`.
+
+What the two builds do share, byte for byte: every installed toolchain program
+in `out/toolchain/bin` (16 files, including `gcc`, `cc1`, `as`, `ld`, `ar` and
+`objdump`), all 68 entries under `build/spike` including the `spike` binary,
+1409 of the 1412 qemu objects, `config-host.mak`, `configure.args` and
+`config.status`. The three qemu simulators differ only through the decode
+tables, and the nine archives only through the metadata ar writes.
+
+Pinning `PYTHONHASHSEED=0` for the qemu configure and passing `D` to ar would
+remove the two causes above, but neither is wired into `scripts/build.sh`, so a
+rerun still differs in these 302 files. The two manifests, their diff and both
+probes are kept in `.fleet/evidence/RISC-VInjection/two-build-determinism/`.
+
 See also: `README.md` for the quick start, `docs/spec.md` for the ISA.
