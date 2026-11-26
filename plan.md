@@ -363,7 +363,8 @@ file, and `artifacts/` is hand-collected.
 
 - [ ] Precision and recall of loop recognition over a labelled corpus (≥30 attention implementations from real projects); report false positives with the guard cost. `[D]`
   - corpus 2026-11-26: the same four trees carry the >=30 sites (11 scalar flash_attn/attn definitions in llama.cpp ggml-cpu and ggml-et, 31 MNN files under source/backend/cpu, 68 ncnn files under src/layer, llama2.c inline in transformer()); the blocker is now the label file (file, line range, attention or not) plus the built recognizer.
-- [ ] Robustness: loops with early exits, aliasing, non-contiguous strides, and mixed precision must be rejected, not mis-recognised. `[D]`
+- [x] Robustness: loops with early exits, aliasing, non-contiguous strides, and mixed precision must be rejected, not mis-recognised. `[D]`
+  - verified-here: `make -C tests/recog reject` with the 076aeab toolchain compiles `tests/recog/reject/{early-exit,alias,strided,mixed-precision}.c` and prints `reject alias ok`, `reject early-exit ok`, `reject mixed-precision ok`, `reject strided ok`, rc 0; each file must keep zero `attn` and emit a `missed: attention loops not replaced: ...` line, with the reasons being `output may alias an input (declare it restrict)`, `loop is not in simple form`, `projections of Q, K, V or the output product not found` (the strided case) and the same projections reason for the double accumulator; `make -C tests/recog check` also runs the four rejections and is still green on QEMU and Spike (`recog_test: all passed` twice).
 - [ ] State the recognised pattern formally in `docs/recognizer.md` as a grammar, and test that the implementation matches it. `[D]`
 
 ### M5.4 CLI and artefact craft
