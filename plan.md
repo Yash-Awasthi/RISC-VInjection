@@ -241,7 +241,8 @@ places, so a rebuild months later is not the same build.
 **Done when:** every script reads `versions.env` and the file is committed.
 
 - **m3.1.1 Inputs**
-  - [ ] Single `versions.env` for upstream branches, Python deps and base image; every script reads it. `[F]`
+  - [x] Single `versions.env` for upstream branches, Python deps and base image; every script reads it. `[F]`
+    - verified-here: `pytest -q tests/test_pins.py` 11 passed in 63.94s; `scripts/check-pins.sh` rc 0 with five pins; shellcheck rc 0 on the three scripts. BASE_IMAGE_DIGEST is empty because no image was built here, so no image is claimed.
   - [ ] GCC to the current release branch, binutils to the current release branch, Spike and QEMU to tagged releases rather than `master`; re-run the full suite and record the result. `[F]`
 - **m3.1.2 Dependency pinning**
   - [x] Replace the unpinned `pip install numpy pytest` (`Makefile:21-24`) with a hashed requirements file. `[F]`

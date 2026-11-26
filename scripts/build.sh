@@ -47,7 +47,9 @@ write_build_info() {
       "$(uname -sm)" "$(nproc)" "$JOBS"
     printf 'host cc:  %s\n' "$(cc --version 2> /dev/null | head -1)"
     printf 'host c++: %s\n' "$(c++ --version 2> /dev/null | head -1)"
-    printf 'python:   %s\n' "$(python3 --version 2>&1 | head -1)"
+    printf 'python:   %s (floor %s)\n' \
+      "$(python3 --version 2>&1 | head -1)" "$(pin_of PYTHON_VERSION)"
+    printf 'pylock:   %s\n' "$(pin_of PYTHON_LOCK)"
     printf 'numpy:    %s\n' \
       "$(python3 -c 'import numpy; print(numpy.__version__)' 2> /dev/null || echo none)"
     printf '\nsubmodules (pinned = versions.env, built = what is checked out):\n'
