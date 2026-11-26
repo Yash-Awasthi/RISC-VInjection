@@ -40,6 +40,18 @@ a grow-only per-thread buffer. It also contains
 no compiler can fuse a multiply and an add and change the result.
 `tests/test_core.py` fails if the copies drift from `include/`.
 
+### Configuration and kernels
+
+`include/attn_config.h` holds what is portability and configuration only:
+the `ATTN_FREESTANDING` shims, `<math.h>`/`<stdint.h>`/`"attn_abi.h"`,
+`ATTN_INLINE` (C99 `inline`, `__inline__` under C89), the `INFINITY`
+fallback for C89, and the fp-contract pragmas including the GCC option
+push. `include/attn_core.h` includes it first and holds only the numeric
+kernels, then pops the option stack. The two are one header in practice:
+include `attn_core.h`, never `attn_config.h` alone. The header hash in
+`tests/vectors/MANIFEST.json` is updated with a `refreeze` record, and the
+14 frozen vectors keep their expected hashes because no arithmetic moved.
+
 ## binutils
 
 | File | Change |

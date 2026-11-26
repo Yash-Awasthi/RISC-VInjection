@@ -1,7 +1,14 @@
 {
   "format": 2,
-  "header_sha256": "1ade1605d7b303f3648caf897f040190b6a0f1f00015ce0eba9918898686fe2a",
-  "refreeze": [],
+  "header_sha256": "6712d67c588b9c9886b60216dad64e5d3b07b96a813e5b86343cf6ce7fc2ef1f",
+  "refreeze": [
+    {
+      "date": "2026-11-26",
+      "old_sha256": "1ade1605d7b303f3648caf897f040190b6a0f1f00015ce0eba9918898686fe2a",
+      "new_sha256": "6712d67c588b9c9886b60216dad64e5d3b07b96a813e5b86343cf6ce7fc2ef1f",
+      "reason": "header split and C89 conversion; portability block moved to attn_config.h"
+    }
+  ],
   "vectors": [
     "bf16_bf16.json",
     "bf16_bf16_causal.json",

@@ -10,24 +10,10 @@
 #ifndef ATTN_CORE_H
 #define ATTN_CORE_H
 
-#ifdef ATTN_FREESTANDING
-/* libgcc has no libc headers; the calls still bind to libm.  */
-#define expf __builtin_expf
-#define sqrtf __builtin_sqrtf
-#define INFINITY __builtin_inff ()
-#else
-#include <math.h>
-#endif
-#include <stdint.h>
-#include "attn_abi.h"
-
-/* Separate rounding of every product and sum is part of the definition.  */
-#if defined(__clang__)
-#pragma clang fp contract(off)
-#elif defined(__GNUC__)
-#pragma GCC push_options
-#pragma GCC optimize("fp-contract=off")
-#endif
+#include "attn_config.h"
+/* attn_config.h holds the portability block: freestanding shims, ATTN_INLINE,
+   and the fp-contract pragmas (#pragma clang fp contract(off); GCC
+   fp-contract=off).  Its option push is popped at the end of this file.  */
 
 struct attn_mem
 {
@@ -39,7 +25,7 @@ struct attn_mem
   void (*st32) (void *ctx, uint64_t addr, uint32_t val);
 };
 
-static inline float
+ATTN_INLINE float
 attn_f32_from_bits (uint32_t u)
 {
   union { uint32_t u; float f; } c;
@@ -47,7 +33,7 @@ attn_f32_from_bits (uint32_t u)
   return c.f;
 }
 
-static inline uint32_t
+ATTN_INLINE uint32_t
 attn_bits_from_f32 (float f)
 {
   union { uint32_t u; float f; } c;
@@ -56,7 +42,7 @@ attn_bits_from_f32 (float f)
 }
 
 /* Round to nearest, ties to even; NaNs stay NaN and become quiet.  */
-static inline uint16_t
+ATTN_INLINE uint16_t
 attn_bf16_from_f32 (float f)
 {
   uint32_t u = attn_bits_from_f32 (f);
@@ -65,7 +51,7 @@ attn_bf16_from_f32 (float f)
   return (uint16_t) ((u + 0x7fffu + ((u >> 16) & 1u)) >> 16);
 }
 
-static inline void
+ATTN_INLINE void
 attn_read_desc (const struct attn_mem *m, uint64_t wa, uint64_t ca,
 		struct attn_weights *w, struct attn_cfg *c)
 {
@@ -96,7 +82,7 @@ attn_read_desc (const struct attn_mem *m, uint64_t wa, uint64_t ca,
    configuration is reserved (the instruction then raises illegal-instruction).
    On RV32 (xlen 32) every pointer in the weights descriptor must fit in
    32 bits.  */
-static inline uint64_t
+ATTN_INLINE uint64_t
 attn_scratch_floats (const struct attn_cfg *c, const struct attn_weights *w,
 		     unsigned xlen)
 {
@@ -122,7 +108,7 @@ attn_scratch_floats (const struct attn_cfg *c, const struct attn_weights *w,
 	 + 2 * e + 2 * kv + (c->mask ? n * n : 0);
 }
 
-static inline float
+ATTN_INLINE float
 attn_ld_elem (const struct attn_mem *m, uint64_t base, uint64_t i,
 	      unsigned dt)
 {
@@ -132,24 +118,28 @@ attn_ld_elem (const struct attn_mem *m, uint64_t base, uint64_t i,
   return attn_f32_from_bits (m->ld32 (m->ctx, base + 4 * i));
 }
 
-static inline void
+ATTN_INLINE void
 attn_ld_vec (const struct attn_mem *m, uint64_t base, uint64_t count,
 	     unsigned dt, float *dst)
 {
-  for (uint64_t i = 0; i < count; i++)
+  uint64_t i;
+
+  for (i = 0; i < count; i++)
     dst[i] = attn_ld_elem (m, base, i, dt);
 }
 
 /* out[r][c] = sum_k in[r][k] * w[k][c] + b[c], accumulated in k order.  */
-static inline void
+ATTN_INLINE void
 attn_matmul (const float *in, const float *w, const float *b, float *out,
 	     uint64_t rows, uint64_t inner, uint64_t cols)
 {
-  for (uint64_t r = 0; r < rows; r++)
-    for (uint64_t c = 0; c < cols; c++)
+  uint64_t r, c, k;
+
+  for (r = 0; r < rows; r++)
+    for (c = 0; c < cols; c++)
       {
 	float acc = 0.0f;
-	for (uint64_t k = 0; k < inner; k++)
+	for (k = 0; k < inner; k++)
 	  acc = acc + in[r * inner + k] * w[k * cols + c];
 	out[r * cols + c] = b ? acc + b[c] : acc;
       }
@@ -157,7 +147,7 @@ attn_matmul (const float *in, const float *w, const float *b, float *out,
 
 /* Execute attn.  w and c come from attn_read_desc; the caller has checked
    attn_scratch_floats (c, w, xlen) != 0 and passes that many floats.  */
-static inline void
+ATTN_INLINE void
 attn_execute (const struct attn_mem *m, uint64_t y_addr, uint64_t x_addr,
 	      const struct attn_weights *w, const struct attn_cfg *c,
 	      float *s)
@@ -165,6 +155,7 @@ attn_execute (const struct attn_mem *m, uint64_t y_addr, uint64_t x_addr,
   uint64_t n = c->n, e = c->e, h = c->h;
   uint64_t hkv = c->h_kv ? c->h_kv : c->h;
   uint64_t d = e / h, kv = hkv * d, group = h / hkv;
+  uint64_t hd, i;
   unsigned dt = c->in_dtype;
   float scale = (c->flags & ATTN_F_SCALE)
 		? attn_f32_from_bits (c->scale_bits)
@@ -203,17 +194,18 @@ attn_execute (const struct attn_mem *m, uint64_t y_addr, uint64_t x_addr,
   attn_matmul (X, Wk, w->bk ? bk : 0, K, n, e, kv);
   attn_matmul (X, Wv, w->bv ? bv : 0, V, n, e, kv);
 
-  for (uint64_t hd = 0; hd < h; hd++)
+  for (hd = 0; hd < h; hd++)
     {
       uint64_t qo = hd * d, ko = (hd / group) * d;
-      for (uint64_t i = 0; i < n; i++)
+      for (i = 0; i < n; i++)
 	{
 	  uint64_t lim = (c->flags & ATTN_F_CAUSAL) ? i + 1 : n;
+	  uint64_t j, t;
 	  float mx = -INFINITY, l = 0.0f;
-	  for (uint64_t j = 0; j < lim; j++)
+	  for (j = 0; j < lim; j++)
 	    {
 	      float acc = 0.0f;
-	      for (uint64_t t = 0; t < d; t++)
+	      for (t = 0; t < d; t++)
 		acc = acc + Q[i * e + qo + t] * K[j * kv + ko + t];
 	      acc = acc * scale;
 	      if (c->mask)
@@ -224,15 +216,15 @@ attn_execute (const struct attn_mem *m, uint64_t y_addr, uint64_t x_addr,
 	    }
 	  /* Plain softmax: a row whose every score is -inf yields NaN, exactly
 	     as the equivalent C loops do (and as PyTorch does).  */
-	  for (uint64_t j = 0; j < lim; j++)
+	  for (j = 0; j < lim; j++)
 	    {
 	      P[j] = expf (P[j] - mx);
 	      l = l + P[j];
 	    }
-	  for (uint64_t t = 0; t < d; t++)
+	  for (t = 0; t < d; t++)
 	    {
 	      float acc = 0.0f;
-	      for (uint64_t j = 0; j < lim; j++)
+	      for (j = 0; j < lim; j++)
 		acc = acc + P[j] * V[j * kv + ko + t];
 	      C[i * e + qo + t] = acc / l;
 	    }
@@ -241,7 +233,7 @@ attn_execute (const struct attn_mem *m, uint64_t y_addr, uint64_t x_addr,
 
   /* Q is dead here; reuse it for Y before rounding to out_dtype.  */
   attn_matmul (C, Wo, w->bo ? bo : 0, Q, n, e, e);
-  for (uint64_t i = 0; i < n * e; i++)
+  for (i = 0; i < n * e; i++)
     {
       if (c->out_dtype == ATTN_DT_BF16)
 	m->st16 (m->ctx, y_addr + 2 * i, attn_bf16_from_f32 (Q[i]));
