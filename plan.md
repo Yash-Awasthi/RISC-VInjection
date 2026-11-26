@@ -371,7 +371,8 @@ file, and `artifacts/` is hand-collected.
 Method: `design-ux` §1 principles applied to a CLI — one job per command, output
 that a machine can read, failures that name the fix.
 
-- [ ] `scripts/attncc.sh --run` prints one line per stage (extract, compile, assemble, run, compare) with a pass/fail marker. `[D]`
+- [x] `scripts/attncc.sh --run` prints one line per stage (extract, compile, assemble, run, compare) with a pass/fail marker. `[D]`
+  - verified-here: in the container with the 076aeab toolchain, `scripts/attncc.sh --run demo/mha_plain.c` prints one timed line per stage (`== stage extract 0.017s PASS`, `compile 4.183s PASS`, `assemble 0.393s PASS`, `link 6.183s PASS`, `run 0.120s PASS`, `compare 0.008s PASS`) and exits 0; a source that does not compile prints `== stage compile 2.050s FAIL` and the script exits 1; `shellcheck -x scripts/attncc.sh` rc 0; `pytest -q tests/test_scripts.py -k 'not script_set'` -> 5 passed, 2 skipped (the script-set test also counts an untracked scripts/check-artifacts.sh in this worktree; HEAD's 11 tracked scripts match KNOWN).
 - [x] `xinsn.py` output: dry-run diff preview, colour only on a TTY, `--json`, and an exit code that distinguishes "spec invalid" from "build failed". `[D]`
   - verified-here: cd /c/GITHUB/yash-awasthi/RISC-VInjection; .venv/bin/python -m pytest -q tests/test_xinsn.py -k "show or json or color or colour or invalid or build" -> 10 passed in 52.44s
 - [x] `make check` summary table at the end: target, pass, fail, time; non-zero exit on any failure. `[D]`
