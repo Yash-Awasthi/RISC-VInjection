@@ -23,6 +23,7 @@ and so on) that runs it.
 | `docs/artifacts.html` | The static report of the collected results, generated from the JSON, no build step. | `tests/test_artifacts_html.py` (`tools/report_html.py` regenerates it). |
 | `docs/results.md` | That there is no measurement on real hardware and no silicon speedup claimed anywhere: no board was available; what a board run would record, and where the simulator results live instead. | `tests/test_results.py` (the no-silicon statement is present, no numeric speedup claim appears, and this row exists). |
 | `docs/troubleshooting.md` | The five most common build failures (missing package, patch conflict, submodule not initialised, stale toolchain, wrong `-march`): the message, the line it came from, and the fix. | `tests/test_diagnose.py` (five fixture logs, exact line numbers and exit codes). |
+| `docs/corpus.md` | What the recognizer does on four real projects: which attention files build, which do not, the per-file instruction counts, and why nothing was replaced. | `tests/test_corpus_report.py` (the page's table regenerated from `tests/corpus/scan.json`). |
 | `docs/INDEX.md` | This table. | `ls docs` against the first column: every row names a file that exists, and every file has a row. |
 
 ## Checking this index
