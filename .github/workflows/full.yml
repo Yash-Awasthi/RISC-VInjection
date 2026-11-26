@@ -112,6 +112,7 @@ jobs:
           rm -rf out/toolchain build/binutils build/gcc build/newlib
 
       - name: Build (six steps)
+        id: build
         run: |
           start=$(date +%s)
           JOBS=$(nproc) scripts/build.sh
@@ -157,3 +158,44 @@ jobs:
             build/*.log
             build/*/*.log
           if-no-files-found: warn
+
+      # The artefact above is logs only: no binary leaves the runner, so every
+      # row that needs a real riscv64-unknown-elf-gcc, spike or qemu stays
+      # unverifiable off-runner. Pack the build once, on demand only, so a
+      # normal push does not pay for the upload.
+      - name: Pack the toolchain and the simulators
+        id: pack
+        if: steps.build.outcome == 'success' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/fleet/'))
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse --short=12 HEAD)
+          mkdir -p dist
+          # gcc, binutils, newlib and libgcc, with the build record beside them.
+          XZ_OPT=-T0 tar -cJf "dist/xattn-toolchain-$sha.tar.xz" -C out toolchain BUILD-INFO
+          # Both simulators in one tarball: together they are small next to gcc.
+          XZ_OPT=-T0 tar -cJf "dist/xattn-simulators-$sha.tar.xz" -C out spike qemu
+          (cd dist && sha256sum ./*.tar.xz > SHA256SUMS)
+          for f in dist/*.tar.xz; do
+            printf '%s %s bytes\n' "$f" "$(stat -c%s "$f")" >> build/CI-TRACE.txt
+          done
+          cat dist/SHA256SUMS
+
+      - name: Upload the toolchain tarball
+        if: steps.pack.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xattn-toolchain-${{ github.sha }}
+          path: |
+            dist/xattn-toolchain-*.tar.xz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload the simulator tarball
+        if: steps.pack.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xattn-simulators-${{ github.sha }}
+          path: dist/xattn-simulators-*.tar.xz
+          if-no-files-found: error
+          retention-days: 14

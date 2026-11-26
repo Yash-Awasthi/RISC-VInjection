@@ -82,6 +82,7 @@ visible on the commit that broke it.
   - verified-here: `full.yml` keys both caches on `sha256(submodule SHAs)` and `sha256(patches/*/*.patch)`, caches `out/toolchain` + `build/{binutils,gcc,newlib}` and validates a hit before the build: `riscv64-unknown-elf-gcc --version` → `GCC 16.2.1`, `-march=rv64gc_xattn -E` → ok, `as` accepts `attn` → ok; without the extension the same line fails (`Error: unrecognized opcode \`attn a3,a0,a1,a2', extension \`xattn' required`), so a stale toolchain drops the cache and rebuilds. Cached set compresses to 810 MB (`tar -czf`), then `make check` (exit 0) is the real validation. `actionlint` → no findings.
   - corrected 2026-11-26: the `GCC 16.2.1` version string, the 810 MB cached set and the `make check` exit 0 came from container trees that no longer exist here (`out/toolchain` has no gcc today). What this host can still check is the `full.yml` cache key over submodule SHAs and patches, and each validation command the workflow runs; the cache-hit numbers are re-established only by a real full run.
   - measured 2026-11-26 (Full run 45817010544, sha fa3096aa): the build step succeeded in 1844 s on 4 cores (host cc 13.3.0, python 3.12.3; gcc 16.2.1 20261012, spike 03a04f0, QEMU 11.1.50), Tests failed in 33 s, and the cache post-step was skipped: `gh api .../actions/caches` returns total_count 0, so nothing was stored. The 278612-byte artefact is `artifacts/` plus `build/CI-TRACE.txt`, not `out/`; no toolchain or simulator binary is retrievable from that run.
+  - green 2026-11-26 (Full run 45835120627, sha cc15183): success in 25m36s (14:03:12Z to 14:28:48Z); the 1.59 GiB toolchain cache and the 0.40 GiB submodules cache both restored and were saved again, so this run proves the build from source and does not re-time it. Its 278752-byte artefact is logs only, so `full.yml` now packs `out/toolchain` and `out/{spike,qemu}` into two tar.xz with a SHA256SUMS when dispatched or on a `fleet/` ref; the first dispatch is the first run that puts a toolchain in our hands, and its CI-TRACE records both byte counts.
   - deviation: ccache is not wired into `scripts/build.sh` yet (that is m3.2.1), so only the toolchain trees are cached here.
 - [x] Publish the job result and the five submodule SHAs as a badge/artefact so the README's claim carries evidence. `[C]`
   - verified-here: `README.md` carries both workflow badges (`ci.yml`, `full.yml`); `full.yml` writes `build/CI-TRACE.txt` (commit, date, runner, pinned SHA and checked-out SHA side by side, plus the gcc/Spike/QEMU versions) and uploads it. The git half run here → `binutils 781713d`, `gcc 041359f`, `newlib 06add56`, `qemu 615ece3`, `spike 89c7471` pinned, and `heads/xattn` for the four patched trees. `actionlint` → no findings.
@@ -308,7 +309,7 @@ file, and `artifacts/` is hand-collected.
 
 - [ ] Add patterns for the transformer ops next to attention (standalone softmax, RoPE, layer norm) as separate recognitions with their own tests. `[W]`
 - [ ] Recognition report on a real code base: which loops were recognised, which were not, and why — a table with per-file counts. `[W]`
-  - blocked-by: needs a corpus of real code to run the recognizer over; network corpus, not the toolchain.
+  - corpus 2026-11-26: fetched from this host into the gitignored `build/corpus/` (llama.cpp 436d7e81, MNN 54694759, ncnn 3c9504a6, llama2.c 350e04fe, per-tree tar sha256 and licences in `.fleet/evidence/RISC-VInjection/corpus-303-350.md`); the blocker is now the built recognizer, not the network.
 - [ ] `-fno-attn` and a per-function attribute to opt out; test both. `[W]`
 - [ ] Cost model: publish the runtime guard cost when the instruction is absent. `[W]`
 
@@ -357,7 +358,7 @@ file, and `artifacts/` is hand-collected.
 ### M5.3 Recognizer quality
 
 - [ ] Precision and recall of loop recognition over a labelled corpus (≥30 attention implementations from real projects); report false positives with the guard cost. `[D]`
-  - blocked-by: needs >=30 attention implementations from real projects; network corpus, not the toolchain.
+  - corpus 2026-11-26: the same four trees carry the >=30 sites (11 scalar flash_attn/attn definitions in llama.cpp ggml-cpu and ggml-et, 31 MNN files under source/backend/cpu, 68 ncnn files under src/layer, llama2.c inline in transformer()); the blocker is now the label file (file, line range, attention or not) plus the built recognizer.
 - [ ] Robustness: loops with early exits, aliasing, non-contiguous strides, and mixed precision must be rejected, not mis-recognised. `[D]`
 - [ ] State the recognised pattern formally in `docs/recognizer.md` as a grammar, and test that the implementation matches it. `[D]`
 
