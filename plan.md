@@ -301,12 +301,14 @@ file, and `artifacts/` is hand-collected.
 
 - [ ] Add patterns for the transformer ops next to attention (standalone softmax, RoPE, layer norm) as separate recognitions with their own tests. `[W]`
 - [ ] Recognition report on a real code base: which loops were recognised, which were not, and why — a table with per-file counts. `[W]`
+  - blocked-by: needs a corpus of real code to run the recognizer over; network corpus, not the toolchain.
 - [ ] `-fno-attn` and a per-function attribute to opt out; test both. `[W]`
 - [ ] Cost model: publish the runtime guard cost when the instruction is absent. `[W]`
 
 ### M4.3 Portability of the instruction
 
 - [ ] RV32: full test coverage (the spec says valid on RV32 and RV64; prove it on both simulators for every vector). `[W]`
+  - defect: tests/baremetal/Makefile hardcodes -mabi=lp64d, so RV32 coverage cannot be built as written; adding an rv32 build is part of this row, not a toolchain wait.
 - [x] Vector (V) variant or a documented reason not to; if done, a separate extension name and spec version. `[W]`
   - verified-here: `grep -n '^## ' docs/spec.md` -> sections 1 to 8; `git diff --numstat HEAD -- docs/spec.md` -> 25 0; `.venv/bin/python -m pytest -q tests/test_vectors.py` -> 23 passed
 - [x] Cross-check against a third implementation (QEMU TCG vs Spike interpreter already differ; add a scalar reference build of `attn_core.h` compiled for the host as the third). `[W]`
@@ -348,6 +350,7 @@ file, and `artifacts/` is hand-collected.
 ### M5.3 Recognizer quality
 
 - [ ] Precision and recall of loop recognition over a labelled corpus (≥30 attention implementations from real projects); report false positives with the guard cost. `[D]`
+  - blocked-by: needs >=30 attention implementations from real projects; network corpus, not the toolchain.
 - [ ] Robustness: loops with early exits, aliasing, non-contiguous strides, and mixed precision must be rejected, not mis-recognised. `[D]`
 - [ ] State the recognised pattern formally in `docs/recognizer.md` as a grammar, and test that the implementation matches it. `[D]`
 
